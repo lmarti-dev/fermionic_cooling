@@ -96,31 +96,34 @@ def ketbra(ket: np.ndarray):
 def print_increased(val_current: float, val_previous: float, quantname: str):
     print(
         "{q} has {i}".format(
-            q=quantname, i="increased" if val_current > val_previous else "decreased"
+            q=quantname,
+            i="increased"
+            if np.real(val_current) > np.real(val_previous)
+            else "decreased",
         )
     )
 
 
 def cool(
     sys_hamiltonian: cirq.PauliSum,
+    sys_qubits: Iterable[cirq.Qid],
     sys_initial_state: np.ndarray,
     sys_ground_state: np.ndarray,
     env_hamiltonian: cirq.PauliSum,
+    env_qubits: Iterable[cirq.Qid],
     env_ground_state: np.ndarray,
     sys_env_coupling: cirq.PauliSum,
     evolution_time: float,
     alpha: float,
     sweep_values: Iterable[float],
 ):
-    sys_qubits = get_psum_qubits(sys_hamiltonian)
-    env_qubits = get_psum_qubits(env_hamiltonian)
     if env_ground_state is None:
         env_ground_state = get_ground_state(env_hamiltonian, qubits=env_qubits)
     env_ground_density_matrix = ketbra(env_ground_state)
 
     total_qubits = sys_qubits + env_qubits
-    initial_state = np.kron(sys_initial_state, env_ground_state)
-    initial_density_matrix = ketbra(initial_state)
+    total_initial_state = np.kron(sys_initial_state, env_ground_state)
+    initial_density_matrix = ketbra(total_initial_state)
     if not cirq.is_hermitian(initial_density_matrix):
         raise ValueError("initial density matrix is not hermitian")
     total_density_matrix = initial_density_matrix
@@ -133,8 +136,8 @@ def cool(
         sys_ground_state,
         qid_shape=(2,) * (len(sys_qubits)),
     )
-    energy = sys_hamiltonian.expectation_from_density_matrix(
-        ketbra(sys_initial_state.astype("complex_")),
+    energy = sys_hamiltonian.expectation_from_state_vector(
+        sys_initial_state.astype("complex_"),
         qubit_map={k: v for k, v in zip(sys_qubits, range(len(sys_qubits)))},
     )
     sys_ground_energy = np.real(

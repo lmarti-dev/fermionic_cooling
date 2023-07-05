@@ -19,6 +19,15 @@ def get_lin_sweep(spectrum_width, n_steps):
     return np.linspace(start=spectrum_width, stop=min_gap, num=n_steps)
 
 
+def expectation_wrapper(observable, state, qubits):
+    return np.real(
+        observable.expectation_from_state_vector(
+            state.astype("complex_"),
+            qubit_map={k: v for k, v in zip(qubits, range(len(qubits)))},
+        )
+    )
+
+
 # system stuff
 model = FermiHubbardModel(x_dimension=1, y_dimension=2, tunneling=1, coulomb=2)
 Nf = [1, 1]
@@ -26,7 +35,7 @@ sys_qubits = model.flattened_qubits
 n_sys_qubits = len(sys_qubits)
 sys_hartree_fock = jw_hartree_fock_state(n_orbitals=n_sys_qubits, n_electrons=sum(Nf))
 sys_dicke = spin_dicke_state(n_qubits=n_sys_qubits, Nf=Nf, right_to_left=True)
-sys_initial_state = sys_dicke
+sys_initial_state = sys_hartree_fock
 sys_eigenspectrum, sys_eigenstates = jw_eigenspectrum_at_particle_number(
     sparse_operator=get_sparse_operator(
         model.fock_hamiltonian, n_qubits=len(model.flattened_qubits)
@@ -37,14 +46,19 @@ sys_eigenspectrum, sys_eigenstates = jw_eigenspectrum_at_particle_number(
 sys_ground_state = sys_eigenstates[:, np.argmin(sys_eigenspectrum)]
 sys_ground_energy = np.min(sys_eigenspectrum)
 
-sys_initial_energy = np.real(
-    model.hamiltonian.expectation_from_state_vector(
-        sys_initial_state.astype("complex_"),
-        qubit_map={k: v for k, v in zip(sys_qubits, range(len(sys_qubits)))},
-    )
+sys_initial_energy = expectation_wrapper(
+    model.hamiltonian, sys_initial_state, model.flattened_qubits
+)
+sys_ground_energy_exp = expectation_wrapper(
+    model.hamiltonian, sys_ground_state, model.flattened_qubits
 )
 
+fidelity = cirq.fidelity(
+    sys_initial_state, sys_ground_state, qid_shape=(2,) * (len(model.flattened_qubits))
+)
+print("initial fidelity: {}".format(fidelity))
 print("ground energy from spectrum: {}".format(sys_ground_energy))
+print("ground energy from model: {}".format(sys_ground_energy_exp))
 print("initial energy from model: {}".format(sys_initial_energy))
 
 
@@ -53,7 +67,7 @@ env_qubits = cirq.GridQubit.rect(n_sys_qubits, 1)
 n_env_qubits = len(env_qubits)
 env_ham = sum((cirq.Z(q) for q in env_qubits))
 env_ground_state = np.zeros((2**n_env_qubits))
-env_ground_state[-1] = 1
+env_ground_state[0] = 1
 
 # coupler
 coupler = cirq.Z(sys_qubits[0]) * cirq.Z(env_qubits[0])
@@ -63,8 +77,9 @@ coupler = cirq.Z(sys_qubits[0]) * cirq.Z(env_qubits[0])
 spectrum_width = max(sys_eigenspectrum) - min(sys_eigenspectrum)
 
 # coupling strength value
-alpha = float(spectrum_width / 1e5)
-evolution_time = alpha
+alpha = float(spectrum_width / 5)
+evolution_time = np.pi / (2 * alpha)
+evolution_time = 1e-3
 
 min_gap = sorted(np.abs(np.diff(sys_eigenspectrum)))[0]
 
@@ -74,9 +89,11 @@ sweep_values = get_log_sweep(spectrum_width, n_steps)
 # call cool
 fidelities, energies = gcool.cool(
     sys_hamiltonian=model.hamiltonian,
+    sys_qubits=model.flattened_qubits,
     sys_ground_state=sys_ground_state,
     sys_initial_state=sys_initial_state,
     env_hamiltonian=env_ham,
+    env_qubits=env_qubits,
     env_ground_state=env_ground_state,
     sys_env_coupling=coupler,
     alpha=alpha,
