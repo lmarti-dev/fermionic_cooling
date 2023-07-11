@@ -69,7 +69,6 @@ env_ground_state[0] = 1
 
 # coupler
 coupler = cirq.X(sys_qubits[0]) * cirq.X(env_qubits[0])
-print(coupler)
 
 # get environment ham sweep values
 spectrum_width = max(model.eig_val) - min(model.eig_val)

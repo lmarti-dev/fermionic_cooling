@@ -1,3 +1,7 @@
+import sys
+
+sys.path.append("/home/Refik/Data/My_files/Dropbox/PhD/repos/fauvqe/")
+
 import generic_cooling as gcool
 from fauvqe.models.fermiHubbardModel import FermiHubbardModel
 from fauvqe.utilities import jw_eigenspectrum_at_particle_number
@@ -12,7 +16,16 @@ def mean_gap(spectrum):
 
 
 def get_log_sweep(spectrum_width, n_steps):
-    return spectrum_width * (1 - np.logspace(start=-10, stop=-1, base=10, num=n_steps))
+    return spectrum_width * (np.logspace(start=0, stop=-2, base=10, num=n_steps))
+
+
+def get_cheat_sweep(spectrum, n_steps):
+    res = []
+    n_rep = int(n_steps / (len(spectrum) - 1))
+    for k in range(len(spectrum) - 1, 0, -1):
+        for m in range(n_rep):
+            res.append(spectrum[k] - spectrum[0])
+    return np.array(res)
 
 
 def get_lin_sweep(spectrum_width, n_steps):
@@ -63,28 +76,27 @@ print("initial energy from model: {}".format(sys_initial_energy))
 
 
 # environment stuff
-env_qubits = cirq.GridQubit.rect(n_sys_qubits, 1)
+env_qubits = cirq.GridQubit.rect(n_sys_qubits, 1, top=Nf[0])
 n_env_qubits = len(env_qubits)
-env_ham = sum((cirq.Z(q) for q in env_qubits))
+env_ham = -sum((cirq.Z(q) for q in env_qubits))
 env_ground_state = np.zeros((2**n_env_qubits))
 env_ground_state[0] = 1
 
 # coupler
-coupler = cirq.Z(sys_qubits[0]) * cirq.Z(env_qubits[0])
-
+coupler = cirq.X(sys_qubits[0]) * cirq.X(env_qubits[0])
 
 # get environment ham sweep values
 spectrum_width = max(sys_eigenspectrum) - min(sys_eigenspectrum)
 
-# coupling strength value
-alpha = float(spectrum_width / 5)
-evolution_time = np.pi / (2 * alpha)
-evolution_time = 1e-3
-
 min_gap = sorted(np.abs(np.diff(sys_eigenspectrum)))[0]
 
-n_steps = 100
-sweep_values = get_log_sweep(spectrum_width, n_steps)
+n_steps = 30
+# sweep_values = get_log_sweep(spectrum_width, n_steps)
+sweep_values = get_cheat_sweep(sys_eigenspectrum, n_steps)
+# coupling strength value
+alphas = sweep_values / 10
+evolution_times = np.pi / (alphas)
+# evolution_time = 1e-3
 
 # call cool
 fidelities, energies = gcool.cool(
@@ -96,8 +108,8 @@ fidelities, energies = gcool.cool(
     env_qubits=env_qubits,
     env_ground_state=env_ground_state,
     sys_env_coupling=coupler,
-    alpha=alpha,
-    evolution_time=evolution_time,
+    alpha=alphas,
+    evolution_time=evolution_times,
     sweep_values=sweep_values,
 )
 
