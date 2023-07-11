@@ -157,7 +157,9 @@ def cool(
 
     for step, env_coupling in enumerate(sweep_values):
         total_ham = (
-            sys_hamiltonian + env_coupling * env_hamiltonian + alpha * sys_env_coupling
+            sys_hamiltonian
+            + env_coupling * env_hamiltonian
+            + float(alpha[step]) * sys_env_coupling
         )
         print("=== step: {} ===".format(step))
         print("env coupling value: {}".format(env_coupling))
@@ -166,7 +168,7 @@ def cool(
         total_density_matrix = time_evolve_density_matrix(
             ham=total_ham.matrix(qubits=total_qubits),
             rho=total_density_matrix,
-            t=evolution_time,
+            t=evolution_time[step],
             method="expm",
         )
         traced_density_matrix = trace_out_env(
