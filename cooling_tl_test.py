@@ -2,28 +2,11 @@ import sys
 
 sys.path.append("/home/Refik/Data/My_files/Dropbox/PhD/repos/fauvqe/")
 
-import generic_cooling as gcool
+from coolerClass import mean_gap, get_log_sweep, expectation_wrapper, Cooler
 import cirq
 from openfermion import get_sparse_operator, jw_hartree_fock_state
 import numpy as np
 from fauvqe import Ising
-
-
-def mean_gap(spectrum):
-    return float(np.mean(np.diff(spectrum)))
-
-
-def get_log_sweep(spectrum_width, n_steps):
-    return spectrum_width * (np.logspace(start=0, stop=-5, base=10, num=n_steps))
-
-
-def expectation_wrapper(observable, state, qubits):
-    return np.real(
-        observable.expectation_from_state_vector(
-            state.astype("complex_"),
-            qubit_map={k: v for k, v in zip(qubits, range(len(qubits)))},
-        )
-    )
 
 
 # system stuff
@@ -77,10 +60,10 @@ n_steps = 100
 sweep_values = get_log_sweep(spectrum_width, n_steps)
 # coupling strength value
 alphas = sweep_values / 10
-evolution_time = np.pi / alphas
+evolution_times = np.pi / alphas
 
 # call cool
-fidelities, energies = gcool.cool(
+cooler = Cooler(
     sys_hamiltonian=model.hamiltonian,
     sys_qubits=model.flattened_qubits,
     sys_ground_state=sys_ground_state,
@@ -89,22 +72,12 @@ fidelities, energies = gcool.cool(
     env_qubits=env_qubits,
     env_ground_state=env_ground_state,
     sys_env_coupling=coupler,
-    alpha=alphas,
-    evolution_time=evolution_time,
+)
+
+fidelities, energies = cooler.cool(
+    alphas=alphas,
+    evolution_times=evolution_times,
     sweep_values=sweep_values,
 )
 
-
-import matplotlib.pyplot as plt
-
-fig, axes = plt.subplots(nrows=2, figsize=(5, 3))
-
-axes[0].plot(
-    range(len(fidelities)),
-    fidelities,
-)
-axes[0].set_ylabel("Fid. cool state with gs")
-axes[1].plot(range(len(energies)), energies)
-axes[1].set_ylabel("Ene. cool state")
-
-plt.show()
+cooler.plot_cooling(energies, fidelities)

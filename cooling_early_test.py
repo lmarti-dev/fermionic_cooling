@@ -1,44 +1,17 @@
 import sys
 
+
+# tsk tsk
 sys.path.append("/home/Refik/Data/My_files/Dropbox/PhD/repos/fauvqe/")
 
-import generic_cooling as gcool
 from fauvqe.models.fermiHubbardModel import FermiHubbardModel
+
+from coolerClass import Cooler, expectation_wrapper, get_cheat_sweep
 from fauvqe.utilities import jw_eigenspectrum_at_particle_number
 import cirq
 from openfermion import get_sparse_operator, jw_hartree_fock_state
 import numpy as np
 from fauvqe.utilities import spin_dicke_state, qmap
-
-
-def mean_gap(spectrum):
-    return float(np.mean(np.diff(spectrum)))
-
-
-def get_log_sweep(spectrum_width, n_steps):
-    return spectrum_width * (np.logspace(start=0, stop=-2, base=10, num=n_steps))
-
-
-def get_cheat_sweep(spectrum, n_steps):
-    res = []
-    n_rep = int(n_steps / (len(spectrum) - 1))
-    for k in range(len(spectrum) - 1, 0, -1):
-        for m in range(n_rep):
-            res.append(spectrum[k] - spectrum[0])
-    return np.array(res)
-
-
-def get_lin_sweep(spectrum_width, n_steps):
-    return np.linspace(start=spectrum_width, stop=min_gap, num=n_steps)
-
-
-def expectation_wrapper(observable, state, qubits):
-    return np.real(
-        observable.expectation_from_state_vector(
-            state.astype("complex_"),
-            qubit_map={k: v for k, v in zip(qubits, range(len(qubits)))},
-        )
-    )
 
 
 # system stuff
@@ -92,14 +65,16 @@ min_gap = sorted(np.abs(np.diff(sys_eigenspectrum)))[0]
 
 n_steps = 30
 # sweep_values = get_log_sweep(spectrum_width, n_steps)
-sweep_values = get_cheat_sweep(sys_eigenspectrum, n_steps)
+sweep_values = np.repeat(get_cheat_sweep(sys_eigenspectrum, n_steps), 4)
+np.random.shuffle(sweep_values)
 # coupling strength value
 alphas = sweep_values / 10
 evolution_times = np.pi / (alphas)
 # evolution_time = 1e-3
 
 # call cool
-fidelities, energies = gcool.cool(
+
+cooler = Cooler(
     sys_hamiltonian=model.hamiltonian,
     sys_qubits=model.flattened_qubits,
     sys_ground_state=sys_ground_state,
@@ -108,25 +83,12 @@ fidelities, energies = gcool.cool(
     env_qubits=env_qubits,
     env_ground_state=env_ground_state,
     sys_env_coupling=coupler,
-    alpha=alphas,
-    evolution_time=evolution_times,
+)
+
+fidelities, energies = cooler.cool(
+    alphas=alphas,
+    evolution_times=evolution_times,
     sweep_values=sweep_values,
 )
 
-
-import matplotlib.pyplot as plt
-
-fig, axes = plt.subplots(nrows=3, figsize=(5, 3))
-
-axes[0].plot(
-    range(len(fidelities)),
-    fidelities,
-)
-axes[0].set_ylabel("Fid. cool state with gs")
-axes[1].plot(range(len(energies)), energies)
-axes[1].set_ylabel("Ene. cool state")
-axes[2].hlines(sys_eigenspectrum, xmin=-2, xmax=2)
-axes[2].set_ylabel("Eigenenergies")
-
-
-plt.show()
+cooler.plot_cooling(energies, fidelities, sys_eigenspectrum)
