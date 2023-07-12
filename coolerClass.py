@@ -275,6 +275,19 @@ def mean_gap(spectrum: np.ndarray):
     return float(np.mean(np.diff(spectrum)))
 
 
+def get_cheat_coupler(sys_eig_states, env_eig_states):
+    coupler = 0
+    env_up = env_eig_states[1].transpose() @ env_eig_states[0].conjugate()
+    for k in range(len(sys_eig_states)):
+        for l in range(len(sys_eig_states)):
+            if k < l:
+                coupler += np.kron(
+                    sys_eig_states[k].transpose() @ sys_eig_states[l].conjugate(),
+                    env_up,
+                )
+    return coupler + coupler.conjugate().transpose()
+
+
 def get_log_sweep(spectrum_width: np.ndarray, n_steps: int):
     return spectrum_width * (np.logspace(start=0, stop=-5, base=10, num=n_steps))
 
