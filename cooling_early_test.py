@@ -48,24 +48,31 @@ print("ground energy from model: {}".format(sys_ground_energy_exp))
 print("initial energy from model: {}".format(sys_initial_energy))
 
 
-# environment stuff
-env_qubits = cirq.GridQubit.rect(n_sys_qubits, 1, top=Nf[0])
-n_env_qubits = len(env_qubits)
-env_ham = -sum((cirq.Z(q) for q in env_qubits))
-env_ground_state = np.zeros((2**n_env_qubits))
-env_ground_state[0] = 1
+def get_Z_env(n_qubits, top):
+    # environment stuff
+    env_qubits = cirq.GridQubit.rect(n_qubits + 2, 1, top=top)
+    n_env_qubits = len(env_qubits)
+    env_ham = -sum((cirq.Z(q) for q in env_qubits))
+    env_ground_state = np.zeros((2**n_env_qubits))
+    env_ground_state[0] = 1
+    return env_qubits, env_ground_state, env_ham
+
+
+env_qubits, env_ground_state, env_ham = get_Z_env(n_qubits=n_sys_qubits, top=Nf[0])
 
 # coupler
-coupler = cirq.X(sys_qubits[0]) * cirq.X(env_qubits[0])
+coupler = cirq.Y(sys_qubits[0]) * cirq.Y(env_qubits[0])
+
 
 # get environment ham sweep values
 spectrum_width = max(sys_eigenspectrum) - min(sys_eigenspectrum)
 
 min_gap = sorted(np.abs(np.diff(sys_eigenspectrum)))[0]
 
-n_steps = 30
+n_steps = 10
 # sweep_values = get_log_sweep(spectrum_width, n_steps)
-sweep_values = np.repeat(get_cheat_sweep(sys_eigenspectrum, n_steps), 4)
+sweep_values = get_cheat_sweep(sys_eigenspectrum, n_steps)
+repeated_sweeps = np.repeat(sweep_values, 4)
 np.random.shuffle(sweep_values)
 # coupling strength value
 alphas = sweep_values / 10
@@ -85,7 +92,7 @@ cooler = Cooler(
     sys_env_coupling=coupler,
 )
 
-fidelities, energies = cooler.cool(
+fidelities, energies = cooler.smartly_cool(
     alphas=alphas,
     evolution_times=evolution_times,
     sweep_values=sweep_values,

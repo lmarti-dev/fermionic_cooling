@@ -23,6 +23,7 @@ from scipy.sparse.linalg import expm_multiply, eigsh, expm
 from typing import Iterable
 import time
 import matplotlib.pyplot as plt
+from openfermion import FermionOperator
 
 
 class Cooler:
@@ -80,18 +81,24 @@ class Cooler:
 
     def sys_energy(self, sys_state: np.ndarray):
         if len(sys_state.shape) == 2:
-            return self.sys_hamiltonian.expectation_from_density_matrix(
-                sys_state.astype("complex_"),
-                qubit_map={
-                    k: v for k, v in zip(self.sys_qubits, range(len(self.sys_qubits)))
-                },
+            return np.real(
+                self.sys_hamiltonian.expectation_from_density_matrix(
+                    sys_state.astype("complex_"),
+                    qubit_map={
+                        k: v
+                        for k, v in zip(self.sys_qubits, range(len(self.sys_qubits)))
+                    },
+                )
             )
         else:
-            return self.sys_hamiltonian.expectation_from_state_vector(
-                sys_state.astype("complex_"),
-                qubit_map={
-                    k: v for k, v in zip(self.sys_qubits, range(len(self.sys_qubits)))
-                },
+            return np.real(
+                self.sys_hamiltonian.expectation_from_state_vector(
+                    sys_state.astype("complex_"),
+                    qubit_map={
+                        k: v
+                        for k, v in zip(self.sys_qubits, range(len(self.sys_qubits)))
+                    },
+                )
             )
 
     def cool(
@@ -149,6 +156,8 @@ class Cooler:
         cooling_hamiltonian = self.cooling_hamiltonian(env_coupling, alpha)
 
         print("env coupling value: {}".format(env_coupling))
+        print("alpha value: {}".format(alpha))
+        print("evolution_time value: {}".format(evolution_time))
 
         print("evolving...")
         total_density_matrix = time_evolve_density_matrix(
@@ -172,8 +181,67 @@ class Cooler:
         )
         return fidelity, energy, total_density_matrix
 
-    def smart_cool(self):
-        pass
+    def smartly_cool(
+        self,
+        evolution_times: np.ndarray,
+        alphas: np.ndarray,
+        sweep_values: Iterable[float],
+    ):
+        initial_density_matrix = ketbra(self.total_initial_state)
+        if not cirq.is_hermitian(initial_density_matrix):
+            raise ValueError("initial density matrix is not hermitian")
+        total_density_matrix = initial_density_matrix
+
+        fidelities = []
+        energies = []
+
+        fidelity = self.sys_fidelity(self.sys_initial_state)
+        energy = self.sys_energy(self.sys_initial_state)
+
+        print(
+            "initial fidelity to gs: {}, initial energy of traced out rho: {}, ground energy: {}".format(
+                fidelity, energy, self.sys_ground_energy
+            )
+        )
+
+        fidelities.append(fidelity)
+        energies.append(energy)
+
+        for step, env_coupling in enumerate(sweep_values):
+            fidelity, energy, total_density_matrix = self.cooling_step(
+                total_density_matrix=total_density_matrix,
+                env_coupling=env_coupling,
+                alpha=alphas[step],
+                evolution_time=evolution_times[step],
+            )
+            fidelities.append(fidelity)
+            energies.append(energy)
+            print(
+                "fidelity to gs: {}, energy diff of traced out rho: {}".format(
+                    fidelity, energy - self.sys_ground_energy
+                )
+            )
+
+            iteration_number = 1
+            while energy + 1e-4 < energies[-2]:
+                print("while loop iteration {}".format(iteration_number))
+                fidelity, energy, total_density_matrix = self.cooling_step(
+                    total_density_matrix=total_density_matrix,
+                    env_coupling=env_coupling,
+                    alpha=alphas[step],
+                    evolution_time=evolution_times[step],
+                )
+                fidelities.append(fidelity)
+                energies.append(energy)
+                print_increased(fidelity, fidelities[-2], "while fidelity")
+                print_increased(energy, energies[-2], "while energy")
+                print(
+                    "fidelity to gs: {}, energy diff of traced out rho: {}".format(
+                        fidelity, energy - self.sys_ground_energy
+                    )
+                )
+                iteration_number += 1
+        return fidelities, energies
 
     def plot_cooling(
         self, energies: list, fidelities: list, sys_eigenspectrum: np.ndarray = None
@@ -211,9 +279,12 @@ def get_log_sweep(spectrum_width: np.ndarray, n_steps: int):
     return spectrum_width * (np.logspace(start=0, stop=-5, base=10, num=n_steps))
 
 
-def get_cheat_sweep(spectrum: np.ndarray, n_steps: int):
+def get_cheat_sweep(spectrum: np.ndarray, n_steps: int = None):
     res = []
-    n_rep = int(n_steps / (len(spectrum) - 1))
+    if n_steps is None:
+        n_rep = 1
+    else:
+        n_rep = int(n_steps / (len(spectrum) - 1))
     for k in range(len(spectrum) - 1, 0, -1):
         for m in range(n_rep):
             res.append(spectrum[k] - spectrum[0])
@@ -313,3 +384,14 @@ def print_increased(val_current: float, val_previous: float, quantname: str):
             else "decreased",
         )
     )
+
+
+def fermionic_spin_and_number(n_qubits):
+    n_up_op = sum(
+        [FermionOperator("{x}^ {x}".format(x=x)) for x in range(0, n_qubits, 2)]
+    )
+    n_down_op = sum(
+        [FermionOperator("{x}^ {x}".format(x=x)) for x in range(1, n_qubits, 2)]
+    )
+    n_total_op = sum(n_up_op, n_down_op)
+    return n_up_op, n_down_op, n_total_op
