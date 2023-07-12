@@ -210,13 +210,11 @@ def mean_gap(spectrum: np.ndarray):
 def get_cheat_coupler(sys_eig_states, env_eig_states):
     coupler = 0
     env_up = env_eig_states[1].transpose() @ env_eig_states[0].conjugate()
-    for k in range(len(sys_eig_states)):
-        for l in range(len(sys_eig_states)):
-            if k < l:
-                coupler += np.kron(
-                    sys_eig_states[k].transpose() @ sys_eig_states[l].conjugate(),
-                    env_up,
-                )
+    for k in range(1, len(sys_eig_states)):
+        coupler += np.kron(
+            sys_eig_states[0].transpose() @ sys_eig_states[k].conjugate(),
+            env_up,
+        )
     return coupler + coupler.conjugate().transpose()
 
 

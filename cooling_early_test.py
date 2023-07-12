@@ -6,7 +6,7 @@ sys.path.append("/home/Refik/Data/My_files/Dropbox/PhD/repos/fauvqe/")
 
 from fauvqe.models.fermiHubbardModel import FermiHubbardModel
 
-from coolerClass import Cooler, expectation_wrapper, get_cheat_sweep
+from coolerClass import Cooler, expectation_wrapper, get_cheat_sweep, get_cheat_coupler
 from fauvqe.utilities import jw_eigenspectrum_at_particle_number
 import cirq
 from openfermion import get_sparse_operator, jw_hartree_fock_state
@@ -56,7 +56,8 @@ env_ground_state = np.zeros((2**n_env_qubits))
 env_ground_state[0] = 1
 
 # coupler
-coupler = cirq.X(sys_qubits[0]) * cirq.X(env_qubits[0])
+coupler = cirq.X(sys_qubits[0]) * cirq.X(env_qubits[0])  # Interaction only on Qubit 0?
+# coupler = get_cheat_coupler(sys_eigenstates, env_eigenstates)
 
 # get environment ham sweep values
 spectrum_width = max(sys_eigenspectrum) - min(sys_eigenspectrum)
