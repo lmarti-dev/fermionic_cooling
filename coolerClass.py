@@ -263,7 +263,7 @@ class Cooler:
             (np.array(energies) - self.sys_ground_energy)
             / np.abs(self.sys_ground_energy),
         )
-        axes[1].set_ylabel(r"$\frac{E_{cool}-E_{gs}}{|E_{gs}|}$", labelpad=0)
+        axes[1].set_ylabel(r"$\frac{E_{cool}-E_0}{|E_0|}$", labelpad=0)
         if sys_eigenspectrum is not None:
             axes[2].hlines(sys_eigenspectrum, xmin=-2, xmax=2)
             axes[2].set_ylabel("Eigenenergies")
@@ -278,13 +278,11 @@ def mean_gap(spectrum: np.ndarray):
 def get_cheat_coupler(sys_eig_states, env_eig_states):
     coupler = 0
     env_up = env_eig_states[1].transpose() @ env_eig_states[0].conjugate()
-    for k in range(len(sys_eig_states)):
-        for l in range(len(sys_eig_states)):
-            if k < l:
-                coupler += np.kron(
-                    sys_eig_states[k].transpose() @ sys_eig_states[l].conjugate(),
-                    env_up,
-                )
+    for k in range(1, len(sys_eig_states)):
+        coupler += np.kron(
+            sys_eig_states[0].transpose() @ sys_eig_states[k].conjugate(),
+            env_up,
+        )
     return coupler + coupler.conjugate().transpose()
 
 

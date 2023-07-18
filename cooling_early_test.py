@@ -6,7 +6,7 @@ sys.path.append("/home/Refik/Data/My_files/Dropbox/PhD/repos/fauvqe/")
 
 from fauvqe.models.fermiHubbardModel import FermiHubbardModel
 
-from coolerClass import Cooler, expectation_wrapper, get_cheat_sweep
+from coolerClass import Cooler, expectation_wrapper, get_cheat_sweep, get_cheat_coupler
 from fauvqe.utilities import jw_eigenspectrum_at_particle_number
 import cirq
 from openfermion import get_sparse_operator, jw_hartree_fock_state
@@ -61,8 +61,8 @@ def get_Z_env(n_qubits, top):
 env_qubits, env_ground_state, env_ham = get_Z_env(n_qubits=n_sys_qubits, top=Nf[0])
 
 # coupler
-coupler = cirq.Y(sys_qubits[0]) * cirq.Y(env_qubits[0])
-
+coupler = cirq.Y(sys_qubits[0]) * cirq.Y(env_qubits[0])  # Interaction only on Qubit 0?
+# coupler = get_cheat_coupler(sys_eigenstates, env_eigenstates)
 
 # get environment ham sweep values
 spectrum_width = max(sys_eigenspectrum) - min(sys_eigenspectrum)
@@ -71,7 +71,7 @@ min_gap = sorted(np.abs(np.diff(sys_eigenspectrum)))[0]
 
 n_steps = 10
 # sweep_values = get_log_sweep(spectrum_width, n_steps)
-sweep_values = np.tile(get_cheat_sweep(sys_eigenspectrum, n_steps), 10)
+sweep_values = np.tile(get_cheat_sweep(sys_eigenspectrum, n_steps), 1)
 # np.random.shuffle(sweep_values)
 # coupling strength value
 alphas = sweep_values / 10
