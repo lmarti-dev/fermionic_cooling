@@ -299,8 +299,7 @@ def get_cheat_sweep(spectrum: np.ndarray, n_steps: int = None):
     else:
         n_rep = int(n_steps / (len(spectrum) - 1))
     for k in range(len(spectrum) - 1, 0, -1):
-        for m in range(n_rep):
-            res.append(spectrum[k] - spectrum[0])
+        res.append(spectrum[k] - spectrum[0])
     return np.array(res)
 
 
