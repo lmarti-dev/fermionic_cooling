@@ -55,13 +55,20 @@ def get_Z_env(n_qubits, top):
     env_ham = -sum((cirq.Z(q) for q in env_qubits))
     env_ground_state = np.zeros((2**n_env_qubits))
     env_ground_state[0] = 1
-    return env_qubits, env_ground_state, env_ham
+    env_matrix = env_ham.matrix(qubits=env_qubits)
+    env_energies, env_eig_states = np.linalg.eigh(env_matrix)
+    return env_qubits, env_ground_state, env_ham, env_energies, env_eig_states
 
 
-env_qubits, env_ground_state, env_ham = get_Z_env(n_qubits=n_sys_qubits, top=Nf[0])
+env_qubits, env_ground_state, env_ham, env_energies, env_eig_states = get_Z_env(
+    n_qubits=n_sys_qubits, top=Nf[0]
+)
 
 # coupler
 coupler = cirq.Y(sys_qubits[0]) * cirq.Y(env_qubits[0])  # Interaction only on Qubit 0?
+coupler = get_cheat_coupler(
+    sys_eig_states=sys_eigenstates, env_eig_states=env_eig_states
+)  # Interaction only on Qubit 0?
 # coupler = get_cheat_coupler(sys_eigenstates, env_eigenstates)
 
 # get environment ham sweep values
