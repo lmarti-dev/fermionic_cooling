@@ -1,6 +1,5 @@
 import sys
 
-
 # tsk tsk
 sys.path.append("/home/Refik/Data/My_files/Dropbox/PhD/repos/fauvqe/")
 
@@ -65,7 +64,7 @@ env_qubits, env_ground_state, env_ham, env_energies, env_eig_states = get_Z_env(
 )
 
 # coupler
-coupler = cirq.Y(sys_qubits[0]) * cirq.Y(env_qubits[0])  # Interaction only on Qubit 0?
+# coupler = cirq.Y(sys_qubits[0]) * cirq.Y(env_qubits[0])  # Interaction only on Qubit 0?
 coupler = get_cheat_coupler(
     sys_eig_states=sys_eigenstates, env_eig_states=env_eig_states
 )  # Interaction only on Qubit 0?
@@ -78,8 +77,8 @@ min_gap = sorted(np.abs(np.diff(sys_eigenspectrum)))[0]
 
 n_steps = 10
 # sweep_values = get_log_sweep(spectrum_width, n_steps)
-sweep_values = np.tile(get_cheat_sweep(sys_eigenspectrum, n_steps), 1)
-# np.random.shuffle(sweep_values)
+sweep_values = np.tile(get_cheat_sweep(sys_eigenspectrum, n_steps), 40)
+np.random.shuffle(sweep_values)
 # coupling strength value
 alphas = sweep_values / 10
 evolution_times = np.pi / (alphas)
