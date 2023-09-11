@@ -270,13 +270,13 @@ def mean_gap(spectrum: np.ndarray):
 
 def get_cheat_coupler(sys_eig_states, env_eig_states):
     coupler = 0
-    env_up = env_eig_states[1].transpose() @ env_eig_states[0].conjugate()
-    for k in range(1, len(sys_eig_states)):
+    env_up = np.outer(env_eig_states[:, 1],np.conjugate(env_eig_states[:, 0]))
+    for k in range(1, sys_eig_states.shape[1]):
         coupler += np.kron(
-            sys_eig_states[0].transpose() @ sys_eig_states[k].conjugate(),
+            np.outer(sys_eig_states[:, k],np.conjugate(sys_eig_states[:, k])),
             env_up,
         )
-    return coupler + coupler.conjugate().transpose()
+    return ndarray_to_psum(coupler + np.conjugate(np.transpose(coupler)))
 
 
 def get_log_sweep(spectrum_width: np.ndarray, n_steps: int):
@@ -408,12 +408,9 @@ def fermionic_spin_and_number(n_qubits):
     return n_up_op, n_down_op, n_total_op
 
 
-def ndarray_to_psum(mat: np.ndarray):
+def ndarray_to_psum(mat: np.ndarray) -> cirq.PauliSum:
     if len(list(set(mat.shape))) != 1:
         raise ValueError("the matrix is not square")
-    if not cirq.is_unitary(matrix=mat):
-        raise ValueError("the matrix is not unitary")
-
     n_qubits = int(np.log2(mat.shape[0]))
     qubits = cirq.LineQubit.range(n_qubits)
     pauli_matrices = (cirq.I, cirq.X, cirq.Y, cirq.Z)
@@ -423,7 +420,6 @@ def ndarray_to_psum(mat: np.ndarray):
         pauli_string = cirq.PauliString(*[m(q) for m, q in zip(pauli_product, qubits)])
         pauli_matrix = pauli_string.matrix(qubits=qubits)
         coeff = np.trace(mat @ pauli_matrix) / mat.shape[0]
-        print(pauli_string, coeff)
         if not np.isclose(np.abs(coeff), 0):
             pauli_sum += cirq.PauliString(pauli_string, coeff)
     return pauli_sum
