@@ -24,6 +24,7 @@ from typing import Iterable
 import time
 import matplotlib.pyplot as plt
 from openfermion import FermionOperator
+import itertools
 
 
 class Cooler:
@@ -175,7 +176,7 @@ class Cooler:
         )
         return fidelity, energy, total_density_matrix
 
-    def smartly_cool(
+    def forced_cool(
         self,
         evolution_times: np.ndarray,
         alphas: np.ndarray,
@@ -273,20 +274,13 @@ def mean_gap(spectrum: np.ndarray):
 
 def get_cheat_coupler(sys_eig_states, env_eig_states):
     coupler = 0
-
-    env_up = np.outer(
-        env_eig_states.transpose()[1],
-        env_eig_states.transpose()[0].conjugate(),
-    )
-    for k in range(1, len(sys_eig_states.transpose())):
+    env_up = np.outer(env_eig_states[:, 1], np.conjugate(env_eig_states[:, 0]))
+    for k in range(1, sys_eig_states.shape[1]):
         coupler += np.kron(
-            np.outer(
-                sys_eig_states.transpose()[0],
-                sys_eig_states.transpose()[k].conjugate(),
-            ),
+            np.outer(sys_eig_states[:, 0], np.conjugate(sys_eig_states[:, k])),
             env_up,
         )
-    return coupler + coupler.conjugate().transpose()
+    return ndarray_to_psum(coupler + np.conjugate(np.transpose(coupler)))
 
 
 def get_log_sweep(spectrum_width: np.ndarray, n_steps: int):
@@ -416,3 +410,20 @@ def fermionic_spin_and_number(n_qubits):
     )
     n_total_op = sum(n_up_op, n_down_op)
     return n_up_op, n_down_op, n_total_op
+
+
+def ndarray_to_psum(mat: np.ndarray) -> cirq.PauliSum:
+    if len(list(set(mat.shape))) != 1:
+        raise ValueError("the matrix is not square")
+    n_qubits = int(np.log2(mat.shape[0]))
+    qubits = cirq.LineQubit.range(n_qubits)
+    pauli_matrices = (cirq.I, cirq.X, cirq.Y, cirq.Z)
+    pauli_products = itertools.product(pauli_matrices, repeat=n_qubits)
+    pauli_sum = cirq.PauliSum()
+    for pauli_product in pauli_products:
+        pauli_string = cirq.PauliString(*[m(q) for m, q in zip(pauli_product, qubits)])
+        pauli_matrix = pauli_string.matrix(qubits=qubits)
+        coeff = np.trace(mat @ pauli_matrix) / mat.shape[0]
+        if not np.isclose(np.abs(coeff), 0):
+            pauli_sum += cirq.PauliString(pauli_string, coeff)
+    return pauli_sum

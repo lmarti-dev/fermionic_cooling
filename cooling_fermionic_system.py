@@ -29,7 +29,8 @@ sys_dicke = spin_dicke_state(n_qubits=n_sys_qubits, Nf=Nf, right_to_left=True)
 sys_initial_state = sys_dicke
 sys_eigenspectrum, sys_eigenstates = jw_eigenspectrum_at_particle_number(
     sparse_operator=get_sparse_operator(
-        model.fock_hamiltonian, n_qubits=len(model.flattened_qubits)
+        model.fock_hamiltonian,
+        n_qubits=len(model.flattened_qubits),
     ),
     particle_number=Nf,
     expanded=True,
@@ -101,6 +102,7 @@ cooler = Cooler(
     env_qubits=env_qubits,
     env_ground_state=env_ground_state,
     sys_env_coupling=coupler,
+    verbosity=3,
 )
 
 fidelities, energies = cooler.cool(
