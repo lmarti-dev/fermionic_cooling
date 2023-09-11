@@ -5,7 +5,13 @@ sys.path.append("/home/Refik/Data/My_files/Dropbox/PhD/repos/fauvqe/")
 
 from fauvqe.models.fermiHubbardModel import FermiHubbardModel
 
-from coolerClass import Cooler, expectation_wrapper, get_cheat_sweep, get_cheat_coupler
+from coolerClass import (
+    Cooler,
+    expectation_wrapper,
+    get_cheat_sweep,
+    get_cheat_coupler,
+    get_log_sweep,
+)
 from fauvqe.utilities import jw_eigenspectrum_at_particle_number
 import cirq
 from openfermion import get_sparse_operator, jw_hartree_fock_state
@@ -49,7 +55,7 @@ print("initial energy from model: {}".format(sys_initial_energy))
 
 def get_Z_env(n_qubits, top):
     # environment stuff
-    env_qubits = cirq.GridQubit.rect(n_qubits + 2, 1, top=top)
+    env_qubits = cirq.GridQubit.rect(n_qubits, 1, top=top)
     n_env_qubits = len(env_qubits)
     env_ham = -sum((cirq.Z(q) for q in env_qubits))
     env_ground_state = np.zeros((2**n_env_qubits))
@@ -75,12 +81,12 @@ spectrum_width = max(sys_eigenspectrum) - min(sys_eigenspectrum)
 
 min_gap = sorted(np.abs(np.diff(sys_eigenspectrum)))[0]
 
-n_steps = 10
+n_steps = 100
 # sweep_values = get_log_sweep(spectrum_width, n_steps)
-sweep_values = np.tile(get_cheat_sweep(sys_eigenspectrum, n_steps), 3)
+sweep_values = get_cheat_sweep(sys_eigenspectrum, n_steps)
 # np.random.shuffle(sweep_values)
 # coupling strength value
-alphas = sweep_values / 10
+alphas = sweep_values * 4
 evolution_times = np.pi / (alphas)
 # evolution_time = 1e-3
 
@@ -97,10 +103,12 @@ cooler = Cooler(
     sys_env_coupling=coupler,
 )
 
-fidelities, energies = cooler.smartly_cool(
+fidelities, energies = cooler.cool(
     alphas=alphas,
     evolution_times=evolution_times,
     sweep_values=sweep_values,
 )
+
+print("Final Fidelity: {}".format(fidelities[-1]))
 
 cooler.plot_cooling(energies, fidelities, sys_eigenspectrum)

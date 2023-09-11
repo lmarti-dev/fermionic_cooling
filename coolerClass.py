@@ -60,10 +60,14 @@ class Cooler:
             print(s)
 
     def cooling_hamiltonian(self, env_coupling: float, alpha: float):
+        if isinstance(self.sys_env_coupling, cirq.PauliSum):
+            coupler = self.sys_env_coupling.matrix(qubits=self.total_qubits)
+        else:
+            coupler = self.sys_env_coupling
         return (
-            self.sys_hamiltonian
-            + env_coupling * self.env_hamiltonian
-            + float(alpha) * self.sys_env_coupling
+            self.sys_hamiltonian.matrix(qubits=self.total_qubits)
+            + env_coupling * self.env_hamiltonian.matrix(qubits=self.total_qubits)
+            + float(alpha) * coupler
         )
 
     @property
@@ -75,7 +79,7 @@ class Cooler:
         if is_density_matrix(self.sys_initial_state):
             return np.kron(self.sys_initial_state, ketbra(self.env_ground_state))
         else:
-            return np.kron(self.sys_initial_state, self.env_ground_state)
+            return ketbra(np.kron(self.sys_initial_state, self.env_ground_state))
 
     @property
     def env_ground_density_matrix(self):
@@ -151,7 +155,7 @@ class Cooler:
 
         self.verbose_print("evolving...")
         total_density_matrix = time_evolve_density_matrix(
-            ham=cooling_hamiltonian.matrix(qubits=self.total_qubits),
+            ham=cooling_hamiltonian,  # .matrix(qubits=self.total_qubits),
             rho=total_density_matrix,
             t=evolution_time,
             method="expm",
@@ -269,10 +273,17 @@ def mean_gap(spectrum: np.ndarray):
 
 def get_cheat_coupler(sys_eig_states, env_eig_states):
     coupler = 0
-    env_up = env_eig_states[1].transpose() @ env_eig_states[0].conjugate()
-    for k in range(1, len(sys_eig_states)):
+
+    env_up = np.outer(
+        env_eig_states.transpose()[1],
+        env_eig_states.transpose()[0].conjugate(),
+    )
+    for k in range(1, len(sys_eig_states.transpose())):
         coupler += np.kron(
-            sys_eig_states[0].transpose() @ sys_eig_states[k].conjugate(),
+            np.outer(
+                sys_eig_states.transpose()[0],
+                sys_eig_states.transpose()[k].conjugate(),
+            ),
             env_up,
         )
     return coupler + coupler.conjugate().transpose()
@@ -290,7 +301,7 @@ def get_cheat_sweep(spectrum: np.ndarray, n_steps: int = None):
         n_rep = int(n_steps / (len(spectrum) - 1))
     for k in range(len(spectrum) - 1, 0, -1):
         res.append(spectrum[k] - spectrum[0])
-    return np.array(res)
+    return np.tile(np.array(res), n_rep)
 
 
 def get_lin_sweep(spectrum: np.ndarray, n_steps: int):
