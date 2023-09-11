@@ -24,6 +24,7 @@ from typing import Iterable
 import time
 import matplotlib.pyplot as plt
 from openfermion import FermionOperator
+import itertools
 
 
 class Cooler:
@@ -171,7 +172,7 @@ class Cooler:
         )
         return fidelity, energy, total_density_matrix
 
-    def smartly_cool(
+    def forced_cool(
         self,
         evolution_times: np.ndarray,
         alphas: np.ndarray,
@@ -405,3 +406,24 @@ def fermionic_spin_and_number(n_qubits):
     )
     n_total_op = sum(n_up_op, n_down_op)
     return n_up_op, n_down_op, n_total_op
+
+
+def ndarray_to_psum(mat: np.ndarray):
+    if len(list(set(mat.shape))) != 1:
+        raise ValueError("the matrix is not square")
+    if not cirq.is_unitary(matrix=mat):
+        raise ValueError("the matrix is not unitary")
+
+    n_qubits = int(np.log2(mat.shape[0]))
+    qubits = cirq.LineQubit.range(n_qubits)
+    pauli_matrices = (cirq.I, cirq.X, cirq.Y, cirq.Z)
+    pauli_products = itertools.product(pauli_matrices, repeat=n_qubits)
+    pauli_sum = cirq.PauliSum()
+    for pauli_product in pauli_products:
+        pauli_string = cirq.PauliString(*[m(q) for m, q in zip(pauli_product, qubits)])
+        pauli_matrix = pauli_string.matrix(qubits=qubits)
+        coeff = np.trace(mat @ pauli_matrix) / mat.shape[0]
+        print(pauli_string, coeff)
+        if not np.isclose(np.abs(coeff), 0):
+            pauli_sum += cirq.PauliString(pauli_string, coeff)
+    return pauli_sum
