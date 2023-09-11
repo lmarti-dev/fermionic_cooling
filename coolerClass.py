@@ -37,7 +37,9 @@ class Cooler:
         env_qubits: Iterable[cirq.Qid],
         env_ground_state: np.ndarray,
         sys_env_coupling: cirq.PauliSum,
+        verbosity: int = 0,
     ):
+        self.verbosity = verbosity
         self.sys_hamiltonian = sys_hamiltonian
         self.sys_qubits = sys_qubits
         self.sys_initial_state = sys_initial_state
@@ -52,6 +54,10 @@ class Cooler:
             )
         )
         self.sys_env_coupling = sys_env_coupling
+
+    def verbose_print(self, s: str, message_level: int = 1):
+        if int(self.verbosity) >= message_level:
+            print(s)
 
     def cooling_hamiltonian(self, env_coupling: float, alpha: float):
         return (
@@ -102,7 +108,7 @@ class Cooler:
         fidelity = self.sys_fidelity(self.sys_initial_state)
         energy = self.sys_energy(self.sys_initial_state)
 
-        print(
+        self.verbose_print(
             "initial fidelity to gs: {}, initial energy of traced out rho: {}, ground energy: {}".format(
                 fidelity, energy, self.sys_ground_energy
             )
@@ -121,9 +127,9 @@ class Cooler:
             )
             fidelities.append(fidelity)
             energies.append(energy)
-            # print_increased(fidelity, fidelities[-2], "fidelity")
-            print_increased(energy, energies[-2], "energy")
-            print(
+            self.verbose_print(has_increased(fidelity, fidelities[-2], "fidelity"))
+            self.verbose_print(has_increased(energy, energies[-2], "energy"))
+            self.verbose_print(
                 "fidelity to gs: {}, energy diff of traced out rho: {}".format(
                     fidelity, energy - self.sys_ground_energy
                 )
@@ -139,11 +145,11 @@ class Cooler:
     ):
         cooling_hamiltonian = self.cooling_hamiltonian(env_coupling, alpha)
 
-        print("env coupling value: {}".format(env_coupling))
-        print("alpha value: {}".format(alpha))
-        print("evolution_time value: {}".format(evolution_time))
+        self.verbose_print("env coupling value: {}".format(env_coupling))
+        self.verbose_print("alpha value: {}".format(alpha))
+        self.verbose_print("evolution_time value: {}".format(evolution_time))
 
-        print("evolving...")
+        self.verbose_print("evolving...")
         total_density_matrix = time_evolve_density_matrix(
             ham=cooling_hamiltonian.matrix(qubits=self.total_qubits),
             rho=total_density_matrix,
@@ -155,11 +161,11 @@ class Cooler:
             n_sys_qubits=len(self.sys_qubits),
             n_env_qubits=len(self.env_qubits),
         )
-        print("computing values...")
+        self.verbose_print("computing values...")
         fidelity = self.sys_fidelity(traced_density_matrix)
         energy = self.sys_energy(traced_density_matrix)
 
-        print("retensoring...")
+        self.verbose_print("retensoring...")
         total_density_matrix = np.kron(
             traced_density_matrix, self.env_ground_density_matrix
         )
@@ -182,7 +188,7 @@ class Cooler:
         fidelity = self.sys_fidelity(self.sys_initial_state)
         energy = self.sys_energy(self.sys_initial_state)
 
-        print(
+        self.verbose_print(
             "initial fidelity to gs: {}, initial energy of traced out rho: {}, ground energy: {}".format(
                 fidelity, energy, self.sys_ground_energy
             )
@@ -200,7 +206,7 @@ class Cooler:
             )
             fidelities.append(fidelity)
             energies.append(energy)
-            print(
+            self.verbose_print(
                 "fidelity to gs: {}, energy diff of traced out rho: {}".format(
                     fidelity, energy - self.sys_ground_energy
                 )
@@ -208,7 +214,7 @@ class Cooler:
 
             iteration_number = 1
             while energy + 1e-4 < energies[-2]:
-                print("while loop iteration {}".format(iteration_number))
+                self.verbose_print("while loop iteration {}".format(iteration_number))
                 fidelity, energy, total_density_matrix = self.cooling_step(
                     total_density_matrix=total_density_matrix,
                     env_coupling=env_coupling,
@@ -217,9 +223,11 @@ class Cooler:
                 )
                 fidelities.append(fidelity)
                 energies.append(energy)
-                print_increased(fidelity, fidelities[-2], "while fidelity")
-                print_increased(energy, energies[-2], "while energy")
-                print(
+                self.verbose_print(
+                    has_increased(fidelity, fidelities[-2], "while fidelity")
+                )
+                self.verbose_print(has_increased(energy, energies[-2], "while energy"))
+                self.verbose_print(
                     "fidelity to gs: {}, energy diff of traced out rho: {}".format(
                         fidelity, energy - self.sys_ground_energy
                     )
@@ -330,7 +338,7 @@ def time_evolve_state(ham: np.ndarray, ket: np.ndarray, t: float):
 def time_evolve_density_matrix(
     ham: np.ndarray, rho: np.ndarray, t: float, method: str = "expm_multiply"
 ):
-    print("timing...")
+    # print("timing...")
     start = time.time()
     if method == "expm_multiply":
         # can be extremely slow
@@ -340,7 +348,7 @@ def time_evolve_density_matrix(
         Ut = expm(-1j * t * ham)
         Ut_rho_Utd = Ut @ rho @ Ut.transpose().conjugate()
     end = time.time()
-    print("time evolution took: {} sec".format(end - start))
+    # print("time evolution took: {} sec".format(end - start))
     if not cirq.is_hermitian(Ut_rho_Utd):
         raise ValueError("time-evolved density matrix is not hermitian")
     return Ut_rho_Utd
@@ -361,10 +369,10 @@ def trace_out_env(
     #     tensor=reshaped_rho, keep_indices=range(n_sys_qubits)
     # )
     # reshaped_traced_rho = np.reshape(traced_rho, (2**n_sys_qubits, 2**n_sys_qubits))
-    print("tracing out environment...")
+    # print("tracing out environment...")
 
     traced_rho = np.zeros((2**n_sys_qubits, 2**n_sys_qubits), dtype="complex_")
-    print("traced rho shape: {} rho shape: {}".format(traced_rho.shape, rho.shape))
+    # print("traced rho shape: {} rho shape: {}".format(traced_rho.shape, rho.shape))
     for iii in range(2**n_sys_qubits):
         for jjj in range(2**n_sys_qubits):
             # take rho[i*env qubits:i*env qubits + env qubtis]
@@ -381,14 +389,10 @@ def ketbra(ket: np.ndarray):
     return np.outer(ket, dagger(ket))
 
 
-def print_increased(val_current: float, val_previous: float, quantname: str):
-    print(
-        "{q} has {i}".format(
-            q=quantname,
-            i="increased"
-            if np.real(val_current) > np.real(val_previous)
-            else "decreased",
-        )
+def has_increased(val_current: float, val_previous: float, quantname: str):
+    return "{q} has {i}".format(
+        q=quantname,
+        i="increased" if np.real(val_current) > np.real(val_previous) else "decreased",
     )
 
 
