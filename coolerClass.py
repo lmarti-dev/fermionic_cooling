@@ -307,7 +307,9 @@ def get_lin_sweep(spectrum: np.ndarray, n_steps: int):
     return np.linspace(start=spectrum_width, stop=min_gap, num=n_steps)
 
 
-def expectation_wrapper(observable, state, qubits):
+def expectation_wrapper(
+    observable: cirq.PauliSum, state: np.ndarray, qubits: list[cirq.Qid]
+):
     return np.real(
         observable.expectation_from_state_vector(
             state.astype("complex_"),

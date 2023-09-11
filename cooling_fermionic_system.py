@@ -20,7 +20,7 @@ sys_qubits = model.flattened_qubits
 n_sys_qubits = len(sys_qubits)
 sys_hartree_fock = jw_hartree_fock_state(n_orbitals=n_sys_qubits, n_electrons=sum(Nf))
 sys_dicke = spin_dicke_state(n_qubits=n_sys_qubits, Nf=Nf, right_to_left=True)
-sys_initial_state = sys_hartree_fock
+sys_initial_state = sys_dicke
 sys_eigenspectrum, sys_eigenstates = jw_eigenspectrum_at_particle_number(
     sparse_operator=get_sparse_operator(
         model.fock_hamiltonian, n_qubits=len(model.flattened_qubits)
@@ -77,8 +77,8 @@ min_gap = sorted(np.abs(np.diff(sys_eigenspectrum)))[0]
 
 n_steps = 10
 # sweep_values = get_log_sweep(spectrum_width, n_steps)
-sweep_values = np.tile(get_cheat_sweep(sys_eigenspectrum, n_steps), 40)
-np.random.shuffle(sweep_values)
+sweep_values = np.tile(get_cheat_sweep(sys_eigenspectrum, n_steps), 3)
+# np.random.shuffle(sweep_values)
 # coupling strength value
 alphas = sweep_values / 10
 evolution_times = np.pi / (alphas)
