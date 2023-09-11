@@ -66,7 +66,10 @@ class Cooler:
 
     @property
     def total_initial_state(self):
-        return np.kron(self.sys_initial_state, self.env_ground_state)
+        if is_density_matrix(self.sys_initial_state):
+            return np.kron(self.sys_initial_state, ketbra(self.env_ground_state))
+        else:
+            return np.kron(self.sys_initial_state, self.env_ground_state)
 
     @property
     def env_ground_density_matrix(self):
@@ -80,26 +83,7 @@ class Cooler:
         )
 
     def sys_energy(self, sys_state: np.ndarray):
-        if len(sys_state.shape) == 2:
-            return np.real(
-                self.sys_hamiltonian.expectation_from_density_matrix(
-                    sys_state.astype("complex_"),
-                    qubit_map={
-                        k: v
-                        for k, v in zip(self.sys_qubits, range(len(self.sys_qubits)))
-                    },
-                )
-            )
-        else:
-            return np.real(
-                self.sys_hamiltonian.expectation_from_state_vector(
-                    sys_state.astype("complex_"),
-                    qubit_map={
-                        k: v
-                        for k, v in zip(self.sys_qubits, range(len(self.sys_qubits)))
-                    },
-                )
-            )
+        return expectation_wrapper(self.sys_hamiltonian, sys_state, self.sys_qubits)
 
     def cool(
         self,
@@ -107,7 +91,7 @@ class Cooler:
         alphas: np.ndarray,
         sweep_values: Iterable[float],
     ):
-        initial_density_matrix = ketbra(self.total_initial_state)
+        initial_density_matrix = self.total_initial_state
         if not cirq.is_hermitian(initial_density_matrix):
             raise ValueError("initial density matrix is not hermitian")
         total_density_matrix = initial_density_matrix
@@ -128,7 +112,7 @@ class Cooler:
         energies.append(energy)
 
         for step, env_coupling in enumerate(sweep_values):
-            print("=== step: {}/{} ===".format(step, len(sweep_values)))
+            # print("=== step: {}/{} ===".format(step, len(sweep_values)))
             fidelity, energy, total_density_matrix = self.cooling_step(
                 total_density_matrix=total_density_matrix,
                 env_coupling=env_coupling,
@@ -137,7 +121,7 @@ class Cooler:
             )
             fidelities.append(fidelity)
             energies.append(energy)
-            print_increased(fidelity, fidelities[-2], "fidelity")
+            # print_increased(fidelity, fidelities[-2], "fidelity")
             print_increased(energy, energies[-2], "energy")
             print(
                 "fidelity to gs: {}, energy diff of traced out rho: {}".format(
@@ -307,15 +291,25 @@ def get_lin_sweep(spectrum: np.ndarray, n_steps: int):
     return np.linspace(start=spectrum_width, stop=min_gap, num=n_steps)
 
 
-def expectation_wrapper(
-    observable: cirq.PauliSum, state: np.ndarray, qubits: list[cirq.Qid]
-):
-    return np.real(
-        observable.expectation_from_state_vector(
-            state.astype("complex_"),
-            qubit_map={k: v for k, v in zip(qubits, range(len(qubits)))},
+def is_density_matrix(state):
+    return len(state.shape) == 2
+
+
+def expectation_wrapper(observable, state, qubits):
+    if is_density_matrix(state):
+        return np.real(
+            observable.expectation_from_density_matrix(
+                state.astype("complex_"),
+                qubit_map={k: v for k, v in zip(qubits, range(len(qubits)))},
+            )
         )
-    )
+    else:
+        return np.real(
+            observable.expectation_from_state_vector(
+                state.astype("complex_"),
+                qubit_map={k: v for k, v in zip(qubits, range(len(qubits)))},
+            )
+        )
 
 
 def get_psum_qubits(psum: cirq.PauliSum) -> Iterable[cirq.Qid]:
