@@ -25,6 +25,7 @@ import time
 import matplotlib.pyplot as plt
 from openfermion import FermionOperator
 import itertools
+import multiprocessing as mp
 
 
 class Cooler:
@@ -268,15 +269,20 @@ def mean_gap(spectrum: np.ndarray):
     return float(np.mean(np.diff(spectrum)))
 
 
-def get_cheat_coupler(sys_eig_states, env_eig_states):
+def get_cheat_coupler(sys_eig_states, env_eig_states, qubits, to_psum: bool = False):
     coupler = 0
-    env_up = np.outer(env_eig_states[:, 1],np.conjugate(env_eig_states[:, 0]))
+    env_up = np.outer(env_eig_states[:, 1], np.conjugate(env_eig_states[:, 0]))
     for k in range(1, sys_eig_states.shape[1]):
         coupler += np.kron(
-            np.outer(sys_eig_states[:, k],np.conjugate(sys_eig_states[:, k])),
+            np.outer(sys_eig_states[:, 0], np.conjugate(sys_eig_states[:, k])),
             env_up,
         )
-    return ndarray_to_psum(coupler + np.conjugate(np.transpose(coupler)))
+    if to_psum:
+        return ndarray_to_psum(
+            coupler + np.conjugate(np.transpose(coupler)), qubits=qubits
+        )
+    else:
+        return coupler + np.conjugate(np.transpose(coupler))
 
 
 def get_log_sweep(spectrum_width: np.ndarray, n_steps: int):
@@ -408,18 +414,49 @@ def fermionic_spin_and_number(n_qubits):
     return n_up_op, n_down_op, n_total_op
 
 
-def ndarray_to_psum(mat: np.ndarray) -> cirq.PauliSum:
+def pauli_string_coeff_dispatcher(data):
+    return pauli_string_coeff(*data)
+
+
+def pauli_string_coeff(
+    mat: np.ndarray, pauli_product: list[cirq.Pauli], qubits: list[cirq.Qid]
+):
+    pauli_string = cirq.PauliString(*[m(q) for m, q in zip(pauli_product, qubits)])
+    pauli_matrix = pauli_string.matrix(qubits=qubits)
+    coeff = np.trace(mat @ pauli_matrix) / mat.shape[0]
+    return coeff, pauli_string
+
+
+def ndarray_to_psum(
+    mat: np.ndarray,
+    qubits: list[cirq.Qid] = None,
+    n_jobs: int = 32,
+    verbose: bool = False,
+) -> cirq.PauliSum:
     if len(list(set(mat.shape))) != 1:
         raise ValueError("the matrix is not square")
     n_qubits = int(np.log2(mat.shape[0]))
-    qubits = cirq.LineQubit.range(n_qubits)
+    if qubits is None:
+        qubits = cirq.LineQubit.range(n_qubits)
     pauli_matrices = (cirq.I, cirq.X, cirq.Y, cirq.Z)
     pauli_products = itertools.product(pauli_matrices, repeat=n_qubits)
     pauli_sum = cirq.PauliSum()
-    for pauli_product in pauli_products:
-        pauli_string = cirq.PauliString(*[m(q) for m, q in zip(pauli_product, qubits)])
-        pauli_matrix = pauli_string.matrix(qubits=qubits)
-        coeff = np.trace(mat @ pauli_matrix) / mat.shape[0]
-        if not np.isclose(np.abs(coeff), 0):
+    if n_jobs > 1:
+        pool = mp.Pool(n_jobs)
+        results = pool.starmap(
+            pauli_string_coeff,
+            ((mat, pauli_product, qubits) for pauli_product in pauli_products),
+        )
+
+        for result in results:
+            coeff, pauli_string = result
             pauli_sum += cirq.PauliString(pauli_string, coeff)
+        pool.close()
+        pool.join()
+    else:
+        for pauli_product in pauli_products:
+            if verbose:
+                print(pauli_product, coeff)
+            if not np.isclose(np.abs(coeff), 0):
+                pauli_sum += cirq.PauliString(pauli_string, coeff)
     return pauli_sum
