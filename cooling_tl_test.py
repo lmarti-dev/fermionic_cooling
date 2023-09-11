@@ -21,8 +21,9 @@ model = Ising(
 )
 sys_qubits = model.flattened_qubits
 n_sys_qubits = len(sys_qubits)
-sys_initial_state = np.random.rand(2 ** (n[0] * n[1]))
-sys_initial_state = sys_initial_state / np.linalg.norm(sys_initial_state)
+# sys_initial_state = np.random.rand(2 ** (n[0] * n[1]))
+# sys_initial_state = sys_initial_state / np.linalg.norm(sys_initial_state)
+sys_initial_state = np.eye(2 ** (n[0] * n[1])) / 2 ** (n[0] * n[1])
 
 model.diagonalise()
 sys_ground_state = model.eig_vec[0]
@@ -56,10 +57,10 @@ coupler = cirq.X(sys_qubits[0]) * cirq.X(env_qubits[0])
 # get environment ham sweep values
 spectrum_width = max(model.eig_val) - min(model.eig_val)
 
-n_steps = 100
+n_steps = 3000
 sweep_values = get_log_sweep(spectrum_width, n_steps)
 # coupling strength value
-alphas = sweep_values / 10
+alphas = sweep_values / 100
 evolution_times = np.pi / alphas
 
 # call cool
