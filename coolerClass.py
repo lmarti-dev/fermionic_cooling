@@ -469,3 +469,15 @@ def ndarray_to_psum(
             if not np.isclose(np.abs(coeff), 0):
                 pauli_sum += cirq.PauliString(pauli_string, coeff)
     return pauli_sum
+
+
+def get_Z_env(n_qubits, top):
+    # environment stuff
+    env_qubits = cirq.LineQubit.range(n_qubits)
+    n_env_qubits = len(env_qubits)
+    env_ham = -sum((cirq.Z(q) for q in env_qubits)) / 2
+    env_ground_state = np.zeros((2**n_env_qubits))
+    env_ground_state[0] = 1
+    env_matrix = env_ham.matrix(qubits=env_qubits)
+    env_energies, env_eig_states = np.linalg.eigh(env_matrix)
+    return env_qubits, env_ground_state, env_ham, env_energies, env_eig_states
