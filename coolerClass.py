@@ -372,7 +372,7 @@ def get_ground_state(ham: cirq.PauliSum, qubits: Iterable[cirq.Qid]) -> np.ndarr
     return ground_state
 
 
-def partial_two_system_trace(rho: np.ndarray, n1: int, n2: int):
+def two_tensors_partial_trace(rho: np.ndarray, n1: int, n2: int):
     """Compute the partial trace of a two density matrix tensor product, ie rho = rho_a otimes rho_b, tr_b(rho) = rho_a
     The density matrices are assumed to have shapes rho_a = 2**n1 x 2**n2 and rho_b = 2**n2 x 2**n2
 
@@ -405,7 +405,7 @@ def trace_out_env(
     if use_refik:
         return ptrace(A=rho, ind=range(n_sys_qubits, n_env_qubits + n_sys_qubits))
     else:
-        return partial_two_system_trace(rho=rho, n1=n_sys_qubits, n2=n_env_qubits)
+        return two_tensors_partial_trace(rho=rho, n1=n_sys_qubits, n2=n_env_qubits)
 
 
 def ketbra(ket: np.ndarray):
