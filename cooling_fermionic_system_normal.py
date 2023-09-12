@@ -104,10 +104,16 @@ def __main__(args):
         verbosity=0,
     )
 
-    fidelities, energies = cooler.cool(
+    # fidelities, energies = cooler.cool(
+    #     alphas=alphas,
+    #     evolution_times=evolution_times,
+    #     sweep_values=sweep_values,
+    # )
+    fidelities, energies, omegas = cooler.big_brain_cool(
         alphas=alphas,
         evolution_times=evolution_times,
-        sweep_values=sweep_values,
+        start_omega=spectrum_width,
+        stop_omega=min_gap,
     )
 
     print(sys_eigenspectrum)

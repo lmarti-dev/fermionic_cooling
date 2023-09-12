@@ -79,9 +79,9 @@ def __main__(args):
 
     min_gap = sorted(np.abs(np.diff(sys_eigenspectrum)))[0]
 
-    n_steps = 100
-    sweep_values = get_log_sweep(spectrum_width, n_steps)
-    # sweep_values = get_cheat_sweep(sys_eigenspectrum, n_steps)
+    n_steps = 1000
+    # sweep_values = get_log_sweep(spectrum_width, n_steps)
+    sweep_values = get_cheat_sweep(sys_eigenspectrum, n_steps)
     # np.random.shuffle(sweep_values)
     # coupling strength value
     alphas = sweep_values / 10
@@ -99,7 +99,7 @@ def __main__(args):
         env_qubits=env_qubits,
         env_ground_state=env_ground_state,
         sys_env_coupling=coupler,
-        verbosity=3,
+        verbosity=0,
     )
 
     fidelities, energies = cooler.cool(
@@ -112,7 +112,12 @@ def __main__(args):
 
     print("Final Fidelity: {}".format(fidelities[-1]))
 
-    cooler.plot_cooling(energies, fidelities, sys_eigenspectrum)
+    cooler.plot_cooling(
+        energies,
+        fidelities,
+        sys_eigenspectrum,
+        suptitle="Cooling 2$\\times$2 Fermi-Hubbard",
+    )
 
 
 if __name__ == "__main__":

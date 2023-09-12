@@ -26,6 +26,8 @@ import matplotlib.pyplot as plt
 from openfermion import FermionOperator
 import itertools
 import multiprocessing as mp
+import helpers.plotting_tools as ptools
+from tqdm import tqdm
 
 
 class Cooler:
@@ -97,6 +99,11 @@ class Cooler:
     def sys_energy(self, sys_state: np.ndarray):
         return expectation_wrapper(self.sys_hamiltonian, sys_state, self.sys_qubits)
 
+    def env_energy(self, env_state: np.ndarray):
+        return expectation_wrapper(
+            self.env_hamiltonian, env_state, self.sys_qubits + self.env_qubits
+        )
+
     def cool(
         self,
         evolution_times: np.ndarray,
@@ -111,36 +118,114 @@ class Cooler:
         fidelities = []
         energies = []
 
-        fidelity = self.sys_fidelity(self.sys_initial_state)
-        energy = self.sys_energy(self.sys_initial_state)
+        sys_fidelity = self.sys_fidelity(self.sys_initial_state)
+        sys_energy = self.sys_energy(self.sys_initial_state)
 
         self.verbose_print(
             "initial fidelity to gs: {}, initial energy of traced out rho: {}, ground energy: {}".format(
-                fidelity, energy, self.sys_ground_energy
-            )
+                sys_fidelity, sys_energy, self.sys_ground_energy
+            ),
+            message_level=9,
         )
 
-        fidelities.append(fidelity)
-        energies.append(energy)
+        fidelities.append(sys_fidelity)
+        energies.append(sys_energy)
 
-        for step, env_coupling in enumerate(sweep_values):
+        for step, env_coupling in tqdm(
+            enumerate(sweep_values), total=len(sweep_values)
+        ):
             # print("=== step: {}/{} ===".format(step, len(sweep_values)))
-            fidelity, energy, total_density_matrix = self.cooling_step(
+            sys_fidelity, sys_energy, _, total_density_matrix = self.cooling_step(
                 total_density_matrix=total_density_matrix,
                 env_coupling=env_coupling,
                 alpha=alphas[step],
                 evolution_time=evolution_times[step],
             )
-            fidelities.append(fidelity)
-            energies.append(energy)
-            self.verbose_print(has_increased(fidelity, fidelities[-2], "fidelity"))
-            self.verbose_print(has_increased(energy, energies[-2], "energy"))
+            fidelities.append(sys_fidelity)
+            energies.append(sys_energy)
+            self.verbose_print(
+                has_increased(sys_fidelity, fidelities[-2], "fidelity"), message_level=9
+            )
+            self.verbose_print(
+                has_increased(sys_energy, energies[-2], "energy"), message_level=9
+            )
             self.verbose_print(
                 "fidelity to gs: {}, energy diff of traced out rho: {}".format(
-                    fidelity, energy - self.sys_ground_energy
-                )
+                    sys_fidelity, sys_energy - self.sys_ground_energy
+                ),
+                message_level=9,
             )
         return fidelities, energies
+
+    def big_brain_cool(
+        self,
+        evolution_times: np.ndarray,
+        alphas: np.ndarray,
+        start_omega: float,
+        stop_omega: float,
+        ansatz_options: dict = {},
+    ):
+        initial_density_matrix = self.total_initial_state
+        if not cirq.is_hermitian(initial_density_matrix):
+            raise ValueError("initial density matrix is not hermitian")
+        total_density_matrix = initial_density_matrix
+
+        fidelities = []
+        energies = []
+        omegas = []
+
+        sys_fidelity = self.sys_fidelity(self.sys_initial_state)
+        sys_energy = self.sys_energy(self.sys_initial_state)
+
+        self.verbose_print(
+            "initial fidelity to gs: {}, initial energy of traced out rho: {}, ground energy: {}".format(
+                sys_fidelity, sys_energy, self.sys_ground_energy
+            ),
+            message_level=8,
+        )
+
+        fidelities.append(sys_fidelity)
+        energies.append(sys_energy)
+
+        omega = start_omega
+        step = 0
+        while omega > stop_omega:
+            (
+                sys_fidelity,
+                sys_energy,
+                env_energy,
+                total_density_matrix,
+            ) = self.cooling_step(
+                total_density_matrix=total_density_matrix,
+                env_coupling=omega,
+                alpha=alphas[step],
+                evolution_time=evolution_times[step],
+            )
+            fidelities.append(sys_fidelity)
+            energies.append(sys_energy)
+            omegas.append(omega)
+            self.verbose_print(
+                has_increased(sys_fidelity, fidelities[-2], "fidelity"), message_level=9
+            )
+            self.verbose_print(
+                has_increased(sys_energy, energies[-2], "energy"), message_level=9
+            )
+            self.verbose_print(
+                "fidelity to gs: {}, energy diff of traced out rho: {}".format(
+                    sys_fidelity, sys_energy - self.sys_ground_energy
+                ),
+                message_level=5,
+            )
+            epsilon = gap_ansatz(omega=omega, t_fridge=env_energy, **ansatz_options)
+            omega = omega - epsilon
+            step += 1
+            self.verbose_print(
+                "prev: {} curr: {} start: {} stop: {}".format(
+                    omega + epsilon, omega, start_omega, stop_omega
+                ),
+                message_level=5,
+            )
+        return fidelities, energies, omegas
 
     def cooling_step(
         self,
@@ -151,11 +236,15 @@ class Cooler:
     ):
         cooling_hamiltonian = self.cooling_hamiltonian(env_coupling, alpha)
 
-        self.verbose_print("env coupling value: {}".format(env_coupling))
-        self.verbose_print("alpha value: {}".format(alpha))
-        self.verbose_print("evolution_time value: {}".format(evolution_time))
+        self.verbose_print(
+            "env coupling value: {}".format(env_coupling), message_level=10
+        )
+        self.verbose_print("alpha value: {}".format(alpha), message_level=10)
+        self.verbose_print(
+            "evolution_time value: {}".format(evolution_time), message_level=10
+        )
 
-        self.verbose_print("evolving...")
+        self.verbose_print("evolving...", message_level=10)
         total_density_matrix = time_evolve_density_matrix(
             ham=cooling_hamiltonian,  # .matrix(qubits=self.total_qubits),
             rho=total_density_matrix,
@@ -167,104 +256,58 @@ class Cooler:
             n_sys_qubits=len(self.sys_qubits),
             n_env_qubits=len(self.env_qubits),
         )
-        self.verbose_print("computing values...")
-        fidelity = self.sys_fidelity(traced_density_matrix)
-        energy = self.sys_energy(traced_density_matrix)
 
-        self.verbose_print("retensoring...")
+        # renormalizing to avoid errors
+        traced_density_matrix /= np.trace(traced_density_matrix)
+        total_density_matrix /= np.trace(total_density_matrix)
+
+        # computing useful values
+        self.verbose_print("computing values...", message_level=10)
+        sys_fidelity = self.sys_fidelity(traced_density_matrix)
+        sys_energy = self.sys_energy(traced_density_matrix)
+        env_energy = self.env_energy(total_density_matrix)
+
+        self.verbose_print("retensoring...", message_level=10)
         total_density_matrix = np.kron(
             traced_density_matrix, self.env_ground_density_matrix
         )
-        return fidelity, energy, total_density_matrix
-
-    def forced_cool(
-        self,
-        evolution_times: np.ndarray,
-        alphas: np.ndarray,
-        sweep_values: Iterable[float],
-    ):
-        initial_density_matrix = ketbra(self.total_initial_state)
-        if not cirq.is_hermitian(initial_density_matrix):
-            raise ValueError("initial density matrix is not hermitian")
-        total_density_matrix = initial_density_matrix
-
-        fidelities = []
-        energies = []
-
-        fidelity = self.sys_fidelity(self.sys_initial_state)
-        energy = self.sys_energy(self.sys_initial_state)
-
-        self.verbose_print(
-            "initial fidelity to gs: {}, initial energy of traced out rho: {}, ground energy: {}".format(
-                fidelity, energy, self.sys_ground_energy
-            )
-        )
-
-        fidelities.append(fidelity)
-        energies.append(energy)
-
-        for step, env_coupling in enumerate(sweep_values):
-            fidelity, energy, total_density_matrix = self.cooling_step(
-                total_density_matrix=total_density_matrix,
-                env_coupling=env_coupling,
-                alpha=alphas[step],
-                evolution_time=evolution_times[step],
-            )
-            fidelities.append(fidelity)
-            energies.append(energy)
-            self.verbose_print(
-                "fidelity to gs: {}, energy diff of traced out rho: {}".format(
-                    fidelity, energy - self.sys_ground_energy
-                )
-            )
-
-            iteration_number = 1
-            while energy + 1e-4 < energies[-2]:
-                self.verbose_print("while loop iteration {}".format(iteration_number))
-                fidelity, energy, total_density_matrix = self.cooling_step(
-                    total_density_matrix=total_density_matrix,
-                    env_coupling=env_coupling,
-                    alpha=alphas[step],
-                    evolution_time=evolution_times[step],
-                )
-                fidelities.append(fidelity)
-                energies.append(energy)
-                self.verbose_print(
-                    has_increased(fidelity, fidelities[-2], "while fidelity")
-                )
-                self.verbose_print(has_increased(energy, energies[-2], "while energy"))
-                self.verbose_print(
-                    "fidelity to gs: {}, energy diff of traced out rho: {}".format(
-                        fidelity, energy - self.sys_ground_energy
-                    )
-                )
-                iteration_number += 1
-        return fidelities, energies
+        return sys_fidelity, sys_energy, env_energy, total_density_matrix
 
     def plot_cooling(
-        self, energies: list, fidelities: list, sys_eigenspectrum: np.ndarray = None
+        self,
+        energies: list,
+        fidelities: list,
+        sys_eigenspectrum: np.ndarray = None,
+        suptitle: str = None,
     ):
         if sys_eigenspectrum is None:
             nrows = 2
         else:
             nrows = 3
         fig, axes = plt.subplots(nrows=nrows, figsize=(5, 3))
-        plt.rcParams.update({"font.size": 22})
 
-        axes[0].plot(
-            range(len(fidelities)),
-            fidelities,
-        )
+        axes[0].plot(range(len(fidelities)), fidelities, color="k", linewidth=2)
         axes[0].set_ylabel(r"$|\langle \psi_{cool} | \psi_{gs} \rangle|^2$", labelpad=0)
         axes[1].plot(
             range(len(energies)),
             (np.array(energies) - self.sys_ground_energy)
             / np.abs(self.sys_ground_energy),
+            color="k",
+            linewidth=2,
         )
         axes[1].set_ylabel(r"$\frac{E_{cool}-E_0}{|E_0|}$", labelpad=0)
         if sys_eigenspectrum is not None:
-            axes[2].hlines(sys_eigenspectrum, xmin=-2, xmax=2)
+            axes[2].hlines(
+                sys_eigenspectrum,
+                xmin=-1,
+                xmax=1,
+                color="k",
+            )
             axes[2].set_ylabel("Eigenenergies")
+
+        ptools.plt_params_set()
+        if suptitle:
+            fig.suptitle(suptitle)
 
         plt.show()
 
@@ -491,3 +534,23 @@ def get_YY_coupler(
     return sum(
         [cirq.Y(sys_qubits[k]) * cirq.Y(env_qubits[k]) for k in range(n_sys_qubits)]
     )
+
+
+def gap_ansatz(
+    omega: float, t_fridge: float, beta: float = 1, mu: float = 1, f: callable = None
+):
+    """Creates an ansatz for the derivative of omega, the strength of the environment. This is all control theory stuff, and I'm too dumb to get it
+
+    Args:
+        omega (float): the current value of omega
+        beta (float): the general prefactor
+        mu (float): the power of t_fridge
+        t_fridge (float): the energy expectation of the environment
+        f (callable, optional): the function wrapping omega. Defaults to None.
+
+    Returns:
+        _type_: _description_
+    """
+    if f is None:
+        f = lambda x: x
+    return beta * f(omega) / (t_fridge**mu)
