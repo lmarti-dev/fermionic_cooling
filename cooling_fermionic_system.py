@@ -123,3 +123,7 @@ def __main__():
     print("Final Fidelity: {}".format(fidelities[-1]))
 
     cooler.plot_cooling(energies, fidelities, sys_eigenspectrum)
+
+
+if __name__ == "__main__":
+    __main__(sys.argv)
