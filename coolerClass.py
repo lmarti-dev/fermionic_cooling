@@ -372,6 +372,29 @@ def get_ground_state(ham: cirq.PauliSum, qubits: Iterable[cirq.Qid]) -> np.ndarr
     return ground_state
 
 
+def partial_two_system_trace(rho: np.ndarray, n1: int, n2: int):
+    """Compute the partial trace of a two density matrix tensor product, ie rho = rho_a otimes rho_b, tr_b(rho) = rho_a
+    The density matrices are assumed to have shapes rho_a = 2**n1 x 2**n2 and rho_b = 2**n2 x 2**n2
+
+    Args:
+        rho (np.ndarray): the total matrix
+        n1 (int): the number of qubits in the first matrix
+        n2 (int): the number of qubits in the second matrix
+    """
+    traced_rho = np.zeros((2**n1, 2**n1), dtype="complex_")
+    # print("traced rho shape: {} rho shape: {}".format(traced_rho.shape, rho.shape))
+    for iii in range(2**n1):
+        for jjj in range(2**n1):
+            # take rho[i*env qubits:i*env qubits + env qubtis]
+            traced_rho[iii, jjj] = np.trace(
+                rho[
+                    iii * (2**n2) : (iii + 1) * (2**n2),
+                    jjj * (2**n2) : (jjj + 1) * (2**n2),
+                ]
+            )
+    return traced_rho
+
+
 def trace_out_env(
     rho: np.ndarray,
     n_sys_qubits: int,
@@ -382,18 +405,7 @@ def trace_out_env(
     if use_refik:
         return ptrace(A=rho, ind=range(n_sys_qubits, n_env_qubits + n_sys_qubits))
     else:
-        traced_rho = np.zeros((2**n_sys_qubits, 2**n_sys_qubits), dtype="complex_")
-        # print("traced rho shape: {} rho shape: {}".format(traced_rho.shape, rho.shape))
-        for iii in range(2**n_sys_qubits):
-            for jjj in range(2**n_sys_qubits):
-                # take rho[i*env qubits:i*env qubits + env qubtis]
-                traced_rho[iii, jjj] = np.trace(
-                    rho[
-                        iii * (2**n_env_qubits) : (iii + 1) * (2**n_env_qubits),
-                        jjj * (2**n_env_qubits) : (jjj + 1) * (2**n_env_qubits),
-                    ]
-                )
-        return traced_rho
+        return partial_two_system_trace(rho=rho, n1=n_sys_qubits, n2=n_env_qubits)
 
 
 def ketbra(ket: np.ndarray):
