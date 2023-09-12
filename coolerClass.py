@@ -255,7 +255,7 @@ class Cooler:
             range(len(fidelities)),
             fidelities,
         )
-        axes[0].set_ylabel(r"$\langle \psi_{cool} | \psi_{gs} \rangle$", labelpad=0)
+        axes[0].set_ylabel(r"$|\langle \psi_{cool} | \psi_{gs} \rangle|^2$", labelpad=0)
         axes[1].plot(
             range(len(energies)),
             (np.array(energies) - self.sys_ground_energy)
@@ -471,7 +471,7 @@ def ndarray_to_psum(
     return pauli_sum
 
 
-def get_Z_env(n_qubits, top):
+def get_Z_env(n_qubits):
     # environment stuff
     env_qubits = cirq.LineQubit.range(n_qubits)
     n_env_qubits = len(env_qubits)
