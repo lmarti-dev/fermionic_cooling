@@ -26,6 +26,7 @@ import matplotlib.pyplot as plt
 from openfermion import FermionOperator
 import itertools
 import multiprocessing as mp
+from fauvqe.models.circuits.cooling import ptrace
 
 
 class Cooler:
@@ -369,45 +370,6 @@ def time_evolve_density_matrix(
 def get_ground_state(ham: cirq.PauliSum, qubits: Iterable[cirq.Qid]) -> np.ndarray:
     _, ground_state = eigsh(ham.matrix(qubits=qubits), k=1, which="SA")
     return ground_state
-
-
-def ptrace(A: np.ndarray, ind: list[np.uint]) -> np.ndarray:
-    """
-    Calculates partial trace of A over the indices indicated by ind
-
-    Parameters
-    ----------
-    self
-    A: np.array
-        matrix which is partially traced over
-    ind: List[np.uint]
-        indices which are being traced
-
-    Returns
-    -------
-    Tr_ind(A): np.ndarray
-    """
-    # number of qubits
-    n = np.log2(len(A))
-    assert (
-        abs(n - int(n)) < 1e-13
-    ), "Wrong matrix size. Required 2^n, Received {}".format(n)
-    n = int(n)
-    # Reshape into qubit indices
-    temp = A.reshape(*[2 for _ in range(2 * n)])
-    count = 0
-    if hasattr(ind, "__len__"):
-        for i in sorted(ind, reverse=True):
-            # Trace over the correct axes
-            temp = np.trace(temp, axis1=i - count, axis2=n + i - 2 * count)
-            count += 1
-        # Reshape back into two-index shape
-        return temp.reshape(2 ** (n - count), 2 ** (n - count))
-    else:
-        # Reshape back into two-index shape
-        return np.trace(temp, axis1=ind, axis2=n + ind).reshape(
-            2 ** (n - 1), 2 ** (n - 1)
-        )
 
 
 def trace_out_env(
