@@ -20,8 +20,20 @@ import numpy as np
 from fauvqe.utilities import spin_dicke_state, qmap
 
 
-if __name__ == "__main__":
-    # system stuff
+def get_Z_env(n_qubits, top):
+    # environment stuff
+    env_qubits = cirq.GridQubit.rect(n_qubits, 1, top=top)
+    n_env_qubits = len(env_qubits)
+    env_ham = -sum((cirq.Z(q) for q in env_qubits))
+    env_ground_state = np.zeros((2**n_env_qubits))
+    env_ground_state[0] = 1
+    env_matrix = env_ham.matrix(qubits=env_qubits)
+    env_energies, env_eig_states = np.linalg.eigh(env_matrix)
+    return env_qubits, env_ground_state, env_ham, env_energies, env_eig_states
+
+
+def __main__():
+    # model stuff
     model = FermiHubbardModel(x_dimension=1, y_dimension=2, tunneling=1, coulomb=2)
     Nf = [1, 1]
     sys_qubits = model.flattened_qubits
@@ -49,28 +61,16 @@ if __name__ == "__main__":
         model.hamiltonian, sys_ground_state, model.flattened_qubits
     )
 
-fidelity = cirq.fidelity(
-    sys_initial_state, sys_ground_state, qid_shape=(2,) * (len(model.flattened_qubits))
-)
-print("initial fidelity: {}".format(fidelity))
-print("ground energy from spectrum: {}".format(sys_ground_energy))
-print("ground energy from model: {}".format(sys_ground_energy_exp))
-print("initial energy from model: {}".format(sys_initial_energy))
+    fidelity = cirq.fidelity(
+        sys_initial_state,
+        sys_ground_state,
+        qid_shape=(2,) * (len(model.flattened_qubits)),
+    )
+    print("initial fidelity: {}".format(fidelity))
+    print("ground energy from spectrum: {}".format(sys_ground_energy))
+    print("ground energy from model: {}".format(sys_ground_energy_exp))
+    print("initial energy from model: {}".format(sys_initial_energy))
 
-
-def get_Z_env(n_qubits, top):
-    # environment stuff
-    env_qubits = cirq.GridQubit.rect(n_qubits, 1, top=top)
-    n_env_qubits = len(env_qubits)
-    env_ham = -sum((cirq.Z(q) for q in env_qubits))
-    env_ground_state = np.zeros((2**n_env_qubits))
-    env_ground_state[0] = 1
-    env_matrix = env_ham.matrix(qubits=env_qubits)
-    env_energies, env_eig_states = np.linalg.eigh(env_matrix)
-    return env_qubits, env_ground_state, env_ham, env_energies, env_eig_states
-
-
-if __name__ == "__main__":
     env_qubits, env_ground_state, env_ham, env_energies, env_eig_states = get_Z_env(
         n_qubits=n_sys_qubits, top=Nf[0]
     )
