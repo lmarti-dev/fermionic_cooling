@@ -289,8 +289,10 @@ def get_cheat_coupler(sys_eig_states, env_eig_states, qubits, to_psum: bool = Fa
         return coupler + np.conjugate(np.transpose(coupler))
 
 
-def get_log_sweep(spectrum_width: np.ndarray, n_steps: int):
-    return spectrum_width * (np.logspace(start=0, stop=-5, base=10, num=n_steps))
+def get_log_sweep(spectrum_width: np.ndarray, n_steps: int, n_rep: int = 1):
+    return np.tile(
+        spectrum_width * (np.logspace(start=0, stop=-5, base=10, num=n_steps)), n_rep
+    )
 
 
 def get_cheat_sweep(spectrum: np.ndarray, n_steps: int = None):

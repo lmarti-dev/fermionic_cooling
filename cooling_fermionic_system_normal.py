@@ -81,8 +81,9 @@ def __main__(args):
 
     min_gap = sorted(np.abs(np.diff(sys_eigenspectrum)))[0]
 
-    n_steps = 1000
-    sweep_values = get_log_sweep(spectrum_width, n_steps)
+    n_steps = 100
+    n_rep = 10
+    sweep_values = get_log_sweep(spectrum_width, n_steps, n_rep)
     # sweep_values = get_cheat_sweep(sys_eigenspectrum, n_steps)
     # np.random.shuffle(sweep_values)
     # coupling strength value
