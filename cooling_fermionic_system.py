@@ -32,7 +32,7 @@ def get_Z_env(n_qubits, top):
     return env_qubits, env_ground_state, env_ham, env_energies, env_eig_states
 
 
-def __main__():
+def __main__(args):
     # model stuff
     model = FermiHubbardModel(x_dimension=1, y_dimension=2, tunneling=1, coulomb=2)
     Nf = [1, 1]
