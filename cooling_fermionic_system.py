@@ -68,17 +68,9 @@ def get_Z_env(n_qubits, top):
     env_matrix = env_ham.matrix(qubits=env_qubits)
     env_energies, env_eig_states = np.linalg.eigh(env_matrix)
     return env_qubits, env_ground_state, env_ham, env_energies, env_eig_states
-    def get_Z_env(n_qubits, top):
-        # environment stuff
-        env_qubits = cirq.GridQubit.rect(n_qubits, 1, top=top)
-        n_env_qubits = len(env_qubits)
-        env_ham = -sum((cirq.Z(q) for q in env_qubits))
-        env_ground_state = np.zeros((2**n_env_qubits))
-        env_ground_state[0] = 1
-        env_matrix = env_ham.matrix(qubits=env_qubits)
-        env_energies, env_eig_states = np.linalg.eigh(env_matrix)
-        return env_qubits, env_ground_state, env_ham, env_energies, env_eig_states
 
+
+if __name__ == "__main__":
     env_qubits, env_ground_state, env_ham, env_energies, env_eig_states = get_Z_env(
         n_qubits=n_sys_qubits, top=Nf[0]
     )
@@ -99,12 +91,12 @@ def get_Z_env(n_qubits, top):
 
     min_gap = sorted(np.abs(np.diff(sys_eigenspectrum)))[0]
 
-    n_steps = 100
+    n_steps = 1000
     # sweep_values = get_log_sweep(spectrum_width, n_steps)
     sweep_values = get_cheat_sweep(sys_eigenspectrum, n_steps)
     # np.random.shuffle(sweep_values)
     # coupling strength value
-    alphas = sweep_values * 4
+    alphas = sweep_values
     evolution_times = np.pi / (alphas)
     # evolution_time = 1e-3
 
@@ -128,6 +120,6 @@ def get_Z_env(n_qubits, top):
         sweep_values=sweep_values,
     )
 
-print("Final Fidelity: {}".format(fidelities[-1]))
+    print("Final Fidelity: {}".format(fidelities[-1]))
 
     cooler.plot_cooling(energies, fidelities, sys_eigenspectrum)
