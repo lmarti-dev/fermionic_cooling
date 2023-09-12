@@ -26,7 +26,6 @@ import matplotlib.pyplot as plt
 from openfermion import FermionOperator
 import itertools
 import multiprocessing as mp
-from fauvqe.models.circuits.cooling import ptrace
 
 
 class Cooler:
@@ -167,7 +166,6 @@ class Cooler:
             rho=total_density_matrix,
             n_sys_qubits=len(self.sys_qubits),
             n_env_qubits=len(self.env_qubits),
-            use_refik=False,
         )
         self.verbose_print("computing values...")
         fidelity = self.sys_fidelity(traced_density_matrix)
@@ -399,13 +397,8 @@ def trace_out_env(
     rho: np.ndarray,
     n_sys_qubits: int,
     n_env_qubits: int,
-    use_refik: bool = False,
 ):
-    # print("tracing out environment...")
-    if use_refik:
-        return ptrace(A=rho, ind=range(n_sys_qubits, n_env_qubits + n_sys_qubits))
-    else:
-        return two_tensors_partial_trace(rho=rho, n1=n_sys_qubits, n2=n_env_qubits)
+    return two_tensors_partial_trace(rho=rho, n1=n_sys_qubits, n2=n_env_qubits)
 
 
 def ketbra(ket: np.ndarray):
