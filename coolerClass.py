@@ -62,7 +62,7 @@ class Cooler:
             print(s)
 
     def cooling_hamiltonian(self, env_coupling: float, alpha: float):
-        if isinstance(self.sys_env_coupling, cirq.PauliSum):
+        if isinstance(self.sys_env_coupling, (cirq.PauliSum, cirq.PauliString)):
             coupler = self.sys_env_coupling.matrix(qubits=self.total_qubits)
         else:
             coupler = self.sys_env_coupling

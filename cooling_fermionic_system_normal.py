@@ -61,16 +61,18 @@ def __main__(args):
     print("initial energy from model: {}".format(sys_initial_energy))
 
     env_qubits, env_ground_state, env_ham, env_energies, env_eig_states = get_Z_env(
-        n_qubits=1, top=Nf[0]
+        n_qubits=n_sys_qubits, top=Nf[0]
     )
 
     # coupler
-    # coupler = cirq.Y(sys_qubits[0]) * cirq.Y(env_qubits[0])  # Interaction only on Qubit 0?
-    coupler = get_cheat_coupler(
-        sys_eig_states=sys_eigenstates,
-        env_eig_states=env_eig_states,
-        qubits=sys_qubits + env_qubits,
+    coupler = sum(
+        [cirq.Y(sys_qubits[k]) * cirq.Y(env_qubits[k]) for k in range(n_sys_qubits)]
     )  # Interaction only on Qubit 0?
+    # coupler = get_cheat_coupler(
+    #    sys_eig_states=sys_eigenstates,
+    #    env_eig_states=env_eig_states,
+    #    qubits=sys_qubits + env_qubits,
+    # )  # Interaction only on Qubit 0?
     print("coupler done")
     # coupler = get_cheat_coupler(sys_eigenstates, env_eigenstates)
 
@@ -80,11 +82,11 @@ def __main__(args):
     min_gap = sorted(np.abs(np.diff(sys_eigenspectrum)))[0]
 
     n_steps = 1000
-    # sweep_values = get_log_sweep(spectrum_width, n_steps)
-    sweep_values = get_cheat_sweep(sys_eigenspectrum, n_steps)
+    sweep_values = get_log_sweep(spectrum_width, n_steps)
+    # sweep_values = get_cheat_sweep(sys_eigenspectrum, n_steps)
     # np.random.shuffle(sweep_values)
     # coupling strength value
-    alphas = sweep_values / 10
+    alphas = sweep_values / 10 / 10
     evolution_times = np.pi / (alphas)
     # evolution_time = 1e-3
 
@@ -99,7 +101,7 @@ def __main__(args):
         env_qubits=env_qubits,
         env_ground_state=env_ground_state,
         sys_env_coupling=coupler,
-        verbosity=3,
+        verbosity=0,
     )
 
     fidelities, energies = cooler.cool(
