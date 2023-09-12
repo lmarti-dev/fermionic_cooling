@@ -42,8 +42,7 @@ def __main__(args):
         n_orbitals=n_sys_qubits, n_electrons=sum(Nf)
     )
     sys_dicke = spin_dicke_state(n_qubits=n_sys_qubits, Nf=Nf, right_to_left=True)
-    sys_initial_state = sys_hartree_fock
-    # sys_initial_state = ketbra(sys_hartree_fock)
+    sys_initial_state = ketbra(sys_hartree_fock)
     sys_eigenspectrum, sys_eigenstates = jw_eigenspectrum_at_particle_number(
         sparse_operator=get_sparse_operator(
             model.fock_hamiltonian,
@@ -83,7 +82,6 @@ def __main__(args):
         env_eig_states=env_eig_states,
         qubits=sys_qubits + env_qubits,
     )  # Interaction only on Qubit 0?
-
     print("coupler done")
     # coupler = get_cheat_coupler(sys_eigenstates, env_eigenstates)
 
@@ -97,7 +95,7 @@ def __main__(args):
     sweep_values = get_cheat_sweep(sys_eigenspectrum, n_steps)
     # np.random.shuffle(sweep_values)
     # coupling strength value
-    alphas = sweep_values
+    alphas = sweep_values / 10
     evolution_times = np.pi / (alphas)
     # evolution_time = 1e-3
 
@@ -120,6 +118,8 @@ def __main__(args):
         evolution_times=evolution_times,
         sweep_values=sweep_values,
     )
+
+    print(sys_eigenspectrum)
 
     print("Final Fidelity: {}".format(fidelities[-1]))
 
