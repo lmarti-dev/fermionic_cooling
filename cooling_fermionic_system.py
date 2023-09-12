@@ -24,7 +24,7 @@ def get_Z_env(n_qubits, top):
     # environment stuff
     env_qubits = cirq.GridQubit.rect(n_qubits, 1, top=top)
     n_env_qubits = len(env_qubits)
-    env_ham = -sum((cirq.Z(q) for q in env_qubits))
+    env_ham = -sum((cirq.Z(q) for q in env_qubits)) / 2
     env_ground_state = np.zeros((2**n_env_qubits))
     env_ground_state[0] = 1
     env_matrix = env_ham.matrix(qubits=env_qubits)
@@ -42,7 +42,7 @@ def __main__(args):
         n_orbitals=n_sys_qubits, n_electrons=sum(Nf)
     )
     sys_dicke = spin_dicke_state(n_qubits=n_sys_qubits, Nf=Nf, right_to_left=True)
-    sys_initial_state = ketbra(sys_hartree_fock)
+    sys_initial_state = ketbra(sys_dicke)
     sys_eigenspectrum, sys_eigenstates = jw_eigenspectrum_at_particle_number(
         sparse_operator=get_sparse_operator(
             model.fock_hamiltonian,
@@ -82,7 +82,6 @@ def __main__(args):
         env_eig_states=env_eig_states,
         qubits=sys_qubits + env_qubits,
     )  # Interaction only on Qubit 0?
-
     print("coupler done")
     # coupler = get_cheat_coupler(sys_eigenstates, env_eigenstates)
 
@@ -91,12 +90,12 @@ def __main__(args):
 
     min_gap = sorted(np.abs(np.diff(sys_eigenspectrum)))[0]
 
-    n_steps = 1000
+    n_steps = 100
     # sweep_values = get_log_sweep(spectrum_width, n_steps)
     sweep_values = get_cheat_sweep(sys_eigenspectrum, n_steps)
     # np.random.shuffle(sweep_values)
     # coupling strength value
-    alphas = sweep_values
+    alphas = sweep_values / 10
     evolution_times = np.pi / (alphas)
     # evolution_time = 1e-3
 
@@ -119,6 +118,8 @@ def __main__(args):
         evolution_times=evolution_times,
         sweep_values=sweep_values,
     )
+
+    print(sys_eigenspectrum)
 
     print("Final Fidelity: {}".format(fidelities[-1]))
 
