@@ -481,3 +481,11 @@ def get_Z_env(n_qubits):
     env_matrix = env_ham.matrix(qubits=env_qubits)
     env_energies, env_eig_states = np.linalg.eigh(env_matrix)
     return env_qubits, env_ground_state, env_ham, env_energies, env_eig_states
+
+
+def get_YY_coupler(
+    sys_qubits: list[cirq.Qid], env_qubits: list[cirq.Qid], n_sys_qubits: int
+):
+    return sum(
+        [cirq.Y(sys_qubits[k]) * cirq.Y(env_qubits[k]) for k in range(n_sys_qubits)]
+    )
