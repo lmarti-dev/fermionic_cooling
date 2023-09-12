@@ -166,6 +166,7 @@ class Cooler:
             rho=total_density_matrix,
             n_sys_qubits=len(self.sys_qubits),
             n_env_qubits=len(self.env_qubits),
+            use_refik=False,
         )
         self.verbose_print("computing values...")
         fidelity = self.sys_fidelity(traced_density_matrix)
@@ -370,30 +371,67 @@ def get_ground_state(ham: cirq.PauliSum, qubits: Iterable[cirq.Qid]) -> np.ndarr
     return ground_state
 
 
+def ptrace(A: np.ndarray, ind: list[np.uint]) -> np.ndarray:
+    """
+    Calculates partial trace of A over the indices indicated by ind
+
+    Parameters
+    ----------
+    self
+    A: np.array
+        matrix which is partially traced over
+    ind: List[np.uint]
+        indices which are being traced
+
+    Returns
+    -------
+    Tr_ind(A): np.ndarray
+    """
+    # number of qubits
+    n = np.log2(len(A))
+    assert (
+        abs(n - int(n)) < 1e-13
+    ), "Wrong matrix size. Required 2^n, Received {}".format(n)
+    n = int(n)
+    # Reshape into qubit indices
+    temp = A.reshape(*[2 for _ in range(2 * n)])
+    count = 0
+    if hasattr(ind, "__len__"):
+        for i in sorted(ind, reverse=True):
+            # Trace over the correct axes
+            temp = np.trace(temp, axis1=i - count, axis2=n + i - 2 * count)
+            count += 1
+        # Reshape back into two-index shape
+        return temp.reshape(2 ** (n - count), 2 ** (n - count))
+    else:
+        # Reshape back into two-index shape
+        return np.trace(temp, axis1=ind, axis2=n + ind).reshape(
+            2 ** (n - 1), 2 ** (n - 1)
+        )
+
+
 def trace_out_env(
     rho: np.ndarray,
     n_sys_qubits: int,
     n_env_qubits: int,
+    use_refik: bool = False,
 ):
-    # reshaped_rho = np.reshape(rho, (2,) * 2 * (n_sys_qubits + n_env_qubits))
-    # traced_rho = cirq.partial_trace(
-    #     tensor=reshaped_rho, keep_indices=range(n_sys_qubits)
-    # )
-    # reshaped_traced_rho = np.reshape(traced_rho, (2**n_sys_qubits, 2**n_sys_qubits))
     # print("tracing out environment...")
-
-    traced_rho = np.zeros((2**n_sys_qubits, 2**n_sys_qubits), dtype="complex_")
-    # print("traced rho shape: {} rho shape: {}".format(traced_rho.shape, rho.shape))
-    for iii in range(2**n_sys_qubits):
-        for jjj in range(2**n_sys_qubits):
-            # take rho[i*env qubits:i*env qubits + env qubtis]
-            traced_rho[iii, jjj] = np.trace(
-                rho[
-                    iii * (2**n_env_qubits) : (iii + 1) * (2**n_env_qubits),
-                    jjj * (2**n_env_qubits) : (jjj + 1) * (2**n_env_qubits),
-                ]
-            )
-    return traced_rho
+    if use_refik:
+        return ptrace(A=rho, ind=range(n_sys_qubits, n_env_qubits + n_sys_qubits))
+    else:
+        traced_rho = np.zeros((2**n_sys_qubits, 2**n_sys_qubits), dtype="complex_")
+        # print("traced rho shape: {} rho shape: {}".format(traced_rho.shape, rho.shape))
+        for iii in range(2**n_sys_qubits):
+            for jjj in range(2**n_sys_qubits):
+                # take rho[i*env qubits:i*env qubits + env qubtis]
+                traced_rho[iii, jjj] = np.trace(
+                    rho[
+                        iii * (2**n_env_qubits) : (iii + 1) * (2**n_env_qubits),
+                        jjj * (2**n_env_qubits) : (jjj + 1) * (2**n_env_qubits),
+                    ]
+                )
+        return traced_rho
 
 
 def ketbra(ket: np.ndarray):
