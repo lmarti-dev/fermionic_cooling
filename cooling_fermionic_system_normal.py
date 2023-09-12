@@ -73,7 +73,6 @@ def __main__(args):
     #    env_eig_states=env_eig_states,
     #    qubits=sys_qubits + env_qubits,
     # )  # Interaction only on Qubit 0?
-    print("coupler done")
     # coupler = get_cheat_coupler(sys_eigenstates, env_eigenstates)
 
     # get environment ham sweep values
@@ -81,13 +80,13 @@ def __main__(args):
 
     min_gap = sorted(np.abs(np.diff(sys_eigenspectrum)))[0]
 
-    n_steps = 10
-    n_rep = 10
+    n_steps = 1000
+    n_rep = 1
     sweep_values = get_log_sweep(spectrum_width, n_steps, n_rep)
     # sweep_values = get_cheat_sweep(sys_eigenspectrum, n_steps)
     # np.random.shuffle(sweep_values)
     # coupling strength value
-    alphas = sweep_values / 10 / 10
+    alphas = sweep_values / 10 / 4
     evolution_times = np.pi / (alphas)
     # evolution_time = 1e-3
 
