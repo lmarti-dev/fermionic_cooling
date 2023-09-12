@@ -61,7 +61,7 @@ def __main__(args):
     print("initial energy from model: {}".format(sys_initial_energy))
 
     env_qubits, env_ground_state, env_ham, env_energies, env_eig_states = get_Z_env(
-        n_qubits=n_sys_qubits, top=Nf[0]
+        n_qubits=n_sys_qubits
     )
 
     # coupler
@@ -81,7 +81,7 @@ def __main__(args):
 
     min_gap = sorted(np.abs(np.diff(sys_eigenspectrum)))[0]
 
-    n_steps = 100
+    n_steps = 10
     n_rep = 10
     sweep_values = get_log_sweep(spectrum_width, n_steps, n_rep)
     # sweep_values = get_cheat_sweep(sys_eigenspectrum, n_steps)
