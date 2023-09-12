@@ -10,6 +10,7 @@ from coolerClass import (
     expectation_wrapper,
     get_cheat_sweep,
     get_cheat_coupler,
+    get_log_sweep,
     ketbra,
 )
 from fauvqe.utilities import jw_eigenspectrum_at_particle_number
@@ -48,16 +49,25 @@ if __name__ == "__main__":
         model.hamiltonian, sys_ground_state, model.flattened_qubits
     )
 
-    fidelity = cirq.fidelity(
-        sys_initial_state,
-        sys_ground_state,
-        qid_shape=(2,) * (len(model.flattened_qubits)),
-    )
-    print("initial fidelity: {}".format(fidelity))
-    print("ground energy from spectrum: {}".format(sys_ground_energy))
-    print("ground energy from model: {}".format(sys_ground_energy_exp))
-    print("initial energy from model: {}".format(sys_initial_energy))
+fidelity = cirq.fidelity(
+    sys_initial_state, sys_ground_state, qid_shape=(2,) * (len(model.flattened_qubits))
+)
+print("initial fidelity: {}".format(fidelity))
+print("ground energy from spectrum: {}".format(sys_ground_energy))
+print("ground energy from model: {}".format(sys_ground_energy_exp))
+print("initial energy from model: {}".format(sys_initial_energy))
 
+
+def get_Z_env(n_qubits, top):
+    # environment stuff
+    env_qubits = cirq.GridQubit.rect(n_qubits, 1, top=top)
+    n_env_qubits = len(env_qubits)
+    env_ham = -sum((cirq.Z(q) for q in env_qubits))
+    env_ground_state = np.zeros((2**n_env_qubits))
+    env_ground_state[0] = 1
+    env_matrix = env_ham.matrix(qubits=env_qubits)
+    env_energies, env_eig_states = np.linalg.eigh(env_matrix)
+    return env_qubits, env_ground_state, env_ham, env_energies, env_eig_states
     def get_Z_env(n_qubits, top):
         # environment stuff
         env_qubits = cirq.GridQubit.rect(n_qubits, 1, top=top)
@@ -89,12 +99,12 @@ if __name__ == "__main__":
 
     min_gap = sorted(np.abs(np.diff(sys_eigenspectrum)))[0]
 
-    n_steps = 10
+    n_steps = 100
     # sweep_values = get_log_sweep(spectrum_width, n_steps)
-    sweep_values = np.tile(get_cheat_sweep(sys_eigenspectrum, n_steps), 3)
+    sweep_values = get_cheat_sweep(sys_eigenspectrum, n_steps)
     # np.random.shuffle(sweep_values)
     # coupling strength value
-    alphas = sweep_values / 10
+    alphas = sweep_values * 4
     evolution_times = np.pi / (alphas)
     # evolution_time = 1e-3
 
@@ -117,5 +127,7 @@ if __name__ == "__main__":
         evolution_times=evolution_times,
         sweep_values=sweep_values,
     )
+
+print("Final Fidelity: {}".format(fidelities[-1]))
 
     cooler.plot_cooling(energies, fidelities, sys_eigenspectrum)
