@@ -109,18 +109,26 @@ def __main__(args):
     #     evolution_times=evolution_times,
     #     sweep_values=sweep_values,
     # )
-    fidelities, energies, omegas = cooler.big_brain_cool(
-        alphas=alphas,
-        evolution_times=evolution_times,
+    fidelities, energies, omegas, env_energies = cooler.big_brain_cool(
         start_omega=spectrum_width,
         stop_omega=min_gap,
+        ansatz_options={"beta": 1e-4, "mu": 0.5, "c": 1e-3},
     )
 
     print(sys_eigenspectrum)
 
     print("Final Fidelity: {}".format(fidelities[-1]))
 
-    cooler.plot_cooling(energies, fidelities, sys_eigenspectrum)
+    cooler.plot_cooling(
+        energies,
+        fidelities,
+        supplementary_data={
+            "Eigenspectrum": sys_eigenspectrum,
+            r"$(\frac{\mathrm{d}}{\mathrm{ds}}\omega)^{-2}$": 1
+            / (np.diff(omegas) ** (-2)),
+            "Evironement temp.": env_energies,
+        },
+    )
 
 
 if __name__ == "__main__":

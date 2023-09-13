@@ -159,8 +159,6 @@ class Cooler:
 
     def big_brain_cool(
         self,
-        evolution_times: np.ndarray,
-        alphas: np.ndarray,
         start_omega: float,
         stop_omega: float,
         ansatz_options: dict = {},
@@ -173,6 +171,7 @@ class Cooler:
         fidelities = []
         energies = []
         omegas = []
+        env_energies = []
 
         sys_fidelity = self.sys_fidelity(self.sys_initial_state)
         sys_energy = self.sys_energy(self.sys_initial_state)
@@ -190,6 +189,11 @@ class Cooler:
         omega = start_omega
         step = 0
         while omega > stop_omega:
+            # set alpha and t
+            alpha = omega / 10 / 4
+            evolution_time = np.pi / alpha
+
+            # evolve system and reset ancilla
             (
                 sys_fidelity,
                 sys_energy,
@@ -198,12 +202,23 @@ class Cooler:
             ) = self.cooling_step(
                 total_density_matrix=total_density_matrix,
                 env_coupling=omega,
-                alpha=alphas[step],
-                evolution_time=evolution_times[step],
+                alpha=alpha,
+                evolution_time=evolution_time,
             )
+            # append values
             fidelities.append(sys_fidelity)
             energies.append(sys_energy)
             omegas.append(omega)
+            env_energies.append(env_energy)
+
+            epsilon = gap_ansatz(omega=omega, t_fridge=env_energy, **ansatz_options)
+            # if epsilon is zero or some NaN, default to 1000 step linear evolution
+            if epsilon == 0 or not isinstance(epsilon, float):
+                epsilon = 1e-3 * (start_omega - stop_omega)
+            omega = omega - epsilon
+            step += 1
+
+            # print stats on evolution
             self.verbose_print(
                 has_increased(sys_fidelity, fidelities[-2], "fidelity"), message_level=9
             )
@@ -216,16 +231,13 @@ class Cooler:
                 ),
                 message_level=5,
             )
-            epsilon = gap_ansatz(omega=omega, t_fridge=env_energy, **ansatz_options)
-            omega = omega - epsilon
-            step += 1
             self.verbose_print(
                 "prev: {} curr: {} start: {} stop: {}".format(
                     omega + epsilon, omega, start_omega, stop_omega
                 ),
                 message_level=5,
             )
-        return fidelities, energies, omegas
+        return fidelities, energies, omegas, env_energies
 
     def cooling_step(
         self,
@@ -267,6 +279,7 @@ class Cooler:
         sys_energy = self.sys_energy(traced_density_matrix)
         env_energy = self.env_energy(total_density_matrix)
 
+        # putting the env back in the ground state
         self.verbose_print("retensoring...", message_level=10)
         total_density_matrix = np.kron(
             traced_density_matrix, self.env_ground_density_matrix
@@ -277,13 +290,10 @@ class Cooler:
         self,
         energies: list,
         fidelities: list,
-        sys_eigenspectrum: np.ndarray = None,
+        supplementary_data: dict = {},
         suptitle: str = None,
     ):
-        if sys_eigenspectrum is None:
-            nrows = 2
-        else:
-            nrows = 3
+        nrows = 2 + len(supplementary_data)
         fig, axes = plt.subplots(nrows=nrows, figsize=(5, 3))
 
         axes[0].plot(range(len(fidelities)), fidelities, color="k", linewidth=2)
@@ -296,14 +306,14 @@ class Cooler:
             linewidth=2,
         )
         axes[1].set_ylabel(r"$\frac{E_{cool}-E_0}{|E_0|}$", labelpad=0)
-        if sys_eigenspectrum is not None:
-            axes[2].hlines(
-                sys_eigenspectrum,
-                xmin=-1,
-                xmax=1,
+        for ind, k in enumerate(supplementary_data.keys()):
+            axes[ind + 2].plot(
+                range(len(supplementary_data[k])),
+                supplementary_data[k],
                 color="k",
+                linewidth=2,
             )
-            axes[2].set_ylabel("Eigenenergies")
+            axes[ind + 2].set_ylabel(k)
 
         ptools.plt_params_set()
         if suptitle:
@@ -520,7 +530,7 @@ def get_Z_env(n_qubits):
     # environment stuff
     env_qubits = cirq.LineQubit.range(n_qubits)
     n_env_qubits = len(env_qubits)
-    env_ham = -sum((cirq.Z(q) for q in env_qubits)) / 2
+    env_ham = -sum((cirq.Z(q) for q in env_qubits)) / 2 + n_env_qubits / 2
     env_ground_state = np.zeros((2**n_env_qubits))
     env_ground_state[0] = 1
     env_matrix = env_ham.matrix(qubits=env_qubits)
@@ -537,7 +547,12 @@ def get_YY_coupler(
 
 
 def gap_ansatz(
-    omega: float, t_fridge: float, beta: float = 1, mu: float = 1, f: callable = None
+    omega: float,
+    t_fridge: float,
+    beta: float = 1,
+    mu: float = 1,
+    c: float = 1e-5,
+    f: callable = None,
 ):
     """Creates an ansatz for the derivative of omega, the strength of the environment. This is all control theory stuff, and I'm too dumb to get it
 
@@ -545,12 +560,13 @@ def gap_ansatz(
         omega (float): the current value of omega
         beta (float): the general prefactor
         mu (float): the power of t_fridge
+        c (float): the stabilisation variable/minimal temp
         t_fridge (float): the energy expectation of the environment
-        f (callable, optional): the function wrapping omega. Defaults to None.
+        f (callable, optional): the function wrapping omega. Defaults to identity.
 
     Returns:
-        _type_: _description_
+        float: absolute value of the gradient ansatz
     """
     if f is None:
         f = lambda x: x
-    return beta * f(omega) / (t_fridge**mu)
+    return abs(beta * f(omega) / (t_fridge**mu + c))
