@@ -26,7 +26,8 @@ import matplotlib.pyplot as plt
 from openfermion import FermionOperator
 import itertools
 import multiprocessing as mp
-import helpers.plotting_tools as ptools
+
+# import helpers.plotting_tools as ptools
 from tqdm import tqdm
 
 
@@ -315,7 +316,7 @@ class Cooler:
             )
             axes[ind + 2].set_ylabel(k)
 
-        ptools.plt_params_set()
+        # ptools.plt_params_set()
         if suptitle:
             fig.suptitle(suptitle)
 

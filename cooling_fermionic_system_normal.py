@@ -111,8 +111,8 @@ def __main__(args):
     # )
     fidelities, energies, omegas, env_energies = cooler.big_brain_cool(
         start_omega=spectrum_width,
-        stop_omega=min_gap,
-        ansatz_options={"beta": 1e-4, "mu": 0.5, "c": 1e-3},
+        stop_omega=0.1 * min_gap,
+        ansatz_options={"beta": 1e-3, "mu": 0.5, "c": 1e-3},
     )
 
     print(sys_eigenspectrum)
