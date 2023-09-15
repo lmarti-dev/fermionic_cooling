@@ -80,14 +80,13 @@ def __main__(args):
 
     min_gap = sorted(np.abs(np.diff(sys_eigenspectrum)))[0]
 
-    n_steps = 1000
-    n_rep = 1
-    sweep_values = get_log_sweep(spectrum_width, n_steps, n_rep)
+    # n_steps = 1000
+    # sweep_values = get_log_sweep(spectrum_width, n_steps, n_rep)
     # sweep_values = get_cheat_sweep(sys_eigenspectrum, n_steps)
     # np.random.shuffle(sweep_values)
     # coupling strength value
-    alphas = sweep_values / 10 / 4
-    evolution_times = np.pi / (alphas)
+    # alphas = sweep_values / 10 / 4
+    # evolution_times = np.pi / (alphas)
     # evolution_time = 1e-3
 
     # call cool
@@ -101,7 +100,7 @@ def __main__(args):
         env_qubits=env_qubits,
         env_ground_state=env_ground_state,
         sys_env_coupling=coupler,
-        verbosity=0,
+        verbosity=5,
     )
 
     # fidelities, energies = cooler.cool(
@@ -109,26 +108,37 @@ def __main__(args):
     #     evolution_times=evolution_times,
     #     sweep_values=sweep_values,
     # )
-    fidelities, energies, omegas, env_energies = cooler.big_brain_cool(
-        start_omega=spectrum_width,
-        stop_omega=min_gap,
-        ansatz_options={"beta": 1e-4, "mu": 0.5, "c": 1e-3},
+
+    n_rep = 5
+    fidelities, sys_energies, omegas, env_energies = cooler.big_brain_cool(
+        start_omega=1.1 * spectrum_width,
+        stop_omega=0.9 * min_gap,
+        ansatz_options={"beta": 1e-3, "mu": 0.5, "c": 1e-5},
+        n_rep=n_rep,
     )
 
     print(sys_eigenspectrum)
 
-    print("Final Fidelity: {}".format(fidelities[-1]))
+    print("Final Fidelity: {}".format(fidelities[-1][-1]))
 
-    cooler.plot_cooling(
-        energies,
-        fidelities,
-        supplementary_data={
-            "Eigenspectrum": sys_eigenspectrum,
-            r"$(\frac{\mathrm{d}}{\mathrm{ds}}\omega)^{-2}$": 1
-            / (np.diff(omegas) ** (-2)),
-            "Evironement temp.": env_energies,
-        },
+    cooler.plot_controlled_cooling(
+        fidelities=fidelities,
+        sys_energies=sys_energies,
+        env_energies=env_energies,
+        omegas=omegas,
+        eigenspectrum=sys_eigenspectrum,
     )
+
+    # cooler.plot_generic_cooling(
+    #     energies,
+    #     fidelities,
+    #     supplementary_data={
+    #         "Eigenspectrum": sys_eigenspectrum,
+    #         r"$(\frac{\mathrm{d}}{\mathrm{ds}}\omega)^{-2}$": 1
+    #         / (np.diff(omegas) ** (-2)),
+    #         "Evironement temp.": env_energies,
+    #     },
+    # )
 
 
 if __name__ == "__main__":

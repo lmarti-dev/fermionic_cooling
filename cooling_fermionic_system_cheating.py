@@ -112,7 +112,7 @@ def __main__(args):
 
     print("Final Fidelity: {}".format(fidelities[-1]))
 
-    cooler.plot_cooling(
+    cooler.plot_generic_cooling(
         energies,
         fidelities,
         sys_eigenspectrum,

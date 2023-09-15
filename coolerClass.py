@@ -29,6 +29,8 @@ import multiprocessing as mp
 import helpers.plotting_tools as ptools
 from tqdm import tqdm
 
+from fauvqe.utilities import flatten
+
 
 class Cooler:
     def __init__(
@@ -161,6 +163,7 @@ class Cooler:
         self,
         start_omega: float,
         stop_omega: float,
+        n_rep: int = 1,
         ansatz_options: dict = {},
     ):
         initial_density_matrix = self.total_initial_state
@@ -169,7 +172,7 @@ class Cooler:
         total_density_matrix = initial_density_matrix
 
         fidelities = []
-        energies = []
+        sys_energies = []
         omegas = []
         env_energies = []
 
@@ -183,61 +186,71 @@ class Cooler:
             message_level=8,
         )
 
-        fidelities.append(sys_fidelity)
-        energies.append(sys_energy)
+        fidelities.append([])
+        sys_energies.append([])
+        omegas.append([])
+        env_energies.append([])
 
-        omega = start_omega
-        step = 0
-        while omega > stop_omega:
-            # set alpha and t
-            alpha = omega / 10 / 4
-            evolution_time = np.pi / alpha
+        fidelities[0].append(sys_fidelity)
+        sys_energies[0].append(sys_energy)
 
-            # evolve system and reset ancilla
-            (
-                sys_fidelity,
-                sys_energy,
-                env_energy,
-                total_density_matrix,
-            ) = self.cooling_step(
-                total_density_matrix=total_density_matrix,
-                env_coupling=omega,
-                alpha=alpha,
-                evolution_time=evolution_time,
-            )
-            # append values
-            fidelities.append(sys_fidelity)
-            energies.append(sys_energy)
-            omegas.append(omega)
-            env_energies.append(env_energy)
+        for rep in range(n_rep):
+            self.verbose_print(s="rep n. {}".format(rep), message_level=5)
+            omega = start_omega
+            step = 0
+            while omega > stop_omega:
+                # set alpha and t
+                alpha = omega / 10 / 4
+                evolution_time = np.pi / alpha
 
-            epsilon = gap_ansatz(omega=omega, t_fridge=env_energy, **ansatz_options)
-            # if epsilon is zero or some NaN, default to 1000 step linear evolution
-            if epsilon == 0 or not isinstance(epsilon, float):
-                epsilon = 1e-3 * (start_omega - stop_omega)
-            omega = omega - epsilon
-            step += 1
+                # evolve system and reset ancilla
+                (
+                    sys_fidelity,
+                    sys_energy,
+                    env_energy,
+                    total_density_matrix,
+                ) = self.cooling_step(
+                    total_density_matrix=total_density_matrix,
+                    env_coupling=omega,
+                    alpha=alpha,
+                    evolution_time=evolution_time,
+                )
 
-            # print stats on evolution
-            self.verbose_print(
-                has_increased(sys_fidelity, fidelities[-2], "fidelity"), message_level=9
-            )
-            self.verbose_print(
-                has_increased(sys_energy, energies[-2], "energy"), message_level=9
-            )
-            self.verbose_print(
-                "fidelity to gs: {}, energy diff of traced out rho: {}".format(
-                    sys_fidelity, sys_energy - self.sys_ground_energy
-                ),
-                message_level=5,
-            )
-            self.verbose_print(
-                "prev: {} curr: {} start: {} stop: {}".format(
-                    omega + epsilon, omega, start_omega, stop_omega
-                ),
-                message_level=5,
-            )
-        return fidelities, energies, omegas, env_energies
+                # append values
+                fidelities[rep].append(sys_fidelity)
+                sys_energies[rep].append(sys_energy)
+                omegas[rep].append(omega)
+                env_energies[rep].append(env_energy)
+
+                epsilon = gap_ansatz(omega=omega, t_fridge=env_energy, **ansatz_options)
+                # if epsilon is zero or some NaN, default to 1000 step linear evolution
+                if epsilon == 0 or not isinstance(epsilon, float):
+                    epsilon = 1e-3 * (start_omega - stop_omega)
+                omega = omega - epsilon
+                step += 1
+
+                # print stats on evolution
+                self.verbose_print(
+                    has_increased(sys_fidelity, fidelities[rep][-2], "fidelity"),
+                    message_level=9,
+                )
+                self.verbose_print(
+                    has_increased(sys_energy, sys_energies[rep][-2], "energy"),
+                    message_level=9,
+                )
+                self.verbose_print(
+                    "fidelity to gs: {}, energy diff of traced out rho: {}".format(
+                        sys_fidelity, sys_energy - self.sys_ground_energy
+                    ),
+                    message_level=5,
+                )
+                self.verbose_print(
+                    "prev: {} curr: {} start: {} stop: {}".format(
+                        omega + epsilon, omega, start_omega, stop_omega
+                    ),
+                    message_level=5,
+                )
+            return fidelities, sys_energies, omegas, env_energies
 
     def cooling_step(
         self,
@@ -286,21 +299,68 @@ class Cooler:
         )
         return sys_fidelity, sys_energy, env_energy, total_density_matrix
 
-    def plot_cooling(
+    def plot_controlled_cooling(
         self,
-        energies: list,
+        fidelities: list,
+        sys_energies: list,
+        env_energies: list,
+        omegas: list,
+        eigenspectrum: list,
+        suptitle: str = None,
+    ):
+        nrows = 2
+        fig, axes = plt.subplots(nrows=nrows, figsize=(5, 3))
+        ptools.plt_params_set()
+        axes[0].plot(
+            range(len(list(flatten(fidelities)))),
+            list(flatten(fidelities)),
+            color="k",
+            linewidth=2,
+        )
+
+        cmap_om = plt.get_cmap("turbo", len(env_energies))
+        cmap_env = plt.get_cmap("viridis", len(env_energies))
+        ax_bottom = axes[1]
+        twin_ax_bottom = ax_bottom.twinx()
+        for rep in range(len(env_energies)):
+            diffs = np.diff(omegas[rep])
+            vals = np.array(omegas[rep][:-1]) + diffs / 2
+            ax_bottom.plot(vals, 1 / (diffs) ** (-2), color=cmap_om(rep), linewidth=2)
+            twin_ax_bottom.plot(omegas, env_energies, color=cmap_env(rep), linewidth=2)
+        ax_bottom.vlines(
+            eigenspectrum,
+            ymin=0,
+            ymax=max(1 / (diffs) ** (-2)),
+            linestyle="--",
+            color="red",
+        )
+        twin_ax_bottom.set_yscale("log")
+
+        axes[0].set_ylabel(r"$|\langle \psi_{cool} | \psi_{gs} \rangle|^2$", labelpad=0)
+        ax_bottom.set_ylabel(r"$(\frac{\mathrm{d}}{\mathrm{ds}}\omega)^{-2}$")
+        twin_ax_bottom.set_ylabel(r"Env. energy")
+
+        if suptitle:
+            fig.suptitle(suptitle)
+
+        plt.show()
+
+    def plot_generic_cooling(
+        self,
+        sys_energies: list,
         fidelities: list,
         supplementary_data: dict = {},
         suptitle: str = None,
     ):
+        ptools.plt_params_set()
         nrows = 2 + len(supplementary_data)
         fig, axes = plt.subplots(nrows=nrows, figsize=(5, 3))
 
         axes[0].plot(range(len(fidelities)), fidelities, color="k", linewidth=2)
         axes[0].set_ylabel(r"$|\langle \psi_{cool} | \psi_{gs} \rangle|^2$", labelpad=0)
         axes[1].plot(
-            range(len(energies)),
-            (np.array(energies) - self.sys_ground_energy)
+            range(len(sys_energies)),
+            (np.array(sys_energies) - self.sys_ground_energy)
             / np.abs(self.sys_ground_energy),
             color="k",
             linewidth=2,
@@ -315,7 +375,6 @@ class Cooler:
             )
             axes[ind + 2].set_ylabel(k)
 
-        ptools.plt_params_set()
         if suptitle:
             fig.suptitle(suptitle)
 

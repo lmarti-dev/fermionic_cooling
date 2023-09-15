@@ -91,4 +91,4 @@ fidelities, energies = cooler.cool(
     sweep_values=sweep_values,
 )
 print("Final fidelity: {}".format(fidelities[-1]))
-cooler.plot_cooling(energies, fidelities)
+cooler.plot_generic_cooling(energies, fidelities)
