@@ -65,14 +65,14 @@ def __main__(args):
     )
 
     # coupler
-    coupler = sum(
-        [cirq.Y(sys_qubits[k]) * cirq.Y(env_qubits[k]) for k in range(n_sys_qubits)]
-    )  # Interaction only on Qubit 0?
-    # coupler = get_cheat_coupler(
-    #    sys_eig_states=sys_eigenstates,
-    #    env_eig_states=env_eig_states,
-    #    qubits=sys_qubits + env_qubits,
+    # coupler = sum(
+    #    [cirq.Y(sys_qubits[k]) * cirq.Y(env_qubits[k]) for k in range(n_sys_qubits)]
     # )  # Interaction only on Qubit 0?
+    coupler = get_cheat_coupler(
+        sys_eig_states=sys_eigenstates,
+        env_eig_states=env_eig_states,
+        qubits=sys_qubits + env_qubits,
+    )
     # coupler = get_cheat_coupler(sys_eigenstates, env_eigenstates)
 
     # get environment ham sweep values
@@ -100,7 +100,7 @@ def __main__(args):
         env_qubits=env_qubits,
         env_ground_state=env_ground_state,
         sys_env_coupling=coupler,
-        verbosity=5,
+        verbosity=0,
     )
 
     # fidelities, energies = cooler.cool(

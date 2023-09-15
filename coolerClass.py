@@ -102,7 +102,12 @@ class Cooler:
         return expectation_wrapper(self.sys_hamiltonian, sys_state, self.sys_qubits)
 
     def env_energy(self, env_state: np.ndarray):
-        return expectation_wrapper(self.env_hamiltonian, env_state, self.total_qubits)
+        return expectation_wrapper(
+            self.env_hamiltonian,
+            # trace_out_sys(env_state, len(self.sys_qubits), len(self.env_qubits)),
+            env_state,
+            self.total_qubits,  # self.env_qubits,
+        )
 
     def cool(
         self,
@@ -561,6 +566,17 @@ def trace_out_env(
     n_env_qubits: int,
 ):
     return two_tensors_partial_trace(rho=rho, n1=n_sys_qubits, n2=n_env_qubits)
+
+
+def trace_out_sys(
+    rho: np.ndarray,
+    n_sys_qubits: int,
+    n_env_qubits: int,
+):
+    return cirq.partial_trace(
+        rho.reshape(*[2 for _ in range(2 * n_sys_qubits + 2 * n_env_qubits)]),
+        range(n_sys_qubits, n_sys_qubits + n_env_qubits),
+    ).reshape(2**n_env_qubits, 2**n_env_qubits)
 
 
 def ketbra(ket: np.ndarray):
