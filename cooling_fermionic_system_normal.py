@@ -109,11 +109,11 @@ def __main__(args):
     #     sweep_values=sweep_values,
     # )
 
-    n_rep = 5
+    n_rep = 1
     fidelities, sys_energies, omegas, env_energies = cooler.big_brain_cool(
-        start_omega=1.1 * spectrum_width,
-        stop_omega=0.9 * min_gap,
-        ansatz_options={"beta": 1e-3, "mu": 0.5, "c": 1e-5},
+        start_omega=1.5 * spectrum_width,
+        stop_omega=0.1 * min_gap,
+        ansatz_options={"beta": 1e-4, "mu": 0.5, "c": 1e-5},
         n_rep=n_rep,
     )
 
@@ -123,7 +123,6 @@ def __main__(args):
 
     cooler.plot_controlled_cooling(
         fidelities=fidelities,
-        sys_energies=sys_energies,
         env_energies=env_energies,
         omegas=omegas,
         eigenspectrum=sys_eigenspectrum,

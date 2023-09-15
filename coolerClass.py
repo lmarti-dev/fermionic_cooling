@@ -27,7 +27,6 @@ from openfermion import FermionOperator
 import itertools
 import multiprocessing as mp
 
-# import helpers.plotting_tools as ptools
 from tqdm import tqdm
 
 from fauvqe.utilities import flatten
@@ -103,9 +102,7 @@ class Cooler:
         return expectation_wrapper(self.sys_hamiltonian, sys_state, self.sys_qubits)
 
     def env_energy(self, env_state: np.ndarray):
-        return expectation_wrapper(
-            self.env_hamiltonian, env_state, self.sys_qubits + self.env_qubits
-        )
+        return expectation_wrapper(self.env_hamiltonian, env_state, self.total_qubits)
 
     def cool(
         self,
@@ -201,7 +198,11 @@ class Cooler:
             step = 0
             while omega > stop_omega:
                 # set alpha and t
-                alpha = omega / 10 / 4
+                qubit_number = len(self.sys_hamiltonian.qubits)
+                weaken_coupling = 10
+                alpha = omega / (weaken_coupling * qubit_number)
+
+                # there's not factor of two here, it's all correct
                 evolution_time = np.pi / alpha
 
                 # evolve system and reset ancilla
@@ -225,7 +226,7 @@ class Cooler:
 
                 epsilon = gap_ansatz(omega=omega, t_fridge=env_energy, **ansatz_options)
                 # if epsilon is zero or some NaN, default to 1000 step linear evolution
-                if epsilon == 0 or not isinstance(epsilon, float):
+                if epsilon == 0:
                     epsilon = 1e-3 * (start_omega - stop_omega)
                 omega = omega - epsilon
                 step += 1
@@ -251,7 +252,7 @@ class Cooler:
                     ),
                     message_level=5,
                 )
-            return fidelities, sys_energies, omegas, env_energies
+        return fidelities, sys_energies, omegas, env_energies
 
     def cooling_step(
         self,
@@ -298,48 +299,69 @@ class Cooler:
         total_density_matrix = np.kron(
             traced_density_matrix, self.env_ground_density_matrix
         )
+
         return sys_fidelity, sys_energy, env_energy, total_density_matrix
 
     def plot_controlled_cooling(
         self,
         fidelities: list,
-        sys_energies: list,
         env_energies: list,
         omegas: list,
         eigenspectrum: list,
         suptitle: str = None,
     ):
+        plt.rcParams.update(
+            {
+                "font.family": r"serif",  # use serif/main font for text elements
+                "text.usetex": True,  # use inline math for ticks
+                "pgf.rcfonts": False,  # don't setup fonts from rc parameters
+                "pgf.preamble": "\n".join(
+                    [
+                        r"\usepackage{url}",  # load additional packages
+                        r"\usepackage{lmodern}",  # unicode math setup
+                    ]
+                ),
+                "figure.figsize": (5, 3),
+            }
+        )
         nrows = 2
         fig, axes = plt.subplots(nrows=nrows, figsize=(5, 3))
-        ptools.plt_params_set()
         axes[0].plot(
             range(len(list(flatten(fidelities)))),
             list(flatten(fidelities)),
             color="k",
             linewidth=2,
         )
-
-        cmap_om = plt.get_cmap("turbo", len(env_energies))
-        cmap_env = plt.get_cmap("viridis", len(env_energies))
+        plot_temp = False
         ax_bottom = axes[1]
-        twin_ax_bottom = ax_bottom.twinx()
+        if plot_temp:
+            twin_ax_bottom = ax_bottom.twinx()
         for rep in range(len(env_energies)):
             diffs = np.diff(omegas[rep])
             vals = np.array(omegas[rep][:-1]) + diffs / 2
-            ax_bottom.plot(vals, 1 / (diffs) ** (-2), color=cmap_om(rep), linewidth=2)
-            twin_ax_bottom.plot(omegas, env_energies, color=cmap_env(rep), linewidth=2)
+            ax_bottom.plot(vals, 1 / (diffs) ** (-2), color="blue", linewidth=2)
+            if plot_temp:
+                twin_ax_bottom.plot(
+                    omegas[rep], env_energies[rep], color="red", linewidth=2
+                )
+
+        transitions = get_transition_rates(eigenspectrum)
         ax_bottom.vlines(
-            eigenspectrum,
+            transitions,
             ymin=0,
             ymax=max(1 / (diffs) ** (-2)),
             linestyle="--",
-            color="red",
+            color="black",
         )
-        twin_ax_bottom.set_yscale("log")
 
         axes[0].set_ylabel(r"$|\langle \psi_{cool} | \psi_{gs} \rangle|^2$", labelpad=0)
         ax_bottom.set_ylabel(r"$(\frac{\mathrm{d}}{\mathrm{ds}}\omega)^{-2}$")
-        twin_ax_bottom.set_ylabel(r"Env. energy")
+        ax_bottom.tick_params(axis="y", labelcolor="blue")
+        ax_bottom.invert_xaxis()
+        if plot_temp:
+            twin_ax_bottom.set_ylabel(r"Env. energy")
+            twin_ax_bottom.tick_params(axis="y", labelcolor="red")
+            twin_ax_bottom.set_yscale("log")
 
         if suptitle:
             fig.suptitle(suptitle)
@@ -380,6 +402,31 @@ class Cooler:
             fig.suptitle(suptitle)
 
         plt.show()
+
+
+def get_transition_rates(eigenspectrum):
+    transitions = np.array(
+        list(
+            gap
+            for gap in np.abs(
+                np.array(
+                    list(
+                        set(
+                            flatten(
+                                np.diff(
+                                    np.array(
+                                        list(itertools.combinations(eigenspectrum, r=2))
+                                    )
+                                )
+                            )
+                        )
+                    )
+                )
+            )
+            if gap != 0
+        )
+    )
+    return transitions
 
 
 def mean_gap(spectrum: np.ndarray):
@@ -628,5 +675,5 @@ def gap_ansatz(
         float: absolute value of the gradient ansatz
     """
     if f is None:
-        f = lambda x: x
+        f = lambda x: 1
     return abs(beta * f(omega) / (t_fridge**mu + c))
