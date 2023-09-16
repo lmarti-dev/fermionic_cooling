@@ -204,7 +204,7 @@ class Cooler:
             while omega > stop_omega:
                 # set alpha and t
                 qubit_number = len(self.sys_hamiltonian.qubits)
-                weaken_coupling = 10
+                weaken_coupling = 20
                 alpha = omega / (weaken_coupling * qubit_number)
 
                 # there's not factor of two here, it's all correct
@@ -337,14 +337,14 @@ class Cooler:
             color="k",
             linewidth=2,
         )
-        plot_temp = False
+        plot_temp = True
         ax_bottom = axes[1]
         if plot_temp:
             twin_ax_bottom = ax_bottom.twinx()
         for rep in range(len(env_energies)):
             diffs = np.diff(omegas[rep])
             vals = np.array(omegas[rep][:-1]) + diffs / 2
-            ax_bottom.plot(vals, 1 / (diffs) ** (-2), color="blue", linewidth=2)
+            ax_bottom.plot(vals, -diffs, color="blue", linewidth=2)
             if plot_temp:
                 twin_ax_bottom.plot(
                     omegas[rep], env_energies[rep], color="red", linewidth=2
@@ -360,7 +360,8 @@ class Cooler:
         )
 
         axes[0].set_ylabel(r"$|\langle \psi_{cool} | \psi_{gs} \rangle|^2$", labelpad=0)
-        ax_bottom.set_ylabel(r"$(\frac{\mathrm{d}}{\mathrm{ds}}\omega)^{-2}$")
+        # ax_bottom.set_ylabel(r"$(\frac{\mathrm{d}}{\mathrm{ds}}\omega)^{-2}$")
+        ax_bottom.set_ylabel(r"$-\frac{\mathrm{d}}{\mathrm{ds}}\omega$")
         ax_bottom.tick_params(axis="y", labelcolor="blue")
         ax_bottom.invert_xaxis()
         if plot_temp:
@@ -691,5 +692,6 @@ def gap_ansatz(
         float: absolute value of the gradient ansatz
     """
     if f is None:
-        f = lambda x: 1
-    return abs(beta * f(omega) / (t_fridge**mu + c))
+        f = lambda x: x
+    # return abs(beta * f(omega) / (t_fridge**mu + c))
+    return abs(beta * f(omega) * np.exp(-((t_fridge * c) ** mu)))

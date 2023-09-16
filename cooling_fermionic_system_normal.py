@@ -100,7 +100,7 @@ def __main__(args):
         env_qubits=env_qubits,
         env_ground_state=env_ground_state,
         sys_env_coupling=coupler,
-        verbosity=0,
+        verbosity=5,
     )
 
     # fidelities, energies = cooler.cool(
@@ -113,7 +113,7 @@ def __main__(args):
     fidelities, sys_energies, omegas, env_energies = cooler.big_brain_cool(
         start_omega=1.5 * spectrum_width,
         stop_omega=0.1 * min_gap,
-        ansatz_options={"beta": 1e-4, "mu": 0.5, "c": 1e-5},
+        ansatz_options={"beta": 1e-1, "mu": 2, "c": 1e2},
         n_rep=n_rep,
     )
 
