@@ -114,8 +114,8 @@ def __main__(args):
     #     sweep_values=sweep_values,
     # )
 
-    n_rep = 1
-    ansatz_options = {"beta": 1e-4, "mu": 0.5, "c": 1e-4}
+    n_rep = 3
+    ansatz_options = {"beta": 1e-4, "mu": 0.5, "c": 1e-5}
 
     fidelities, sys_energies, omegas, env_energies = cooler.big_brain_cool(
         start_omega=1.1 * spectrum_width,

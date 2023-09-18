@@ -396,12 +396,13 @@ class Cooler:
             )
 
         axes[0].set_ylabel(r"$|\langle \psi_{cool} | \psi_{gs} \rangle|^2$", labelpad=0)
+        axes[0].set_xlabel("step")
+        ax_bottom.legend(bbox_to_anchor=(0.2, 2))
         ax_bottom.set_ylabel(r"$(\frac{\mathrm{d}}{\mathrm{ds}}\omega)^{-2}$")
-        ax_bottom.tick_params(axis="y", labelcolor="blue")
+        ax_bottom.tick_params(axis="y")  # , labelcolor="blue")
         ax_bottom.set_yscale("log")
         ax_bottom.invert_xaxis()
-        ax_bottom.legend()
-        ax_bottom.set_xlabel(r"$environment \ gap$")
+        ax_bottom.set_xlabel("Fridge gap")
         if plot_temp:
             twin_ax_bottom.set_ylabel(r"Env. energy")
             twin_ax_bottom.tick_params(axis="y", labelcolor="red")
