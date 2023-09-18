@@ -114,7 +114,12 @@ class Cooler:
         return expectation_wrapper(self.sys_hamiltonian, sys_state, self.sys_qubits)
 
     def env_energy(self, env_state: np.ndarray):
-        return expectation_wrapper(self.env_hamiltonian, env_state, self.total_qubits)
+        return expectation_wrapper(
+            self.env_hamiltonian,
+            # trace_out_sys(env_state, len(self.sys_qubits), len(self.env_qubits)),
+            env_state,
+            self.total_qubits,  # self.env_qubits,
+        )
 
     def cool(
         self,
@@ -217,7 +222,7 @@ class Cooler:
             while omega > stop_omega:
                 # set alpha and t
                 qubit_number = len(self.sys_hamiltonian.qubits)
-                weaken_coupling = 100
+                weaken_coupling = 10
                 alpha = omega / (weaken_coupling * qubit_number)
 
                 # there's not factor of two here, it's all correct
@@ -392,10 +397,8 @@ class Cooler:
             )
 
         axes[0].set_ylabel(r"$|\langle \psi_{cool} | \psi_{gs} \rangle|^2$", labelpad=0)
-        axes[0].set_xlabel(r"$steps$")
         ax_bottom.set_ylabel(r"$(\frac{\mathrm{d}}{\mathrm{ds}}\omega)^{-2}$")
-        ax_bottom.tick_params(axis="y", labelcolor="black")
-        ax_bottom.set_yscale("log")
+        ax_bottom.tick_params(axis="y", labelcolor="blue")
         ax_bottom.invert_xaxis()
         ax_bottom.legend()
         ax_bottom.set_xlabel(r"$environment \ gap$")
@@ -603,6 +606,17 @@ def trace_out_env(
     return two_tensors_partial_trace(rho=rho, n1=n_sys_qubits, n2=n_env_qubits)
 
 
+def trace_out_sys(
+    rho: np.ndarray,
+    n_sys_qubits: int,
+    n_env_qubits: int,
+):
+    return cirq.partial_trace(
+        rho.reshape(*[2 for _ in range(2 * n_sys_qubits + 2 * n_env_qubits)]),
+        range(n_sys_qubits, n_sys_qubits + n_env_qubits),
+    ).reshape(2**n_env_qubits, 2**n_env_qubits)
+
+
 def ketbra(ket: np.ndarray):
     return np.outer(ket, dagger(ket))
 
@@ -715,5 +729,6 @@ def gap_ansatz(
         float: absolute value of the gradient ansatz
     """
     if f is None:
-        f = lambda x: 1
+        f = lambda x: x
     return abs(beta * f(omega) / (t_fridge**mu + c))
+    # return abs(beta * f(omega) * np.exp(-((t_fridge * c) ** mu)))

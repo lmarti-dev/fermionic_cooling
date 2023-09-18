@@ -69,10 +69,15 @@ def __main__(args):
         [cirq.Y(sys_qubits[k]) * cirq.Y(env_qubits[k]) for k in range(n_sys_qubits)]
     )  # Interaction only on Qubit 0?
     # coupler = get_cheat_coupler(
+    #    sys_eig_states=sys_eigenstates,
+    #    env_eig_states=env_eig_states,
+    #    qubits=sys_qubits + env_qubits,
+    # )  # Interaction only on Qubit 0?
+    # coupler = get_cheat_coupler(
     #     sys_eig_states=sys_eigenstates,
     #     env_eig_states=env_eig_states,
     #     qubits=sys_qubits + env_qubits,
-    # )  # Interaction only on Qubit 0?
+    # )
     # coupler = get_cheat_coupler(sys_eigenstates, env_eigenstates)
 
     # get environment ham sweep values
@@ -113,7 +118,7 @@ def __main__(args):
     fidelities, sys_energies, omegas, env_energies = cooler.big_brain_cool(
         start_omega=1.5 * spectrum_width,
         stop_omega=0.1 * min_gap,
-        ansatz_options={"beta": 1e-3, "mu": 0.2, "c": 1e-6},
+        ansatz_options={"beta": 1e-2, "mu": 0.2, "c": 1e-6},
         n_rep=n_rep,
     )
 
