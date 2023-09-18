@@ -116,9 +116,8 @@ class Cooler:
     def env_energy(self, env_state: np.ndarray):
         return expectation_wrapper(
             self.env_hamiltonian,
-            # trace_out_sys(env_state, len(self.sys_qubits), len(self.env_qubits)),
             env_state,
-            self.total_qubits,  # self.env_qubits,
+            self.total_qubits,
         )
 
     def cool(
@@ -222,7 +221,7 @@ class Cooler:
             while omega > stop_omega:
                 # set alpha and t
                 qubit_number = len(self.sys_hamiltonian.qubits)
-                weaken_coupling = 10
+                weaken_coupling = 100
                 alpha = omega / (weaken_coupling * qubit_number)
 
                 # there's not factor of two here, it's all correct
@@ -425,6 +424,7 @@ class Cooler:
 
         axes[0].plot(range(len(fidelities)), fidelities, color="k", linewidth=2)
         axes[0].set_ylabel(r"$|\langle \psi_{cool} | \psi_{gs} \rangle|^2$", labelpad=0)
+        axes[0].set_xlabel(r"$Steps$", labelpad=0)
         axes[1].plot(
             range(len(sys_energies)),
             (np.array(sys_energies) - self.sys_ground_energy)
@@ -731,5 +731,5 @@ def gap_ansatz(
     """
     if f is None:
         f = lambda x: 1
-    return abs(beta * f(omega) / (t_fridge**mu + c))
+    return abs(beta * f(omega) / ((t_fridge / omega) ** mu + c))
     # return abs(beta * f(omega) * np.exp(-((t_fridge * c) ** mu)))
