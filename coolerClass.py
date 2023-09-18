@@ -26,6 +26,7 @@ import matplotlib.pyplot as plt
 from openfermion import FermionOperator
 import itertools
 import multiprocessing as mp
+import sys
 
 from tqdm import tqdm
 
@@ -61,9 +62,20 @@ class Cooler:
         )
         self.sys_env_coupling = sys_env_coupling
 
-    def verbose_print(self, s: str, message_level: int = 1):
+        # message for verbose printing
+        self.msg = []
+
+    def update_message(self, s: str, message_level: int = 1):
         if int(self.verbosity) >= message_level:
-            print(s)
+            self.msg.append(s)
+
+    def reset_msg(self):
+        self.msg = []
+
+    def print_msg(self):
+        print("\n".join(self.msg))
+        print("\033[F" * (1 + len(self.msg)))
+        self.reset_msg()
 
     def cooling_hamiltonian(self, env_coupling: float, alpha: float):
         if isinstance(self.sys_env_coupling, (cirq.PauliSum, cirq.PauliString)):
@@ -121,8 +133,8 @@ class Cooler:
         sys_fidelity = self.sys_fidelity(self.sys_initial_state)
         sys_energy = self.sys_energy(self.sys_initial_state)
 
-        self.verbose_print(
-            "initial fidelity to gs: {}, initial energy of traced out rho: {}, ground energy: {}".format(
+        self.update_message(
+            "initial fidelity to gs: {:.4f}, initial energy of traced out rho: {:.4f}, ground energy: {:.4f}".format(
                 sys_fidelity, sys_energy, self.sys_ground_energy
             ),
             message_level=9,
@@ -143,14 +155,14 @@ class Cooler:
             )
             fidelities.append(sys_fidelity)
             energies.append(sys_energy)
-            self.verbose_print(
+            self.update_message(
                 has_increased(sys_fidelity, fidelities[-2], "fidelity"), message_level=9
             )
-            self.verbose_print(
+            self.update_message(
                 has_increased(sys_energy, energies[-2], "energy"), message_level=9
             )
-            self.verbose_print(
-                "fidelity to gs: {}, energy diff of traced out rho: {}".format(
+            self.update_message(
+                "fidelity to gs: {:.4f}, energy diff of traced out rho: {:.4f}".format(
                     sys_fidelity, sys_energy - self.sys_ground_energy
                 ),
                 message_level=9,
@@ -176,30 +188,36 @@ class Cooler:
 
         sys_fidelity = self.sys_fidelity(self.sys_initial_state)
         sys_energy = self.sys_energy(self.sys_initial_state)
+        env_energy = self.env_energy(self.total_initial_state)
 
-        self.verbose_print(
-            "initial fidelity to gs: {}, initial energy of traced out rho: {}, ground energy: {}".format(
+        self.update_message(
+            "initial fidelity to gs: {:.4f}, initial energy of traced out rho: {:.4f}, ground energy: {:.4f}".format(
                 sys_fidelity, sys_energy, self.sys_ground_energy
             ),
             message_level=8,
         )
 
-        fidelities.append([])
-        sys_energies.append([])
-        omegas.append([])
-        env_energies.append([])
-
-        fidelities[0].append(sys_fidelity)
-        sys_energies[0].append(sys_energy)
-
         for rep in range(n_rep):
-            self.verbose_print(s="rep n. {}".format(rep), message_level=5)
+            self.update_message(s="rep n. {}".format(rep), message_level=5)
             omega = start_omega
             step = 0
+
+            # create first rep array
+            fidelities.append([])
+            sys_energies.append([])
+            omegas.append([])
+            env_energies.append([])
+
+            # append step 0 values
+            fidelities[rep].append(sys_fidelity)
+            sys_energies[rep].append(sys_energy)
+            omegas[rep].append(start_omega)
+            env_energies[rep].append(env_energy)
+
             while omega > stop_omega:
                 # set alpha and t
                 qubit_number = len(self.sys_hamiltonian.qubits)
-                weaken_coupling = 10
+                weaken_coupling = 100
                 alpha = omega / (weaken_coupling * qubit_number)
 
                 # there's not factor of two here, it's all correct
@@ -232,23 +250,23 @@ class Cooler:
                 step += 1
 
                 # print stats on evolution
-                self.verbose_print(
+                self.update_message(
                     has_increased(sys_fidelity, fidelities[rep][-2], "fidelity"),
                     message_level=9,
                 )
-                self.verbose_print(
+                self.update_message(
                     has_increased(sys_energy, sys_energies[rep][-2], "energy"),
                     message_level=9,
                 )
-                self.verbose_print(
-                    "fidelity to gs: {}, energy diff of traced out rho: {}".format(
+                self.update_message(
+                    "fidelity to gs: {:.4f}, energy diff of traced out rho: {:.4f}".format(
                         sys_fidelity, sys_energy - self.sys_ground_energy
                     ),
                     message_level=5,
                 )
-                self.verbose_print(
-                    "prev: {} curr: {} start: {} stop: {}".format(
-                        omega + epsilon, omega, start_omega, stop_omega
+                self.update_message(
+                    "epsi: {:.5f} prev: {:.3f} start: {:.3f} stop: {:.3f}".format(
+                        epsilon, omega + epsilon, start_omega, stop_omega
                     ),
                     message_level=5,
                 )
@@ -263,15 +281,15 @@ class Cooler:
     ):
         cooling_hamiltonian = self.cooling_hamiltonian(env_coupling, alpha)
 
-        self.verbose_print(
+        self.update_message(
             "env coupling value: {}".format(env_coupling), message_level=10
         )
-        self.verbose_print("alpha value: {}".format(alpha), message_level=10)
-        self.verbose_print(
+        self.update_message("alpha value: {}".format(alpha), message_level=10)
+        self.update_message(
             "evolution_time value: {}".format(evolution_time), message_level=10
         )
 
-        self.verbose_print("evolving...", message_level=10)
+        self.update_message("evolving...", message_level=10)
         total_density_matrix = time_evolve_density_matrix(
             ham=cooling_hamiltonian,  # .matrix(qubits=self.total_qubits),
             rho=total_density_matrix,
@@ -289,25 +307,26 @@ class Cooler:
         total_density_matrix /= np.trace(total_density_matrix)
 
         # computing useful values
-        self.verbose_print("computing values...", message_level=10)
+        self.update_message("computing values...", message_level=10)
         sys_fidelity = self.sys_fidelity(traced_density_matrix)
         sys_energy = self.sys_energy(traced_density_matrix)
         env_energy = self.env_energy(total_density_matrix)
 
         # putting the env back in the ground state
-        self.verbose_print("retensoring...", message_level=10)
+        self.update_message("retensoring...", message_level=10)
         total_density_matrix = np.kron(
             traced_density_matrix, self.env_ground_density_matrix
         )
-
+        self.print_msg()
         return sys_fidelity, sys_energy, env_energy, total_density_matrix
 
     def plot_controlled_cooling(
         self,
         fidelities: list,
+        sys_energies: list,
         env_energies: list,
         omegas: list,
-        eigenspectrum: list,
+        eigenspectrums: list[list],
         suptitle: str = None,
     ):
         plt.rcParams.update(
@@ -325,39 +344,61 @@ class Cooler:
             }
         )
         nrows = 2
+        cmap = plt.get_cmap("turbo", len(env_energies))
+
         fig, axes = plt.subplots(nrows=nrows, figsize=(5, 3))
-        axes[0].plot(
-            range(len(list(flatten(fidelities)))),
-            list(flatten(fidelities)),
-            color="k",
-            linewidth=2,
-        )
+
         plot_temp = False
         ax_bottom = axes[1]
+
         if plot_temp:
             twin_ax_bottom = ax_bottom.twinx()
         for rep in range(len(env_energies)):
+            if rep == 0:
+                len_prev = 0
+            else:
+                len_prev += len(fidelities[rep - 1])
+            axes[0].plot(
+                range(len_prev, len_prev + len(fidelities[rep])),
+                fidelities[rep],
+                color=cmap(rep),
+                linewidth=2,
+            )
+
             diffs = np.diff(omegas[rep])
-            vals = np.array(omegas[rep][:-1]) + diffs / 2
-            ax_bottom.plot(vals, 1 / (diffs) ** (-2), color="blue", linewidth=2)
+            omega_halfs = np.array(omegas[rep][:-1]) + diffs / 2
+            y_values = diffs ** (-2)
+            ax_bottom.plot(
+                omega_halfs,
+                y_values,
+                color=cmap(rep),
+                linewidth=2,
+                label="Rep. {}".format(rep + 1),
+            )
             if plot_temp:
                 twin_ax_bottom.plot(
                     omegas[rep], env_energies[rep], color="red", linewidth=2
                 )
 
-        transitions = get_transition_rates(eigenspectrum)
-        ax_bottom.vlines(
-            transitions,
-            ymin=0,
-            ymax=max(1 / (diffs) ** (-2)),
-            linestyle="--",
-            color="black",
-        )
+        spectrum_cmap = plt.get_cmap("viridis", len(eigenspectrums))
+        for ind, spectrum in enumerate(eigenspectrums):
+            transitions = get_transition_rates(spectrum)
+            ax_bottom.vlines(
+                transitions,
+                ymin=0,
+                ymax=np.nanmax(y_values[np.isfinite(y_values)]),
+                linestyle="--",
+                color=spectrum_cmap(ind),
+            )
 
         axes[0].set_ylabel(r"$|\langle \psi_{cool} | \psi_{gs} \rangle|^2$", labelpad=0)
+        axes[0].set_xlabel(r"$steps$")
         ax_bottom.set_ylabel(r"$(\frac{\mathrm{d}}{\mathrm{ds}}\omega)^{-2}$")
-        ax_bottom.tick_params(axis="y", labelcolor="blue")
+        ax_bottom.tick_params(axis="y", labelcolor="black")
+        ax_bottom.set_yscale("log")
         ax_bottom.invert_xaxis()
+        ax_bottom.legend()
+        ax_bottom.set_xlabel(r"$environment \ gap$")
         if plot_temp:
             twin_ax_bottom.set_ylabel(r"Env. energy")
             twin_ax_bottom.tick_params(axis="y", labelcolor="red")
@@ -375,7 +416,6 @@ class Cooler:
         supplementary_data: dict = {},
         suptitle: str = None,
     ):
-        ptools.plt_params_set()
         nrows = 2 + len(supplementary_data)
         fig, axes = plt.subplots(nrows=nrows, figsize=(5, 3))
 
