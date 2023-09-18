@@ -114,17 +114,17 @@ def __main__(args):
     #     sweep_values=sweep_values,
     # )
 
-    n_rep = 3
+    n_rep = 1
+    ansatz_options = {"beta": 1e-4, "mu": 0.5, "c": 1e-4}
+
     fidelities, sys_energies, omegas, env_energies = cooler.big_brain_cool(
-        start_omega=1.5 * spectrum_width,
+        start_omega=1.1 * spectrum_width,
         stop_omega=0.1 * min_gap,
-        ansatz_options={"beta": 1e-2, "mu": 0.2, "c": 1e-6},
+        ansatz_options=ansatz_options,
         n_rep=n_rep,
     )
 
     print(sys_eigenspectrum)
-
-    total_eigenspectrum = 0
 
     print("Final Fidelity: {}".format(fidelities[-1][-1]))
 

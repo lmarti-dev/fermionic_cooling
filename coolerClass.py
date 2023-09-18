@@ -399,6 +399,7 @@ class Cooler:
         axes[0].set_ylabel(r"$|\langle \psi_{cool} | \psi_{gs} \rangle|^2$", labelpad=0)
         ax_bottom.set_ylabel(r"$(\frac{\mathrm{d}}{\mathrm{ds}}\omega)^{-2}$")
         ax_bottom.tick_params(axis="y", labelcolor="blue")
+        ax_bottom.set_yscale("log")
         ax_bottom.invert_xaxis()
         ax_bottom.legend()
         ax_bottom.set_xlabel(r"$environment \ gap$")
@@ -729,6 +730,6 @@ def gap_ansatz(
         float: absolute value of the gradient ansatz
     """
     if f is None:
-        f = lambda x: x
+        f = lambda x: 1
     return abs(beta * f(omega) / (t_fridge**mu + c))
     # return abs(beta * f(omega) * np.exp(-((t_fridge * c) ** mu)))
