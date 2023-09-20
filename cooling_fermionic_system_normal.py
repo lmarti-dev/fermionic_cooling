@@ -27,7 +27,7 @@ from fauvqe.utilities import (
 def __main__(args):
     # model stuff
     model = FermiHubbardModel(x_dimension=2, y_dimension=2, tunneling=1, coulomb=2)
-    Nf = [2, 1]
+    Nf = [1, 1]
     is_subspace_gs_global(model, Nf)
     sys_qubits = model.flattened_qubits
     n_sys_qubits = len(sys_qubits)
@@ -67,8 +67,8 @@ def __main__(args):
     print("ground energy from model: {}".format(sys_ground_energy_exp))
     print("initial energy from model: {}".format(sys_initial_energy))
 
-    n_env_qubits = n_sys_qubits
-    # n_env_qubits = 1
+    # n_env_qubits = n_sys_qubits
+    n_env_qubits = 1
 
     env_qubits, env_ground_state, env_ham, env_energies, env_eig_states = get_Z_env(
         n_qubits=n_env_qubits
@@ -97,7 +97,7 @@ def __main__(args):
         verbosity=5,
     )
 
-    n_rep = 3
+    n_rep = 1
     ansatz_options = {"beta": 1e-3, "mu": 0.1, "c": 1e-5}
     weaken_coupling = 100
 

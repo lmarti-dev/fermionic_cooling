@@ -395,7 +395,7 @@ class Cooler:
                 omega_halfs,
                 y_values,
                 color=cmap(rep),
-                linewidth=2,
+                linewidth=1,
                 label="Rep. {}".format(rep + 1),
             )
             if plot_temp:
@@ -412,6 +412,7 @@ class Cooler:
                 ymax=np.nanmax(y_values[np.isfinite(y_values)]),
                 linestyle="--",
                 color=spectrum_cmap(ind),
+                linewidth=0.5,
             )
 
         axes[0].set_ylabel(r"$|\langle \psi_{cool} | \psi_{gs} \rangle|^2$", labelpad=0)
@@ -431,10 +432,13 @@ class Cooler:
             fig.suptitle(suptitle)
 
         use_cbar = True
-        if use_cbar:
-            fig.colorbar(cm.ScalarMappable(norm=colors.NoNorm(), cmap=cmap), ax=axes)
-        else:
-            ax_bottom.legend(bbox_to_anchor=(0.2, 2))
+        if len(env_energies) > 1:
+            if use_cbar:
+                fig.colorbar(
+                    cm.ScalarMappable(norm=colors.NoNorm(), cmap=cmap), ax=axes
+                )
+            else:
+                ax_bottom.legend(bbox_to_anchor=(0.2, 2))
 
         plt.show()
 
