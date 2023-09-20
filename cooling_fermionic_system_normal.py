@@ -26,8 +26,8 @@ from fauvqe.utilities import (
 
 def __main__(args):
     # model stuff
-    model = FermiHubbardModel(x_dimension=1, y_dimension=2, tunneling=1, coulomb=2)
-    Nf = [1, 1]
+    model = FermiHubbardModel(x_dimension=2, y_dimension=2, tunneling=1, coulomb=2)
+    Nf = [2, 1]
     is_subspace_gs_global(model, Nf)
     sys_qubits = model.flattened_qubits
     n_sys_qubits = len(sys_qubits)
@@ -75,8 +75,8 @@ def __main__(args):
     )
 
     # coupler
-    coupler = get_ZY_coupler(sys_qubits, env_qubits)
-    # coupler_list = get_moving_ZY_coupler_list(sys_qubits, env_qubits)
+    # coupler = get_ZY_coupler(sys_qubits, env_qubits)
+    coupler_list = get_moving_ZY_coupler_list(sys_qubits, env_qubits)
 
     # get environment ham sweep values
     spectrum_width = max(sys_eigenspectrum) - min(sys_eigenspectrum)
@@ -93,11 +93,11 @@ def __main__(args):
         env_hamiltonian=env_ham,
         env_qubits=env_qubits,
         env_ground_state=env_ground_state,
-        sys_env_coupling=coupler,
+        sys_env_coupling=coupler_list[0],
         verbosity=5,
     )
 
-    n_rep = 10
+    n_rep = 3
     ansatz_options = {"beta": 1e-3, "mu": 0.1, "c": 1e-5}
     weaken_coupling = 100
 
@@ -112,7 +112,7 @@ def __main__(args):
         ansatz_options=ansatz_options,
         n_rep=n_rep,
         weaken_coupling=weaken_coupling,
-        coupler_list=None,
+        coupler_list=coupler_list,
     )
 
     print(sys_eigenspectrum)

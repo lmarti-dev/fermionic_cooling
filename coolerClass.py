@@ -32,7 +32,7 @@ from cooling_utils import (
     time_evolve_density_matrix,
     trace_out_env,
 )
-from cooling_building_blocks import gap_ansatz
+from cooling_building_blocks import control_function
 from tqdm import tqdm
 
 from fauvqe.utilities import ket_in_subspace
@@ -257,7 +257,9 @@ class Cooler:
                 omegas[rep].append(omega)
                 env_energies[rep].append(env_energy)
 
-                epsilon = gap_ansatz(omega=omega, t_fridge=env_energy, **ansatz_options)
+                epsilon = control_function(
+                    omega=omega, t_fridge=env_energy, **ansatz_options
+                )
                 # if epsilon is zero or some NaN, default to 1000 step linear evolution
                 if epsilon == 0:
                     epsilon = 1e-3 * (start_omega - stop_omega)
@@ -266,7 +268,9 @@ class Cooler:
 
                 if coupler_list is not None:
                     coupler_index += 1
-                    self.sys_env_coupling = coupler_list[coupler_index]
+                    self.sys_env_coupling = coupler_list[
+                        coupler_index % len(coupler_list)
+                    ]
 
                 # print stats on evolution
                 self.update_message(

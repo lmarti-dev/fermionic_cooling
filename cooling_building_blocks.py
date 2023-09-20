@@ -82,10 +82,12 @@ def get_ZY_coupler(sys_qubits, env_qubits):
 
 def get_moving_ZY_coupler_list(sys_qubits, env_qubit):
     n_sys_qubits = len(sys_qubits)
-    return ([cirq.Z(sys_qubits[k]) * cirq.Y(env_qubit[0])] for k in range(n_sys_qubits))
+    return list(
+        cirq.Z(sys_qubits[k]) * cirq.Y(env_qubit[0]) for k in range(n_sys_qubits)
+    )
 
 
-def gap_ansatz(
+def control_function(
     omega: float,
     t_fridge: float,
     beta: float = 1,
