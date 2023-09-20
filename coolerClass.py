@@ -23,6 +23,8 @@ from scipy.sparse.linalg import expm_multiply, eigsh, expm
 from typing import Iterable
 import time
 import matplotlib.pyplot as plt
+import matplotlib.cm as cm
+import matplotlib.colors as colors
 from openfermion import FermionOperator
 import itertools
 import multiprocessing as mp
@@ -179,6 +181,7 @@ class Cooler:
         stop_omega: float,
         n_rep: int = 1,
         ansatz_options: dict = {},
+        weaken_coupling: float = 100,
     ):
         initial_density_matrix = self.total_initial_state
         if not cirq.is_hermitian(initial_density_matrix):
@@ -220,9 +223,8 @@ class Cooler:
 
             while omega > stop_omega:
                 # set alpha and t
-                qubit_number = len(self.sys_hamiltonian.qubits)
-                weaken_coupling = 100
-                alpha = omega / (weaken_coupling * qubit_number)
+                n_qubits = len(self.sys_hamiltonian.qubits)
+                alpha = omega / (weaken_coupling * n_qubits)
 
                 # there's not factor of two here, it's all correct
                 evolution_time = np.pi / alpha
@@ -384,7 +386,7 @@ class Cooler:
                     omegas[rep], env_energies[rep], color="red", linewidth=2
                 )
 
-        spectrum_cmap = plt.get_cmap("viridis", len(eigenspectrums))
+        spectrum_cmap = plt.get_cmap("hsv", len(eigenspectrums))
         for ind, spectrum in enumerate(eigenspectrums):
             transitions = get_transition_rates(spectrum)
             ax_bottom.vlines(
@@ -397,7 +399,7 @@ class Cooler:
 
         axes[0].set_ylabel(r"$|\langle \psi_{cool} | \psi_{gs} \rangle|^2$", labelpad=0)
         axes[0].set_xlabel("step")
-        ax_bottom.legend(bbox_to_anchor=(0.2, 2))
+
         ax_bottom.set_ylabel(r"$(\frac{\mathrm{d}}{\mathrm{ds}}\omega)^{-2}$")
         ax_bottom.tick_params(axis="y")  # , labelcolor="blue")
         ax_bottom.set_yscale("log")
@@ -410,6 +412,12 @@ class Cooler:
 
         if suptitle:
             fig.suptitle(suptitle)
+
+        use_cbar = True
+        if use_cbar:
+            fig.colorbar(cm.ScalarMappable(norm=colors.NoNorm(), cmap=cmap), ax=axes)
+        else:
+            ax_bottom.legend(bbox_to_anchor=(0.2, 2))
 
         plt.show()
 
@@ -468,7 +476,7 @@ def get_transition_rates(eigenspectrum):
                     )
                 )
             )
-            if gap != 0
+            if not np.isclose(gap, 0)
         )
     )
     return transitions
