@@ -1,7 +1,7 @@
 import cirq
 import numpy as np
 from cooling_utils import ndarray_to_psum
-
+from math import prod
 
 # This file contains a lot of legos to help with the cooling sims,
 # for example common environment hamiltonians, sweeps, and couplers
@@ -80,10 +80,21 @@ def get_ZY_coupler(sys_qubits, env_qubits):
     )
 
 
-def get_moving_ZY_coupler_list(sys_qubits, env_qubit):
+def get_moving_ZY_coupler_list(sys_qubits, env_qubits):
     n_sys_qubits = len(sys_qubits)
+    n_env_qubits = len(env_qubits)
+    YY_coupler = prod(list(cirq.Y(env_qubits[j]) for j in range(n_env_qubits)))
+    return list(cirq.Z(sys_qubits[k]) * YY_coupler for k in range(n_sys_qubits))
+
+
+def get_moving_ZYZY_coupler_list(sys_qubits, env_qubits):
+    n_sys_qubits = len(sys_qubits)
+    n_env_qubits = len(env_qubits)
     return list(
-        cirq.Z(sys_qubits[k]) * cirq.Y(env_qubit[0]) for k in range(n_sys_qubits)
+        cirq.Z(sys_qubits[k]) * cirq.Y(env_qubits[0])
+        + cirq.Z(sys_qubits[(k + n_sys_qubits - 1) % n_sys_qubits])
+        * cirq.Y(env_qubits[1])
+        for k in range(n_sys_qubits)
     )
 
 
