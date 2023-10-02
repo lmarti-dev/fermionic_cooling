@@ -9,9 +9,11 @@ import numpy as np
 from coolerClass import Cooler, get_total_spectra_at_given_omega
 from cooling_building_blocks import (
     get_moving_ZY_coupler_list,
+    get_moving_ZYZY_coupler_list,
     get_Z_env,
     get_ZY_coupler,
     get_moving_paulipauli_coupler_list,
+    get_moving_fsim_coupler_list,
 )
 from cooling_utils import expectation_wrapper
 from openfermion import get_sparse_operator, jw_hartree_fock_state
@@ -27,8 +29,8 @@ from fauvqe.utilities import (
 
 def __main__(args):
     # model stuff
-    model = FermiHubbardModel(x_dimension=1, y_dimension=2, tunneling=1, coulomb=2)
-    Nf = [1, 1]
+    model = FermiHubbardModel(x_dimension=2, y_dimension=2, tunneling=1, coulomb=2)
+    Nf = [2, 1]
     is_subspace_gs_global(model, Nf)
     sys_qubits = model.flattened_qubits
     n_sys_qubits = len(sys_qubits)
@@ -77,11 +79,11 @@ def __main__(args):
 
     # coupler
     # coupler = get_ZY_coupler(sys_qubits, env_qubits)
-    # coupler_list = [
-    #     get_moving_ZY_coupler_list(sys_qubits, env_qubits),
-    #     get_moving_paulipauli_coupler_list(sys_qubits, env_qubits, cirq.Y, cirq.X),
-    # ]
-    coupler_list = get_moving_ZY_coupler_list(sys_qubits, env_qubits)
+    coupler_list = [
+        get_moving_fsim_coupler_list(sys_qubits, env_qubits),
+        get_moving_ZY_coupler_list(sys_qubits, env_qubits),
+    ]
+    # coupler_list = get_moving_ZY_coupler_list(sys_qubits, env_qubits)
     # get environment ham sweep values
     spectrum_width = max(sys_eigenspectrum) - min(sys_eigenspectrum)
 
@@ -101,7 +103,7 @@ def __main__(args):
         verbosity=7,
     )
 
-    n_rep = 10
+    n_rep = 2
     ansatz_options = {"beta": 1e-3, "mu": 0.1, "c": 1e-5}
     weaken_coupling = 100
 
@@ -134,7 +136,9 @@ def __main__(args):
         sys_energies=sys_energies,
         env_energies=env_energies,
         omegas=omegas,
-        eigenspectrums=[*supp_eigenspectra, sys_eigenspectrum],
+        eigenspectrums=[
+            sys_eigenspectrum,
+        ],
     )
     print(sys_energies[0][0] - sys_energies[0][-1])
     print(np.sum(env_energies[0]))
