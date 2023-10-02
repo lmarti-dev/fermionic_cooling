@@ -80,10 +80,18 @@ def get_ZY_coupler(sys_qubits, env_qubits):
     )
 
 
-def get_moving_ZY_coupler_list(sys_qubits, env_qubit):
+def get_moving_paulipauli_coupler_list(
+    sys_qubits, env_qubit, sys_pauli: cirq.Pauli, env_pauli: cirq.Pauli
+):
     n_sys_qubits = len(sys_qubits)
     return list(
-        cirq.Z(sys_qubits[k]) * cirq.Y(env_qubit[0]) for k in range(n_sys_qubits)
+        sys_pauli(sys_qubits[k]) * env_pauli(env_qubit[0]) for k in range(n_sys_qubits)
+    )
+
+
+def get_moving_ZY_coupler_list(sys_qubits, env_qubit):
+    return get_moving_paulipauli_coupler_list(
+        sys_qubits, env_qubit, sys_pauli=cirq.Z, env_pauli=cirq.Y
     )
 
 

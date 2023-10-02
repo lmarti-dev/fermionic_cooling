@@ -11,6 +11,7 @@ from cooling_building_blocks import (
     get_moving_ZY_coupler_list,
     get_Z_env,
     get_ZY_coupler,
+    get_moving_paulipauli_coupler_list,
 )
 from cooling_utils import expectation_wrapper
 from openfermion import get_sparse_operator, jw_hartree_fock_state
@@ -26,7 +27,7 @@ from fauvqe.utilities import (
 
 def __main__(args):
     # model stuff
-    model = FermiHubbardModel(x_dimension=2, y_dimension=2, tunneling=1, coulomb=2)
+    model = FermiHubbardModel(x_dimension=1, y_dimension=2, tunneling=1, coulomb=2)
     Nf = [1, 1]
     is_subspace_gs_global(model, Nf)
     sys_qubits = model.flattened_qubits
@@ -76,8 +77,11 @@ def __main__(args):
 
     # coupler
     # coupler = get_ZY_coupler(sys_qubits, env_qubits)
+    # coupler_list = [
+    #     get_moving_ZY_coupler_list(sys_qubits, env_qubits),
+    #     get_moving_paulipauli_coupler_list(sys_qubits, env_qubits, cirq.Y, cirq.X),
+    # ]
     coupler_list = get_moving_ZY_coupler_list(sys_qubits, env_qubits)
-
     # get environment ham sweep values
     spectrum_width = max(sys_eigenspectrum) - min(sys_eigenspectrum)
 
@@ -93,11 +97,11 @@ def __main__(args):
         env_hamiltonian=env_ham,
         env_qubits=env_qubits,
         env_ground_state=env_ground_state,
-        sys_env_coupling=coupler_list[0],
-        verbosity=5,
+        sys_env_coupler_data=coupler_list,
+        verbosity=7,
     )
 
-    n_rep = 1
+    n_rep = 10
     ansatz_options = {"beta": 1e-3, "mu": 0.1, "c": 1e-5}
     weaken_coupling = 100
 
@@ -112,7 +116,7 @@ def __main__(args):
         ansatz_options=ansatz_options,
         n_rep=n_rep,
         weaken_coupling=weaken_coupling,
-        coupler_list=coupler_list,
+        coupler_indexing=True,
     )
 
     print(sys_eigenspectrum)

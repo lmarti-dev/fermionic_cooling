@@ -82,7 +82,7 @@ cooler = Cooler(
     env_hamiltonian=env_ham,
     env_qubits=env_qubits,
     env_ground_state=env_ground_state,
-    sys_env_coupling=coupler,
+    sys_env_coupler=coupler,
 )
 
 fidelities, energies = cooler.cool(

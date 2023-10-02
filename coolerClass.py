@@ -16,7 +16,7 @@
 # get max(eigenvalues)-min(eigenvalues)
 # logsweep is log spaced omega sampling
 
-from typing import Iterable
+from typing import Iterable, Union
 
 import cirq
 import matplotlib.cm as cm
@@ -31,11 +31,13 @@ from cooling_utils import (
     ketbra,
     time_evolve_density_matrix,
     trace_out_env,
+    depth_indexing,
+    get_list_depth,
 )
 from cooling_building_blocks import control_function
 from tqdm import tqdm
 
-from fauvqe.utilities import ket_in_subspace
+from fauvqe.utilities import ket_in_subspace, flatten
 
 
 class Cooler:
@@ -48,7 +50,7 @@ class Cooler:
         env_hamiltonian: cirq.PauliSum,
         env_qubits: Iterable[cirq.Qid],
         env_ground_state: np.ndarray,
-        sys_env_coupling: cirq.PauliSum,
+        sys_env_coupler_data: Union[cirq.PauliSum, list],
         verbosity: int = 0,
     ):
         self.verbosity = verbosity
@@ -65,7 +67,9 @@ class Cooler:
                 qubit_map={k: v for k, v in zip(sys_qubits, range(len(sys_qubits)))},
             )
         )
-        self.sys_env_coupling = sys_env_coupling
+        self.sys_env_coupler_data = sys_env_coupler_data
+        self.sys_env_coupler_data_dims = get_list_depth(sys_env_coupler_data)
+        self.sys_env_coupler = self.get_coupler_from_data()
 
         # message for verbose printing
         self.msg = []
@@ -83,10 +87,10 @@ class Cooler:
         self.reset_msg()
 
     def cooling_hamiltonian(self, env_coupling: float, alpha: float):
-        if isinstance(self.sys_env_coupling, (cirq.PauliSum, cirq.PauliString)):
-            coupler = self.sys_env_coupling.matrix(qubits=self.total_qubits)
+        if isinstance(self.sys_env_coupler, (cirq.PauliSum, cirq.PauliString)):
+            coupler = self.sys_env_coupler.matrix(qubits=self.total_qubits)
         else:
-            coupler = self.sys_env_coupling
+            coupler = self.sys_env_coupler
         return (
             self.sys_hamiltonian.matrix(qubits=self.total_qubits)
             + env_coupling * self.env_hamiltonian.matrix(qubits=self.total_qubits)
@@ -124,6 +128,12 @@ class Cooler:
             env_state,
             self.total_qubits,
         )
+
+    def get_coupler_from_data(self, indices: tuple = None):
+        # if no index given pick the first element
+        if indices is None:
+            indices = (0,) * self.sys_env_coupler_data_dims
+        return depth_indexing(l=self.sys_env_coupler_data, indices=iter(indices))
 
     def cool(
         self,
@@ -184,7 +194,7 @@ class Cooler:
         stop_omega: float,
         n_rep: int = 1,
         ansatz_options: dict = {},
-        coupler_list: list[cirq.PauliSum] = None,
+        coupler_indexing: bool = False,
         weaken_coupling: float = 100,
     ):
         initial_density_matrix = self.total_initial_state
@@ -225,10 +235,11 @@ class Cooler:
             omegas[rep].append(start_omega)
             env_energies[rep].append(env_energy)
 
-            # set coupler from list
-            if coupler_list is not None:
+            if coupler_indexing:
+                # if we starting counting iteration to track couplers
                 coupler_index = 0
-                self.sys_env_coupling = coupler_list[coupler_index]
+                # get how many sublist we have
+                dims = self.sys_env_coupler_data_dims
 
             while omega > stop_omega:
                 # set alpha and t
@@ -266,11 +277,25 @@ class Cooler:
                 omega = omega - epsilon
                 step += 1
 
-                if coupler_list is not None:
+                if coupler_indexing:
+                    if dims == 1:
+                        coupler_index_mod = coupler_index % len(
+                            self.sys_env_coupler_data
+                        )
+                        coupler_tuple = (coupler_index_mod,)
+
+                    elif dims == 2:
+                        rep_mod = rep % len(self.sys_env_coupler_data)
+                        coupler_index_mod = coupler_index % len(
+                            self.sys_env_coupler_data[rep_mod]
+                        )
+
+                        coupler_tuple = (rep_mod, coupler_index_mod)
+                    self.sys_env_coupler = self.get_coupler_from_data(coupler_tuple)
                     coupler_index += 1
-                    self.sys_env_coupling = coupler_list[
-                        coupler_index % len(coupler_list)
-                    ]
+                    self.update_message(
+                        f"Current coupler: {self.sys_env_coupler}", message_level=7
+                    )
 
                 # print stats on evolution
                 self.update_message(

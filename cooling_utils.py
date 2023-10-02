@@ -1,15 +1,16 @@
 import itertools
 import multiprocessing as mp
 import time
-from typing import Iterable
+from typing import Iterable, Iterator
 
 import cirq
+
 import numpy as np
+
 from openfermion import FermionOperator
 from scipy.sparse.linalg import eigsh, expm, expm_multiply
 
 from fauvqe.utilities import flatten
-
 
 # this file contains general utils for the cooling.
 # Some of them are simply convenience functions
@@ -103,6 +104,22 @@ def time_evolve_density_matrix(
 def get_ground_state(ham: cirq.PauliSum, qubits: Iterable[cirq.Qid]) -> np.ndarray:
     _, ground_state = eigsh(ham.matrix(qubits=qubits), k=1, which="SA")
     return ground_state
+
+
+def get_list_depth(l, depth=0):
+    if isinstance(l, list):
+        return get_list_depth(l[0], depth=depth + 1)
+    return depth
+
+
+def depth_indexing(l, indices: Iterator):
+    # get l[a][b][c][d] until indices or list depth is exhausted
+    ind = next(indices, None)
+    if isinstance(l, list):
+        if ind is None:
+            raise ValueError("Indices shorter than list depth")
+        return depth_indexing(l[ind], indices)
+    return l
 
 
 def two_tensors_partial_trace(rho: np.ndarray, n1: int, n2: int):
