@@ -80,6 +80,11 @@ def get_ZY_coupler(sys_qubits, env_qubits):
     )
 
 
+def check_env_qubits(env_qubits: list[cirq.Qid], expected: int):
+    if len(env_qubits) != expected:
+        raise ValueError(f"Expected {expected} ancillas, got {len(env_qubits)}")
+
+
 def get_moving_ZY_coupler_list(sys_qubits, env_qubits):
     n_sys_qubits = len(sys_qubits)
     n_env_qubits = len(env_qubits)
@@ -89,12 +94,23 @@ def get_moving_ZY_coupler_list(sys_qubits, env_qubits):
 
 def get_moving_ZYZY_coupler_list(sys_qubits, env_qubits):
     n_sys_qubits = len(sys_qubits)
-    n_env_qubits = len(env_qubits)
     return list(
         cirq.Z(sys_qubits[k]) * cirq.Y(env_qubits[0])
         + cirq.Z(sys_qubits[(k + n_sys_qubits - 1) % n_sys_qubits])
         * cirq.Y(env_qubits[1])
         for k in range(n_sys_qubits)
+    )
+
+
+def get_moving_fsim_coupler_list(sys_qubits, env_qubits):
+    n_sys_qubits = len(sys_qubits)
+    return list(
+        (
+            cirq.X(sys_qubits[k]) * cirq.X(sys_qubits[k + 1])
+            + cirq.Y(sys_qubits[k]) * cirq.Y(sys_qubits[k + 1])
+        )
+        * cirq.Y(env_qubits[0])
+        for k in range(n_sys_qubits - 1)
     )
 
 

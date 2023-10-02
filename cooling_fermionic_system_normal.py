@@ -12,6 +12,7 @@ from cooling_building_blocks import (
     get_moving_ZYZY_coupler_list,
     get_Z_env,
     get_ZY_coupler,
+    get_moving_fsim_coupler_list,
 )
 from cooling_utils import expectation_wrapper
 from openfermion import get_sparse_operator, jw_hartree_fock_state
@@ -69,7 +70,7 @@ def __main__(args):
     print("initial energy from model: {}".format(sys_initial_energy))
 
     # n_env_qubits = n_sys_qubits
-    n_env_qubits = 2
+    n_env_qubits = 1
 
     env_qubits, env_ground_state, env_ham, env_energies, env_eig_states = get_Z_env(
         n_qubits=n_env_qubits
@@ -77,8 +78,8 @@ def __main__(args):
 
     # coupler
     # coupler = get_ZY_coupler(sys_qubits, env_qubits)
-    coupler_list = get_moving_ZYZY_coupler_list(sys_qubits, env_qubits)
-
+    # coupler_list = get_moving_ZYZY_coupler_list(sys_qubits, env_qubits)
+    coupler_list = get_moving_fsim_coupler_list(sys_qubits, env_qubits)
     # get environment ham sweep values
     spectrum_width = max(sys_eigenspectrum) - min(sys_eigenspectrum)
 
