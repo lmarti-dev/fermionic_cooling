@@ -14,6 +14,7 @@ from cooling_building_blocks import (
     get_ZY_coupler,
     get_moving_paulipauli_coupler_list,
     get_moving_fsim_coupler_list,
+    get_hamiltonian_coupler,
 )
 from cooling_utils import expectation_wrapper
 from openfermion import get_sparse_operator, jw_hartree_fock_state
@@ -87,11 +88,12 @@ def __main__(args):
     )
 
     # coupler
-    # coupler = get_ZY_coupler(sys_qubits, env_qubits)
-    coupler_list = [
-        get_moving_fsim_coupler_list(sys_qubits, env_qubits),
-        get_moving_ZY_coupler_list(sys_qubits, env_qubits),
-    ]
+    # coupler_list = get_hamiltonian_coupler(model.hamiltonian, env_qubits=env_qubits)
+    coupler_list = get_moving_ZY_coupler_list(sys_qubits, env_qubits)
+    # coupler_list = [
+    #     get_moving_fsim_coupler_list(sys_qubits, env_qubits),
+    #     get_moving_ZY_coupler_list(sys_qubits, env_qubits),
+    # ]
     # coupler_list = get_moving_ZY_coupler_list(sys_qubits, env_qubits)
     # get environment ham sweep values
     spectrum_width = max(sys_eigenspectrum) - min(sys_eigenspectrum)
@@ -113,8 +115,8 @@ def __main__(args):
         verbosity=7,
     )
 
-    n_rep = 2
-    ansatz_options = {"beta": 1e-3, "mu": 0.1, "c": 1e-5}
+    n_rep = 1
+    ansatz_options = {"beta": 1e-4, "mu": 0.1, "c": 1e-5}
     weaken_coupling = 100
 
     start_omega = 1.1 * spectrum_width

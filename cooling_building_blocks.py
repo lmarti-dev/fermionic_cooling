@@ -154,3 +154,12 @@ def control_function(
         f = lambda x: 1
     return abs(beta * f(omega) / ((t_fridge / omega) ** mu + c))
     # return abs(beta * f(omega) * np.exp(-((t_fridge * c) ** mu)))
+
+
+def get_hamiltonian_coupler(hamiltonian: cirq.PauliSum, env_qubits):
+    coupler_list = []
+    n_env_qubits = len(env_qubits)
+    YY_coupler = prod(list(cirq.Y(env_qubits[j]) for j in range(n_env_qubits)))
+    for pstr in hamiltonian:
+        coupler_list.append(pstr * YY_coupler)
+    return coupler_list
