@@ -33,17 +33,25 @@ from cooling_utils import (
     trace_out_env,
     depth_indexing,
     get_list_depth,
+    coupler_fidelity_to_ground_state_projectors,
 )
 from cooling_building_blocks import control_function
 from tqdm import tqdm
 
-from fauvqe.utilities import ket_in_subspace, flatten
+from fauvqe.utilities import (
+    ket_in_subspace,
+    flatten,
+    jw_eigenspectrum_at_particle_number,
+)
+
+from openfermion import get_sparse_operator
 
 
 class Cooler:
     def __init__(
         self,
         sys_hamiltonian: cirq.PauliSum,
+        n_electrons: list,
         sys_qubits: Iterable[cirq.Qid],
         sys_initial_state: np.ndarray,
         sys_ground_state: np.ndarray,
@@ -55,9 +63,11 @@ class Cooler:
     ):
         self.verbosity = verbosity
         self.sys_hamiltonian = sys_hamiltonian
+        self.n_electrons = n_electrons
         self.sys_qubits = sys_qubits
         self.sys_initial_state = sys_initial_state
         self.sys_ground_state = sys_ground_state
+        self._sys_eig_states = None
         self.env_hamiltonian = env_hamiltonian
         self.env_qubits = env_qubits
         self.env_ground_state = env_ground_state
@@ -505,7 +515,7 @@ class Cooler:
 
 def get_total_spectra_at_given_omega(
     cooler: Cooler,
-    Nf: list,
+    n_electrons: list,
     omega: float,
     weaken_coupling: float,
 ):
@@ -516,7 +526,9 @@ def get_total_spectra_at_given_omega(
     subspace_eigvals = []
     subspace_eigvecs = []
     for eigval, eigvec in zip(eigvals, eigvecs):
-        if ket_in_subspace(ket=eigvec, Nf=Nf, n_subspace_qubits=n_qubits // 2):
+        if ket_in_subspace(
+            ket=eigvec, n_electrons=n_electrons, n_subspace_qubits=n_qubits // 2
+        ):
             subspace_eigvals.append(eigval)
             subspace_eigvecs.append(eigvec)
     return subspace_eigvals, subspace_eigvecs

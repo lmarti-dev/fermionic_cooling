@@ -232,3 +232,67 @@ def ndarray_to_psum(
             if not np.isclose(np.abs(coeff), 0):
                 pauli_sum += cirq.PauliString(pauli_string, coeff)
     return pauli_sum
+
+
+def state_fidelity_to_eigenstates(state: np.ndarray, eigenstates: np.ndarray):
+    # eigenstates have shape N * M where M is the number of eigenstates
+    fids = []
+    for jj in eigenstates.shape[1]:
+        fids.append(
+            cirq.fidelity(
+                state, eigenstates[:, jj], qid_shape=(2,) * int(np.log2(len(state)))
+            )
+        )
+    return fids
+
+
+def coupler_fidelity_to_ground_state_projectors(
+    coupler: np.ndarray,
+    sys_eig_states: np.ndarray,
+    env_eig_states: np.ndarray,
+    exponentiate: bool = True,
+):
+    measures = []
+    env_up = np.outer(env_eig_states[:, 1], np.conjugate(env_eig_states[:, 0]))
+    for k in range(1, sys_eig_states.shape[1]):
+        projector = np.kron(
+            np.outer(sys_eig_states[:, 0], np.conjugate(sys_eig_states[:, k])),
+            env_up,
+        )
+        projector += np.conjugate(np.transpose(projector))
+        # for now, settle for Hilbert-Schmidt inner product instead of fidelity
+        # since ZY is no density matrix...
+        if exponentiate:
+            exp_coupler = expm(-1j * coupler)
+            exp_coupler = exp_coupler / np.trace(exp_coupler)
+
+            exp_projector = expm(-1j * projector)
+            exp_projector = exp_projector / np.trace(exp_projector)
+        else:
+            exp_coupler = coupler
+            exp_projector = projector
+        measures.append(
+            np.trace(np.conjugate(np.transpose(exp_coupler)) @ exp_projector)
+        )
+
+        # measures.append(
+        #     cirq.fidelity(
+        #         expm(-1j * coupler),
+        #         expm(-1j * projector),
+        #         qid_shape=(2,) * int(np.log2(len(coupler))),
+        #     )
+        # )
+    return measures
+
+
+def print_coupler_fidelity_to_ground_state_projectors(
+    coupler: np.ndarray, sys_eig_states: np.ndarray, env_eig_states: np.ndarray
+):
+    fidelities = coupler_fidelity_to_ground_state_projectors(
+        coupler=coupler,
+        sys_eig_states=sys_eig_states,
+        env_eig_states=env_eig_states,
+    )
+    for ind, fid in enumerate(fidelities):
+        print(f"|ψ₀Xψ({ind+1})|: {np.real(fid):.5f}", end=", ")
+    print("\n")

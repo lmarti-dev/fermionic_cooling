@@ -27,27 +27,36 @@ from fauvqe.utilities import (
 )
 
 
+def pick_ground_state(name: str, n_sys_qubits: int, n_electrons: list):
+    if name == "hartree_fock":
+        return jw_hartree_fock_state(
+            n_orbitals=n_sys_qubits, n_electrons=sum(n_electrons)
+        )
+    elif name == "dicke":
+        return spin_dicke_state(
+            n_qubits=n_sys_qubits, n_electrons=n_electrons, right_to_left=True
+        )
+    elif name == "mixed":
+        return spin_dicke_mixed_state(
+            n_qubits=n_sys_qubits, n_electrons=n_electrons, right_to_left=True
+        )
+
+
 def __main__(args):
     # model stuff
     model = FermiHubbardModel(x_dimension=2, y_dimension=2, tunneling=1, coulomb=2)
-    Nf = [2, 1]
-    is_subspace_gs_global(model, Nf)
+    n_electrons = [2, 1]
+    is_subspace_gs_global(model, n_electrons)
     sys_qubits = model.flattened_qubits
     n_sys_qubits = len(sys_qubits)
-    sys_hartree_fock = jw_hartree_fock_state(
-        n_orbitals=n_sys_qubits, n_electrons=sum(Nf)
-    )
-    sys_dicke = spin_dicke_state(n_qubits=n_sys_qubits, Nf=Nf, right_to_left=True)
-    sys_mixed_state = spin_dicke_mixed_state(
-        n_qubits=n_sys_qubits, Nf=Nf, right_to_left=True
-    )
-    sys_initial_state = sys_hartree_fock
+
+    sys_initial_state = pick_ground_state("hartree_fock", n_sys_qubits, n_electrons)
     sys_eigenspectrum, sys_eigenstates = jw_eigenspectrum_at_particle_number(
         sparse_operator=get_sparse_operator(
             model.fock_hamiltonian,
             n_qubits=len(model.flattened_qubits),
         ),
-        particle_number=Nf,
+        particle_number=n_electrons,
         expanded=True,
     )
     sys_ground_state = sys_eigenstates[:, np.argmin(sys_eigenspectrum)]
@@ -93,6 +102,7 @@ def __main__(args):
 
     cooler = Cooler(
         sys_hamiltonian=model.hamiltonian,
+        n_electrons=n_electrons,
         sys_qubits=model.flattened_qubits,
         sys_ground_state=sys_ground_state,
         sys_initial_state=sys_initial_state,
@@ -126,7 +136,10 @@ def __main__(args):
     supp_eigenspectra = []
     for omega in sys_eigenspectrum:
         subspace_eigvals, subspace_eigvecs = get_total_spectra_at_given_omega(
-            cooler=cooler, Nf=Nf, omega=omega, weaken_coupling=weaken_coupling
+            cooler=cooler,
+            n_electrons=n_electrons,
+            omega=omega,
+            weaken_coupling=weaken_coupling,
         )
         supp_eigenspectra.append(subspace_eigvals)
     print("Final Fidelity: {}".format(fidelities[-1][-1]))
