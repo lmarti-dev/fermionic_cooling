@@ -15,6 +15,7 @@ from cooling_building_blocks import (
     get_moving_paulipauli_coupler_list,
     get_moving_fsim_coupler_list,
     get_hamiltonian_coupler,
+    get_cheat_coupler,
 )
 from cooling_utils import expectation_wrapper
 from openfermion import get_sparse_operator, jw_hartree_fock_state
@@ -41,6 +42,24 @@ def pick_ground_state(name: str, n_sys_qubits: int, n_electrons: list):
         return spin_dicke_mixed_state(
             n_qubits=n_sys_qubits, n_electrons=n_electrons, right_to_left=True
         )
+
+
+def get_hybrid_eigenspectra(
+    sys_eigenspectrum: np.ndarray,
+    cooler: Cooler,
+    n_electrons: list,
+    weaken_coupling: float,
+):
+    supp_eigenspectra = []
+    for omega in sys_eigenspectrum:
+        subspace_eigvals, subspace_eigvecs = get_total_spectra_at_given_omega(
+            cooler=cooler,
+            n_electrons=n_electrons,
+            omega=omega,
+            weaken_coupling=weaken_coupling,
+        )
+        supp_eigenspectra.append(subspace_eigvals)
+    return supp_eigenspectra
 
 
 def __main__(args):
@@ -87,9 +106,9 @@ def __main__(args):
         n_qubits=n_env_qubits
     )
 
-    # coupler
     # coupler_list = get_hamiltonian_coupler(model.hamiltonian, env_qubits=env_qubits)
     coupler_list = get_moving_ZY_coupler_list(sys_qubits, env_qubits)
+    # coupler_list = get_cheat_coupler(sys_eigenstates, env_eig_states)
     # coupler_list = [
     #     get_moving_fsim_coupler_list(sys_qubits, env_qubits),
     #     get_moving_ZY_coupler_list(sys_qubits, env_qubits),
@@ -116,11 +135,11 @@ def __main__(args):
     )
 
     n_rep = 1
-    ansatz_options = {"beta": 1e-4, "mu": 0.1, "c": 1e-5}
+    ansatz_options = {"beta": 1e-3, "mu": 0.01, "c": 1e-4}
     weaken_coupling = 100
 
-    start_omega = 1.1 * spectrum_width
-    stop_omega = 0.1 * min_gap
+    start_omega = 1.05 * spectrum_width
+    stop_omega = 0.5 * min_gap
 
     print("start: {:.4f} stop: {:.4f}".format(start_omega, stop_omega))
 
@@ -130,20 +149,8 @@ def __main__(args):
         ansatz_options=ansatz_options,
         n_rep=n_rep,
         weaken_coupling=weaken_coupling,
-        coupler_indexing=True,
     )
 
-    print(sys_eigenspectrum)
-
-    supp_eigenspectra = []
-    for omega in sys_eigenspectrum:
-        subspace_eigvals, subspace_eigvecs = get_total_spectra_at_given_omega(
-            cooler=cooler,
-            n_electrons=n_electrons,
-            omega=omega,
-            weaken_coupling=weaken_coupling,
-        )
-        supp_eigenspectra.append(subspace_eigvals)
     print("Final Fidelity: {}".format(fidelities[-1][-1]))
 
     cooler.plot_controlled_cooling(
@@ -155,8 +162,6 @@ def __main__(args):
             sys_eigenspectrum,
         ],
     )
-    print(sys_energies[0][0] - sys_energies[0][-1])
-    print(np.sum(env_energies[0]))
 
 
 if __name__ == "__main__":

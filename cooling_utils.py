@@ -107,7 +107,7 @@ def get_ground_state(ham: cirq.PauliSum, qubits: Iterable[cirq.Qid]) -> np.ndarr
 
 
 def get_list_depth(l, depth=0):
-    if isinstance(l, list):
+    if isinstance(l, (list, tuple)):
         return get_list_depth(l[0], depth=depth + 1)
     return depth
 
@@ -115,7 +115,7 @@ def get_list_depth(l, depth=0):
 def depth_indexing(l, indices: Iterator):
     # get l[a][b][c][d] until indices or list depth is exhausted
     ind = next(indices, None)
-    if isinstance(l, list):
+    if isinstance(l, (list, tuple)):
         if ind is None:
             raise ValueError("Indices shorter than list depth")
         return depth_indexing(l[ind], indices)
@@ -237,7 +237,7 @@ def ndarray_to_psum(
 def state_fidelity_to_eigenstates(state: np.ndarray, eigenstates: np.ndarray):
     # eigenstates have shape N * M where M is the number of eigenstates
     fids = []
-    for jj in eigenstates.shape[1]:
+    for jj in range(eigenstates.shape[1]):
         fids.append(
             cirq.fidelity(
                 state, eigenstates[:, jj], qid_shape=(2,) * int(np.log2(len(state)))

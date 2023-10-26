@@ -78,23 +78,28 @@ class Cooler:
             )
         )
         self.sys_env_coupler_data = sys_env_coupler_data
-        self.sys_env_coupler_data_dims = get_list_depth(sys_env_coupler_data)
+
+        # check if we got a list to iterate over
+        if isinstance(sys_env_coupler_data, cirq.PauliSum):
+            self.sys_env_coupler_data_dims = 0
+        else:
+            self.sys_env_coupler_data_dims = get_list_depth(sys_env_coupler_data)
         self.sys_env_coupler = self.get_coupler_from_data()
 
         # message for verbose printing
-        self.msg = []
+        self.msg = {}
 
-    def update_message(self, s: str, message_level: int = 1):
+    def update_message(self, k: str, s: str, message_level: int = 1):
         if int(self.verbosity) >= message_level:
-            self.msg.append(s)
+            self.msg[k] = s
 
     def reset_msg(self):
-        self.msg = []
+        self.msg = {}
 
     def print_msg(self):
-        print("\n".join(self.msg))
-        print("\033[F" * (1 + len(self.msg)))
-        self.reset_msg()
+        if self.verbosity:
+            print("\n".join(self.msg.values()))
+            print("\033[F" * (1 + len(self.msg.keys())))
 
     def cooling_hamiltonian(self, env_coupling: float, alpha: float):
         if isinstance(self.sys_env_coupler, (cirq.PauliSum, cirq.PauliString)):
@@ -150,6 +155,7 @@ class Cooler:
         evolution_times: np.ndarray,
         alphas: np.ndarray,
         sweep_values: Iterable[float],
+        use_trotter: bool = False,
     ):
         initial_density_matrix = self.total_initial_state
         if not cirq.is_hermitian(initial_density_matrix):
@@ -163,6 +169,7 @@ class Cooler:
         sys_energy = self.sys_energy(self.sys_initial_state)
 
         self.update_message(
+            "fidgs",
             "initial fidelity to gs: {:.4f}, initial energy of traced out rho: {:.4f}, ground energy: {:.4f}".format(
                 sys_fidelity, sys_energy, self.sys_ground_energy
             ),
@@ -172,31 +179,58 @@ class Cooler:
         fidelities.append(sys_fidelity)
         energies.append(sys_energy)
 
-        for step, env_coupling in tqdm(
-            enumerate(sweep_values), total=len(sweep_values)
-        ):
-            # print("=== step: {}/{} ===".format(step, len(sweep_values)))
-            sys_fidelity, sys_energy, _, total_density_matrix = self.cooling_step(
+        for step, env_coupling in enumerate(sweep_values):
+            # trotterize cooling to go slow
+            if use_trotter:
+                step_fn = self.trotter_cooling_step
+                evolution_time = 1e-2
+            else:
+                step_fn = self.cooling_step
+                evolution_time = evolution_times[step]
+            sys_fidelity, sys_energy, _, total_density_matrix = step_fn(
                 total_density_matrix=total_density_matrix,
                 env_coupling=env_coupling,
                 alpha=alphas[step],
-                evolution_time=evolution_times[step],
+                evolution_time=evolution_time,
             )
             fidelities.append(sys_fidelity)
             energies.append(sys_energy)
             self.update_message(
-                has_increased(sys_fidelity, fidelities[-2], "fidelity"), message_level=9
-            )
-            self.update_message(
-                has_increased(sys_energy, energies[-2], "energy"), message_level=9
-            )
-            self.update_message(
+                "fidgs",
                 "fidelity to gs: {:.4f}, energy diff of traced out rho: {:.4f}".format(
                     sys_fidelity, sys_energy - self.sys_ground_energy
                 ),
-                message_level=9,
+                message_level=5,
             )
-        return fidelities, energies
+            self.update_message("step", f"step: {step} coupling: {env_coupling:.4f}")
+        final_sys_density_matrix = trace_out_env(
+            rho=total_density_matrix,
+            n_sys_qubits=len(self.sys_qubits),
+            n_env_qubits=len(self.env_qubits),
+        )
+        return fidelities, energies, final_sys_density_matrix
+
+    def sys_env_coupler_easy_setter(self, coupler_index: int, rep: int):
+        coupler_indexing = self.sys_env_coupler_data_dims > 0
+        dims = self.sys_env_coupler_data_dims
+        if coupler_indexing:
+            # if there's only one list of couplers, iterate over all of them
+            if dims == 1:
+                coupler_index_mod = coupler_index % len(self.sys_env_coupler_data)
+                coupler_tuple = (coupler_index_mod,)
+
+            # if there are two lists, then iterate over one of them for a rep, then the other for the other rep
+            elif dims == 2:
+                rep_mod = rep % len(self.sys_env_coupler_data)
+                coupler_index_mod = coupler_index % len(
+                    self.sys_env_coupler_data[rep_mod]
+                )
+
+                # get tupler index
+                coupler_tuple = (rep_mod, coupler_index_mod)
+            self.sys_env_coupler = self.get_coupler_from_data(coupler_tuple)
+        else:
+            pass
 
     def big_brain_cool(
         self,
@@ -204,7 +238,6 @@ class Cooler:
         stop_omega: float,
         n_rep: int = 1,
         ansatz_options: dict = {},
-        coupler_indexing: bool = False,
         weaken_coupling: float = 100,
     ):
         initial_density_matrix = self.total_initial_state
@@ -222,6 +255,7 @@ class Cooler:
         env_energy = self.env_energy(self.total_initial_state)
 
         self.update_message(
+            "figs",
             "initial fidelity to gs: {:.4f}, initial energy of traced out rho: {:.4f}, ground energy: {:.4f}".format(
                 sys_fidelity, sys_energy, self.sys_ground_energy
             ),
@@ -229,7 +263,7 @@ class Cooler:
         )
 
         for rep in range(n_rep):
-            self.update_message(s="rep n. {}".format(rep), message_level=5)
+            self.update_message("rep", s="rep n. {}".format(rep), message_level=5)
             omega = start_omega
             step = 0
 
@@ -245,11 +279,13 @@ class Cooler:
             omegas[rep].append(start_omega)
             env_energies[rep].append(env_energy)
 
-            if coupler_indexing:
-                # if we starting counting iteration to track couplers
-                coupler_index = 0
-                # get how many sublist we have
-                dims = self.sys_env_coupler_data_dims
+            # check number of couplers in list
+            if self.sys_env_coupler_data_dims == 0:
+                coupler_number = 1
+            elif self.sys_env_coupler_data_dims == 1:
+                coupler_number = len(self.sys_env_coupler_data)
+            elif self.sys_env_coupler_data_dims == 2:
+                coupler_number = len(self.sys_env_coupler_data[rep])
 
             while omega > stop_omega:
                 # set alpha and t
@@ -259,25 +295,47 @@ class Cooler:
                 # there's not factor of two here, it's all correct
                 evolution_time = np.pi / alpha
 
-                # evolve system and reset ancilla
-                (
-                    sys_fidelity,
-                    sys_energy,
-                    env_energy,
-                    total_density_matrix,
-                ) = self.cooling_step(
-                    total_density_matrix=total_density_matrix,
-                    env_coupling=omega,
-                    alpha=alpha,
-                    evolution_time=evolution_time,
-                )
+                # cool with all couplers for a given gap
+                for coupler_index in range(coupler_number):
+                    self.sys_env_coupler_easy_setter(
+                        coupler_index=coupler_index, rep=rep
+                    )
 
-                # append values
-                fidelities[rep].append(sys_fidelity)
-                sys_energies[rep].append(sys_energy)
-                omegas[rep].append(omega)
-                env_energies[rep].append(env_energy)
+                    # evolve system and reset ancilla
+                    (
+                        sys_fidelity,
+                        sys_energy,
+                        env_energy,
+                        total_density_matrix,
+                    ) = self.cooling_step(
+                        total_density_matrix=total_density_matrix,
+                        env_coupling=omega,
+                        alpha=alpha,
+                        evolution_time=evolution_time,
+                    )
 
+                    # append values
+                    fidelities[rep].append(sys_fidelity)
+                    sys_energies[rep].append(sys_energy)
+                    omegas[rep].append(omega)
+                    env_energies[rep].append(env_energy)
+
+                    # print stats on evolution
+                    self.update_message(
+                        "fidgs",
+                        "fidelity to gs: {:.4f}, energy diff of traced out rho: {:.4f}".format(
+                            sys_fidelity, sys_energy - self.sys_ground_energy
+                        ),
+                        message_level=5,
+                    )
+
+                    self.update_message(
+                        "coupler",
+                        f"Current coupler: {self.sys_env_coupler}",
+                        message_level=7,
+                    )
+
+                # update the control function
                 epsilon = control_function(
                     omega=omega, t_fridge=env_energy, **ansatz_options
                 )
@@ -286,49 +344,65 @@ class Cooler:
                     epsilon = 1e-3 * (start_omega - stop_omega)
                 omega = omega - epsilon
                 step += 1
-
-                if coupler_indexing:
-                    if dims == 1:
-                        coupler_index_mod = coupler_index % len(
-                            self.sys_env_coupler_data
-                        )
-                        coupler_tuple = (coupler_index_mod,)
-
-                    elif dims == 2:
-                        rep_mod = rep % len(self.sys_env_coupler_data)
-                        coupler_index_mod = coupler_index % len(
-                            self.sys_env_coupler_data[rep_mod]
-                        )
-
-                        coupler_tuple = (rep_mod, coupler_index_mod)
-                    self.sys_env_coupler = self.get_coupler_from_data(coupler_tuple)
-                    coupler_index += 1
-                    self.update_message(
-                        f"Current coupler: {self.sys_env_coupler}", message_level=7
-                    )
-
-                # print stats on evolution
                 self.update_message(
-                    has_increased(sys_fidelity, fidelities[rep][-2], "fidelity"),
-                    message_level=9,
-                )
-                self.update_message(
-                    has_increased(sys_energy, sys_energies[rep][-2], "energy"),
-                    message_level=9,
-                )
-                self.update_message(
-                    "fidelity to gs: {:.4f}, energy diff of traced out rho: {:.4f}".format(
-                        sys_fidelity, sys_energy - self.sys_ground_energy
-                    ),
-                    message_level=5,
-                )
-                self.update_message(
+                    "epsi",
                     "epsi: {:.3e} prev: {:.3f} fridge E: {:.3e}".format(
                         epsilon, omega + epsilon, env_energy
                     ),
                     message_level=5,
                 )
+
         return fidelities, sys_energies, omegas, env_energies
+
+    def trotter_cooling_step(
+        self,
+        total_density_matrix: np.ndarray,
+        alpha: float,
+        env_coupling: float,
+        evolution_time: float = 1e-3,
+    ):
+        cooling_hamiltonian = self.cooling_hamiltonian(env_coupling, alpha)
+
+        # set up dummy values
+        total_time = 0
+        sys_energy = 1e10
+        sys_energy_before = sys_energy
+        sys_energy_after = 0
+        while sys_energy_after < sys_energy_before:
+            sys_energy_before = sys_energy
+            total_density_matrix = time_evolve_density_matrix(
+                ham=cooling_hamiltonian,  # .matrix(qubits=self.total_qubits),
+                rho=total_density_matrix,
+                t=evolution_time,
+                method="expm",
+            )
+            total_time += evolution_time
+            traced_density_matrix = trace_out_env(
+                rho=total_density_matrix,
+                n_sys_qubits=len(self.sys_qubits),
+                n_env_qubits=len(self.env_qubits),
+            )
+
+            # renormalizing to avoid errors
+            traced_density_matrix /= np.trace(traced_density_matrix)
+            total_density_matrix /= np.trace(total_density_matrix)
+            sys_energy = self.sys_energy(traced_density_matrix)
+            sys_energy_after = sys_energy
+
+            self.update_message(
+                "trottime",
+                f"total evolved time [α/π]: {total_time*alpha/np.pi:.5f}, energy: {sys_energy:.4f}",
+                message_level=5,
+            )
+            self.print_msg()
+        sys_fidelity = self.sys_fidelity(traced_density_matrix)
+        env_energy = self.env_energy(total_density_matrix)
+        # putting the env back in the ground state
+        total_density_matrix = np.kron(
+            traced_density_matrix, self.env_ground_density_matrix
+        )
+
+        return sys_fidelity, sys_energy, env_energy, total_density_matrix
 
     def cooling_step(
         self,
@@ -340,14 +414,15 @@ class Cooler:
         cooling_hamiltonian = self.cooling_hamiltonian(env_coupling, alpha)
 
         self.update_message(
-            "env coupling value: {}".format(env_coupling), message_level=10
+            "envcou", "env coupling value: {}".format(env_coupling), message_level=10
         )
-        self.update_message("alpha value: {}".format(alpha), message_level=10)
+        self.update_message("alpha", "alpha value: {}".format(alpha), message_level=10)
         self.update_message(
-            "evolution_time value: {}".format(evolution_time), message_level=10
+            "evtime",
+            "evolution_time value: {}".format(evolution_time),
+            message_level=10,
         )
 
-        self.update_message("evolving...", message_level=10)
         total_density_matrix = time_evolve_density_matrix(
             ham=cooling_hamiltonian,  # .matrix(qubits=self.total_qubits),
             rho=total_density_matrix,
@@ -365,13 +440,11 @@ class Cooler:
         total_density_matrix /= np.trace(total_density_matrix)
 
         # computing useful values
-        self.update_message("computing values...", message_level=10)
         sys_fidelity = self.sys_fidelity(traced_density_matrix)
         sys_energy = self.sys_energy(traced_density_matrix)
         env_energy = self.env_energy(total_density_matrix)
 
         # putting the env back in the ground state
-        self.update_message("retensoring...", message_level=10)
         total_density_matrix = np.kron(
             traced_density_matrix, self.env_ground_density_matrix
         )
@@ -511,6 +584,74 @@ class Cooler:
             fig.suptitle(suptitle)
 
         plt.show()
+
+    def probe_evolution_times(self, alphas, sweep_values, N_slices: int):
+        initial_density_matrix = self.total_initial_state
+        if not cirq.is_hermitian(initial_density_matrix):
+            raise ValueError("initial density matrix is not hermitian")
+        total_density_matrix = initial_density_matrix
+
+        fidelities = []
+        energies = []
+
+        sys_fidelity = self.sys_fidelity(self.sys_initial_state)
+        sys_energy = self.sys_energy(self.sys_initial_state)
+
+        self.update_message(
+            "fidgs",
+            "initial fidelity to gs: {:.4f}, initial energy of traced out rho: {:.4f}, ground energy: {:.4f}".format(
+                sys_fidelity, sys_energy, self.sys_ground_energy
+            ),
+            message_level=9,
+        )
+
+        fidelities.append(sys_fidelity)
+        energies.append(sys_energy)
+        env_energy_dynamics = []
+        for step, env_coupling in enumerate(sweep_values):
+            max_evolution_time = 4 * np.pi / alphas[step]
+            evolution_times = []
+            env_energies = []
+            for evolution_time in np.linspace(
+                max_evolution_time / N_slices, max_evolution_time, N_slices
+            ):
+                (
+                    sys_fidelity,
+                    sys_energy,
+                    env_energy,
+                    _,
+                ) = self.cooling_step(
+                    total_density_matrix=total_density_matrix,
+                    env_coupling=env_coupling,
+                    alpha=alphas[step],
+                    evolution_time=evolution_time,
+                )
+                fidelities.append(sys_fidelity)
+                energies.append(sys_energy)
+                self.update_message(
+                    "evtime",
+                    f"evolution time: {evolution_time:.3f}/{max_evolution_time:.3f}, env_ene: {env_energy:.3f}",
+                    message_level=5,
+                )
+                self.update_message(
+                    "fidgs",
+                    "fidelity to gs: {:.4f}, energy diff of traced out rho: {:.4f}".format(
+                        sys_fidelity, sys_energy - self.sys_ground_energy
+                    ),
+                    message_level=5,
+                )
+                self.update_message(
+                    "step", f"step: {step} coupling: {env_coupling:.4f}"
+                )
+                evolution_times.append(evolution_time)
+                env_energies.append(env_energy)
+            env_energy_dynamics.append((evolution_times, env_energies))
+        final_sys_density_matrix = trace_out_env(
+            rho=total_density_matrix,
+            n_sys_qubits=len(self.sys_qubits),
+            n_env_qubits=len(self.env_qubits),
+        )
+        return fidelities, energies, final_sys_density_matrix, env_energy_dynamics
 
 
 def get_total_spectra_at_given_omega(

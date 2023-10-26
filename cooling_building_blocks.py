@@ -1,6 +1,6 @@
 import cirq
 import numpy as np
-from cooling_utils import ndarray_to_psum
+from cooling_utils import ndarray_to_psum, get_transition_rates
 from math import prod
 
 # This file contains a lot of legos to help with the cooling sims,
@@ -10,10 +10,13 @@ from math import prod
 # depending on the environment energy
 
 
-def get_cheat_coupler(sys_eig_states, env_eig_states, qubits, to_psum: bool = False):
+def get_cheat_coupler(
+    sys_eig_states, env_eig_states, qubits: list[cirq.Qid] = None, to_psum: bool = False
+):
     coupler = 0
     env_up = np.outer(env_eig_states[:, 1], np.conjugate(env_eig_states[:, 0]))
     for k in range(1, sys_eig_states.shape[1]):
+        # |sys_0Xsys_k| O |env_1Xenv_0|
         coupler += np.kron(
             np.outer(sys_eig_states[:, 0], np.conjugate(sys_eig_states[:, k])),
             env_up,
@@ -23,6 +26,7 @@ def get_cheat_coupler(sys_eig_states, env_eig_states, qubits, to_psum: bool = Fa
             coupler + np.conjugate(np.transpose(coupler)), qubits=qubits
         )
     else:
+        # C + C**dagger
         return coupler + np.conjugate(np.transpose(coupler))
 
 
@@ -39,8 +43,14 @@ def get_cheat_sweep(spectrum: np.ndarray, n_steps: int = None):
     else:
         n_rep = int(n_steps / (len(spectrum) - 1))
     for k in range(len(spectrum) - 1, 0, -1):
-        res.append(spectrum[k] - spectrum[0])
+        gap = spectrum[k] - spectrum[0]
+        if not np.isclose(gap, 0):
+            res.append(gap)
     return np.tile(np.array(res), n_rep)
+
+
+def get_all_gaps(spectrum: np.ndarray, n_rep: int):
+    return np.tile(np.sort(np.array(get_transition_rates(spectrum)))[::-1], n_rep)
 
 
 def get_lin_sweep(spectrum: np.ndarray, n_steps: int):
