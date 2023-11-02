@@ -232,6 +232,15 @@ class Cooler:
         else:
             pass
 
+    def get_coupler_number(self, rep):
+        if self.sys_env_coupler_data_dims == 0:
+            coupler_number = 1
+        elif self.sys_env_coupler_data_dims == 1:
+            coupler_number = len(self.sys_env_coupler_data)
+        elif self.sys_env_coupler_data_dims == 2:
+            coupler_number = len(self.sys_env_coupler_data[rep])
+        return coupler_number
+
     def big_brain_cool(
         self,
         start_omega: float,
@@ -239,6 +248,7 @@ class Cooler:
         n_rep: int = 1,
         ansatz_options: dict = {},
         weaken_coupling: float = 100,
+        zip_coupler: bool = False,
     ):
         initial_density_matrix = self.total_initial_state
         if not cirq.is_hermitian(initial_density_matrix):
@@ -280,12 +290,7 @@ class Cooler:
             env_energies[rep].append(env_energy)
 
             # check number of couplers in list
-            if self.sys_env_coupler_data_dims == 0:
-                coupler_number = 1
-            elif self.sys_env_coupler_data_dims == 1:
-                coupler_number = len(self.sys_env_coupler_data)
-            elif self.sys_env_coupler_data_dims == 2:
-                coupler_number = len(self.sys_env_coupler_data[rep])
+            coupler_number = self.get_coupler_number(rep)
 
             while omega > stop_omega:
                 # set alpha and t
@@ -296,6 +301,7 @@ class Cooler:
                 evolution_time = np.pi / alpha
 
                 # cool with all couplers for a given gap
+
                 for coupler_index in range(coupler_number):
                     self.sys_env_coupler_easy_setter(
                         coupler_index=coupler_index, rep=rep
