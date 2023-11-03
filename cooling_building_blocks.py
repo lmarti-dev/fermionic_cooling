@@ -10,17 +10,51 @@ from math import prod
 # depending on the environment energy
 
 
+def get_cheat_coupler_list(
+    sys_eig_states,
+    env_eig_states,
+    qubits: list[cirq.Qid] = None,
+    to_psum: bool = False,
+    gs_indices: int = (0,),
+):
+    couplers = []
+    env_up = np.outer(env_eig_states[:, 1], np.conjugate(env_eig_states[:, 0]))
+    for gs_index in gs_indices:
+        for k in range(1, sys_eig_states.shape[1]):
+            # |sys_0Xsys_k| O |env_1Xenv_0|
+            coupler = np.kron(
+                np.outer(
+                    sys_eig_states[:, gs_index], np.conjugate(sys_eig_states[:, k])
+                ),
+                env_up,
+            )
+            coupler = coupler + np.conjugate(np.transpose(coupler))
+            if to_psum:
+                coupler = ndarray_to_psum(coupler, qubits=qubits)
+            couplers.append(coupler)
+
+    # bigger first to match cheat sweep
+    return list(reversed(couplers))
+
+
 def get_cheat_coupler(
-    sys_eig_states, env_eig_states, qubits: list[cirq.Qid] = None, to_psum: bool = False
+    sys_eig_states,
+    env_eig_states,
+    qubits: list[cirq.Qid] = None,
+    to_psum: bool = False,
+    gs_indices: int = (0,),
 ):
     coupler = 0
     env_up = np.outer(env_eig_states[:, 1], np.conjugate(env_eig_states[:, 0]))
-    for k in range(1, sys_eig_states.shape[1]):
-        # |sys_0Xsys_k| O |env_1Xenv_0|
-        coupler += np.kron(
-            np.outer(sys_eig_states[:, 0], np.conjugate(sys_eig_states[:, k])),
-            env_up,
-        )
+    for gs_index in gs_indices:
+        for k in range(1, sys_eig_states.shape[1]):
+            # |sys_0Xsys_k| O |env_1Xenv_0|
+            coupler += np.kron(
+                np.outer(
+                    sys_eig_states[:, gs_index], np.conjugate(sys_eig_states[:, k])
+                ),
+                env_up,
+            )
     if to_psum:
         return ndarray_to_psum(
             coupler + np.conjugate(np.transpose(coupler)), qubits=qubits

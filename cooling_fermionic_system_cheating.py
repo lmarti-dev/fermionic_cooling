@@ -11,6 +11,7 @@ from cooling_building_blocks import (
     get_cheat_sweep,
     get_cheat_coupler,
     get_Z_env,
+    get_cheat_coupler_list,
 )
 
 from cooling_utils import expectation_wrapper, ketbra, state_fidelity_to_eigenstates
@@ -62,12 +63,17 @@ def probe_times(
 
 def __main__(args):
     data_folder = "C:/Users/Moi4/Desktop/current/FAU/phd/code/vqe/data"
+
+    # whether we want to skip all saving data
+    dry_run = False
     edm = ExperimentDataManager(
-        data_folder=data_folder, experiment_name="cooling_probe_time"
+        data_folder=data_folder,
+        experiment_name="cooling_cheat_both_gs",
+        dry_run=dry_run,
     )
     # model stuff
     model = FermiHubbardModel(x_dimension=2, y_dimension=2, tunneling=1, coulomb=2)
-    n_electrons = [2, 1]
+    n_electrons = [2, 2]
     sys_qubits = model.flattened_qubits
     n_sys_qubits = len(sys_qubits)
     sys_hartree_fock = jw_hartree_fock_state(
@@ -120,10 +126,17 @@ def __main__(args):
     )
     # coupler
     # coupler = cirq.Y(sys_qubits[0]) * cirq.Y(env_qubits[0])  # Interaction only on Qubit 0?
-    coupler = get_cheat_coupler(
+    # coupler = get_cheat_coupler(
+    #     sys_eig_states=sys_eig_states,
+    #     env_eig_states=env_eig_states,
+    #     qubits=sys_qubits + env_qubits,
+    #     gs_indices=(0,),
+    # )  # Interaction only on Qubit 0?
+    couplers = get_cheat_coupler_list(
         sys_eig_states=sys_eig_states,
         env_eig_states=env_eig_states,
         qubits=sys_qubits + env_qubits,
+        gs_indices=(0,),
     )  # Interaction only on Qubit 0?
     print("coupler done")
     # coupler = get_cheat_coupler(sys_eigenstates, env_eigenstates)
@@ -133,7 +146,7 @@ def __main__(args):
 
     min_gap = sorted(np.abs(np.diff(sys_eig_energies)))[0]
 
-    n_steps = 100
+    n_steps = 50
     # sweep_values = get_log_sweep(spectrum_width, n_steps)
     sweep_values = get_cheat_sweep(sys_eig_energies, n_steps)
     # np.random.shuffle(sweep_values)
@@ -153,23 +166,22 @@ def __main__(args):
         env_hamiltonian=env_ham,
         env_qubits=env_qubits,
         env_ground_state=env_ground_state,
-        sys_env_coupler_data=coupler,
+        sys_env_coupler_data=couplers,
         verbosity=5,
     )
 
     # probe_times(edm, cooler, alphas, sweep_values)
 
-    fidelities, energies, final_sys_density_matrix = cooler.cool(
+    fidelities, energies, final_sys_density_matrix = cooler.zip_cool(
         alphas=alphas,
         evolution_times=evolution_times,
         sweep_values=sweep_values,
-        use_trotter=False,
     )
 
     jobj = {
         "fidelities": fidelities,
         "energies": energies,
-        "final_sys_density_matrix": final_sys_density_matrix,
+        # "final_sys_density_matrix": final_sys_density_matrix,
     }
     edm.save_dict_to_experiment(jobj=jobj)
 
@@ -182,11 +194,14 @@ def __main__(args):
 
     print(f"sum of fidelities: {sum(fids)}")
 
-    cooler.plot_generic_cooling(
+    fig = cooler.plot_generic_cooling(
         energies,
         fidelities,
         {"eigenspectrum": sys_eig_energies, "omegas": sweep_values},
         suptitle="Cooling 2$\\times$2 Fermi-Hubbard",
+    )
+    edm.save_figure(
+        fig,
     )
 
 

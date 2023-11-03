@@ -150,6 +150,60 @@ class Cooler:
             indices = (0,) * self.sys_env_coupler_data_dims
         return depth_indexing(l=self.sys_env_coupler_data, indices=iter(indices))
 
+    def zip_cool(
+        self,
+        evolution_times: np.ndarray,
+        alphas: np.ndarray,
+        sweep_values: Iterable[float],
+    ):
+        initial_density_matrix = self.total_initial_state
+        if not cirq.is_hermitian(initial_density_matrix):
+            raise ValueError("initial density matrix is not hermitian")
+        total_density_matrix = initial_density_matrix
+
+        fidelities = []
+        energies = []
+
+        sys_fidelity = self.sys_fidelity(self.sys_initial_state)
+        sys_energy = self.sys_energy(self.sys_initial_state)
+
+        self.update_message(
+            "fidgs",
+            "initial fidelity to gs: {:.4f}, initial energy of traced out rho: {:.4f}, ground energy: {:.4f}".format(
+                sys_fidelity, sys_energy, self.sys_ground_energy
+            ),
+            message_level=9,
+        )
+
+        fidelities.append(sys_fidelity)
+        energies.append(sys_energy)
+
+        for step, env_coupling in enumerate(sweep_values):
+            # set one coupler for one gap
+            self.sys_env_coupler_easy_setter(coupler_index=step, rep=None)
+            sys_fidelity, sys_energy, _, total_density_matrix = self.cooling_step(
+                total_density_matrix=total_density_matrix,
+                env_coupling=env_coupling,
+                alpha=alphas[step],
+                evolution_time=evolution_times[step],
+            )
+            fidelities.append(sys_fidelity)
+            energies.append(sys_energy)
+            self.update_message(
+                "fidgs",
+                "fidelity to gs: {:.4f}, energy diff of traced out rho: {:.4f}".format(
+                    sys_fidelity, sys_energy - self.sys_ground_energy
+                ),
+                message_level=5,
+            )
+            self.update_message("step", f"step: {step} coupling: {env_coupling:.4f}")
+        final_sys_density_matrix = trace_out_env(
+            rho=total_density_matrix,
+            n_sys_qubits=len(self.sys_qubits),
+            n_env_qubits=len(self.env_qubits),
+        )
+        return fidelities, energies, final_sys_density_matrix
+
     def cool(
         self,
         evolution_times: np.ndarray,
@@ -231,6 +285,11 @@ class Cooler:
             self.sys_env_coupler = self.get_coupler_from_data(coupler_tuple)
         else:
             pass
+        self.update_message(
+            "coupler",
+            f"Current coupler: {self.sys_env_coupler}",
+            message_level=7,
+        )
 
     def get_coupler_number(self, rep):
         if self.sys_env_coupler_data_dims == 0:
@@ -248,7 +307,6 @@ class Cooler:
         n_rep: int = 1,
         ansatz_options: dict = {},
         weaken_coupling: float = 100,
-        zip_coupler: bool = False,
     ):
         initial_density_matrix = self.total_initial_state
         if not cirq.is_hermitian(initial_density_matrix):
@@ -333,12 +391,6 @@ class Cooler:
                             sys_fidelity, sys_energy - self.sys_ground_energy
                         ),
                         message_level=5,
-                    )
-
-                    self.update_message(
-                        "coupler",
-                        f"Current coupler: {self.sys_env_coupler}",
-                        message_level=7,
                     )
 
                 # update the control function
@@ -590,6 +642,7 @@ class Cooler:
             fig.suptitle(suptitle)
 
         plt.show()
+        return fig
 
     def probe_evolution_times(self, alphas, sweep_values, N_slices: int):
         initial_density_matrix = self.total_initial_state
