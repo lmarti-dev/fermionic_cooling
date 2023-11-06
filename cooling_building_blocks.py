@@ -16,6 +16,7 @@ def get_cheat_coupler_list(
     qubits: list[cirq.Qid] = None,
     to_psum: bool = False,
     gs_indices: int = (0,),
+    noise: float = 0,
 ):
     couplers = []
     env_up = np.outer(env_eig_states[:, 1], np.conjugate(env_eig_states[:, 0]))
@@ -28,6 +29,9 @@ def get_cheat_coupler_list(
                 ),
                 env_up,
             )
+            if abs(noise) > 0:
+                noisy_coupler = np.random.rand(*coupler.shape)
+                coupler = coupler + (noise * noisy_coupler)
             coupler = coupler + np.conjugate(np.transpose(coupler))
             if to_psum:
                 coupler = ndarray_to_psum(coupler, qubits=qubits)

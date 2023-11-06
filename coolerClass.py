@@ -155,6 +155,7 @@ class Cooler:
         evolution_times: np.ndarray,
         alphas: np.ndarray,
         sweep_values: Iterable[float],
+        n_rep: int = 1,
     ):
         initial_density_matrix = self.total_initial_state
         if not cirq.is_hermitian(initial_density_matrix):
@@ -177,26 +178,29 @@ class Cooler:
 
         fidelities.append(sys_fidelity)
         energies.append(sys_energy)
-
-        for step, env_coupling in enumerate(sweep_values):
-            # set one coupler for one gap
-            self.sys_env_coupler_easy_setter(coupler_index=step, rep=None)
-            sys_fidelity, sys_energy, _, total_density_matrix = self.cooling_step(
-                total_density_matrix=total_density_matrix,
-                env_coupling=env_coupling,
-                alpha=alphas[step],
-                evolution_time=evolution_times[step],
-            )
-            fidelities.append(sys_fidelity)
-            energies.append(sys_energy)
-            self.update_message(
-                "fidgs",
-                "fidelity to gs: {:.4f}, energy diff of traced out rho: {:.4f}".format(
-                    sys_fidelity, sys_energy - self.sys_ground_energy
-                ),
-                message_level=5,
-            )
-            self.update_message("step", f"step: {step} coupling: {env_coupling:.4f}")
+        for rep in range(n_rep):
+            self.update_message("repn", f"rep: {rep}")
+            for step, env_coupling in enumerate(sweep_values):
+                # set one coupler for one gap
+                self.sys_env_coupler_easy_setter(coupler_index=step, rep=None)
+                sys_fidelity, sys_energy, _, total_density_matrix = self.cooling_step(
+                    total_density_matrix=total_density_matrix,
+                    env_coupling=env_coupling,
+                    alpha=alphas[step],
+                    evolution_time=evolution_times[step],
+                )
+                fidelities.append(sys_fidelity)
+                energies.append(sys_energy)
+                self.update_message(
+                    "fidgs",
+                    "fidelity to gs: {:.4f}, energy diff of traced out rho: {:.4f}".format(
+                        sys_fidelity, sys_energy - self.sys_ground_energy
+                    ),
+                    message_level=5,
+                )
+                self.update_message(
+                    "step", f"step: {step} coupling: {env_coupling:.4f}"
+                )
         final_sys_density_matrix = trace_out_env(
             rho=total_density_matrix,
             n_sys_qubits=len(self.sys_qubits),

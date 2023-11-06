@@ -139,6 +139,8 @@ def __main__(args):
         gs_indices=(0,),
     )  # Interaction only on Qubit 0?
     print("coupler done")
+
+    print(f"number of couplers: {len(couplers)}")
     # coupler = get_cheat_coupler(sys_eigenstates, env_eigenstates)
 
     # get environment ham sweep values
