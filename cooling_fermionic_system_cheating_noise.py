@@ -98,7 +98,7 @@ def __main__(args):
             "figure.figsize": (5, 4),
         }
     )
-    probe_alpha_with_noise(
+    probe_reps_with_noise(
         edm,
         model,
         n_electrons,
@@ -128,10 +128,11 @@ def probe_reps_with_noise(
     env_ham: cirq.PauliSum,
     env_eig_states: np.ndarray,
 ):
-    noise_range = 10 ** np.linspace(-9, 1, 20)
-    n_reps = 6
+    noise_range = 10 ** np.linspace(-4, 0, 10)
+    n_reps = 5
     end_fidelities = np.zeros((n_reps, len(noise_range)))
     for n_rep in range(n_reps):
+        actual_rep = 4 * (n_rep + 1)
         for noise_ind, noise in enumerate(noise_range):
             print(f"noise: {noise}\n\n")
             couplers = get_cheat_coupler_list(
@@ -181,7 +182,7 @@ def probe_reps_with_noise(
                 alphas=alphas,
                 evolution_times=evolution_times,
                 sweep_values=sweep_values,
-                n_rep=n_rep,
+                n_rep=actual_rep,
             )
 
             jobj = {
@@ -194,14 +195,20 @@ def probe_reps_with_noise(
 
             end_fidelities[n_rep, noise_ind] = fidelities[-1]
     fig, ax = plt.subplots()
-    for rep in range(n_rep):
+    for n_rep in range(n_reps):
+        actual_rep = 4 * (n_rep + 1)
         ax.plot(
-            noise_range, end_fidelities[rep, :], "x--", linewidth=2, label=f"rep: {rep}"
+            noise_range,
+            end_fidelities[n_rep, :],
+            "x--",
+            linewidth=2,
+            label=f"{actual_rep} rep.",
         )
     ax.set_xlabel("Noise coefficient [-]")
     ax.set_ylabel("Final fidelity")
     ax.set_xscale("log")
     ax.legend()
+    ax.set_title("Effect of cooling repetitions on noisy coupler")
 
     plt.tight_layout()
 
