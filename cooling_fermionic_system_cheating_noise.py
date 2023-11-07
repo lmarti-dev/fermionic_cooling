@@ -1,7 +1,7 @@
 import sys
 
 # tsk tsk
-sys.path.append("/home/Refik/Data/My_files/Dropbox/PhD/repos/fauvqe/")
+# sys.path.append("/home/Refik/Data/My_files/Dropbox/PhD/repos/fauvqe/")
 
 from fauvqe.models.fermiHubbardModel import FermiHubbardModel
 
@@ -27,10 +27,10 @@ from scipy.ndimage.filters import gaussian_filter1d
 
 
 def __main__(args):
-    data_folder = "C:/Users/Moi4/Desktop/current/FAU/phd/code/vqe/data"
+    data_folder = "/home/eckstein/Desktop/projects/data/"
 
     # whether we want to skip all saving data
-    dry_run = True
+    dry_run = False
     edm = ExperimentDataManager(
         data_folder=data_folder,
         experiment_name="cooling_check_noise_w_reps",
@@ -166,7 +166,7 @@ def __main__(args):
     )
 
     fig, ax = plt.subplots()
-    for rep in n_rep:
+    for rep in range(n_rep):
         ax.plot(
             noise_range, end_fidelities[rep, :], "x--", linewidth=2, label=f"rep: {rep}"
         )
