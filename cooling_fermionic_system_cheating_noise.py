@@ -23,7 +23,6 @@ import matplotlib.pyplot as plt
 
 
 from data_manager import ExperimentDataManager
-from scipy.ndimage.filters import gaussian_filter1d
 
 
 def __main__(args):
@@ -90,6 +89,45 @@ def __main__(args):
         env_eigenergies=env_eig_energies,
         model=model.to_json_dict()["constructor_params"],
     )
+
+    plt.rcParams.update(
+        {
+            "text.usetex": True,  # use inline math for ticks
+            "font.family": r"Computer Modern Roman",  # use serif/main font for text elements
+            "font.size": 15,
+            "figure.figsize": (5, 4),
+        }
+    )
+    probe_alpha_with_noise(
+        edm,
+        model,
+        n_electrons,
+        sys_qubits,
+        sys_initial_state,
+        sys_eig_energies,
+        sys_eig_states,
+        sys_ground_state,
+        env_qubits,
+        env_ground_state,
+        env_ham,
+        env_eig_states,
+    )
+
+
+def probe_reps_with_noise(
+    edm: ExperimentDataManager,
+    model: FermiHubbardModel,
+    n_electrons: int,
+    sys_qubits: list[cirq.Qid],
+    sys_initial_state: np.ndarray,
+    sys_eig_energies: np.ndarray,
+    sys_eig_states: np.ndarray,
+    sys_ground_state: np.ndarray,
+    env_qubits: list[cirq.Qid],
+    env_ground_state: np.ndarray,
+    env_ham: cirq.PauliSum,
+    env_eig_states: np.ndarray,
+):
     noise_range = 10 ** np.linspace(-9, 1, 20)
     n_reps = 6
     end_fidelities = np.zeros((n_reps, len(noise_range)))
@@ -155,16 +193,6 @@ def __main__(args):
             )
 
             end_fidelities[n_rep, noise_ind] = fidelities[-1]
-
-    plt.rcParams.update(
-        {
-            "text.usetex": True,  # use inline math for ticks
-            "font.family": r"Computer Modern Roman",  # use serif/main font for text elements
-            "font.size": 15,
-            "figure.figsize": (5, 4),
-        }
-    )
-
     fig, ax = plt.subplots()
     for rep in range(n_rep):
         ax.plot(
@@ -173,7 +201,109 @@ def __main__(args):
     ax.set_xlabel("Noise coefficient [-]")
     ax.set_ylabel("Final fidelity")
     ax.set_xscale("log")
+    ax.legend()
 
+    plt.tight_layout()
+
+    edm.save_figure(
+        fig,
+    )
+
+    plt.show()
+
+
+def probe_alpha_with_noise(
+    edm: ExperimentDataManager,
+    model: FermiHubbardModel,
+    n_electrons: int,
+    sys_qubits: list[cirq.Qid],
+    sys_initial_state: np.ndarray,
+    sys_eig_energies: np.ndarray,
+    sys_eig_states: np.ndarray,
+    sys_ground_state: np.ndarray,
+    env_qubits: list[cirq.Qid],
+    env_ground_state: np.ndarray,
+    env_ham: cirq.PauliSum,
+    env_eig_states: np.ndarray,
+):
+    noise_range = 10 ** np.linspace(-9, 1, 20)
+    weaken_couplings = 10 ** np.linspace(0, 4, 20)
+    end_fidelities = np.zeros((len(weaken_couplings), len(noise_range)))
+    for wc_ind, weaken_coupling in enumerate(weaken_couplings):
+        for noise_ind, noise in enumerate(noise_range):
+            print(f"noise: {noise}\n\n")
+            couplers = get_cheat_coupler_list(
+                sys_eig_states=sys_eig_states,
+                env_eig_states=env_eig_states,
+                qubits=sys_qubits + env_qubits,
+                gs_indices=(0,),
+                noise=noise,
+            )  # Interaction only on Qubit 0?
+            print("coupler done")
+
+            print(f"number of couplers: {len(couplers)}")
+            # coupler = get_cheat_coupler(sys_eigenstates, env_eigenstates)
+
+            # get environment ham sweep values
+            spectrum_width = max(sys_eig_energies) - min(sys_eig_energies)
+
+            min_gap = sorted(np.abs(np.diff(sys_eig_energies)))[0]
+
+            n_steps = len(couplers)
+            # sweep_values = get_log_sweep(spectrum_width, n_steps)
+            sweep_values = get_cheat_sweep(sys_eig_energies, n_steps)
+            # np.random.shuffle(sweep_values)
+            # coupling strength value
+            alphas = sweep_values / weaken_coupling
+            evolution_times = 2.5 * np.pi / (alphas)
+            # evolution_time = 1e-3
+
+            # call cool
+
+            cooler = Cooler(
+                sys_hamiltonian=model.hamiltonian,
+                n_electrons=n_electrons,
+                sys_qubits=model.flattened_qubits,
+                sys_ground_state=sys_ground_state,
+                sys_initial_state=sys_initial_state,
+                env_hamiltonian=env_ham,
+                env_qubits=env_qubits,
+                env_ground_state=env_ground_state,
+                sys_env_coupler_data=couplers,
+                verbosity=5,
+            )
+
+            # probe_times(edm, cooler, alphas, sweep_values)
+
+            fidelities, energies, _ = cooler.zip_cool(
+                alphas=alphas,
+                evolution_times=evolution_times,
+                sweep_values=sweep_values,
+                n_rep=1,
+            )
+
+            jobj = {
+                "fidelities": fidelities,
+                "energies": energies,
+            }
+            edm.save_dict_to_experiment(
+                filename=f"data_noise_{weaken_coupling}_{noise:.4f}", jobj=jobj
+            )
+
+            end_fidelities[wc_ind, noise_ind] = fidelities[-1]
+    fig, ax = plt.subplots()
+    for wc_ind, weaken_coupling in enumerate(weaken_couplings):
+        ax.plot(
+            noise_range,
+            end_fidelities[wc_ind, :],
+            "x--",
+            linewidth=2,
+            label=f"alpha/{weaken_coupling}",
+        )
+    ax.set_xlabel("Noise coefficient [-]")
+    ax.set_ylabel("Final fidelity")
+    ax.set_xscale("log")
+    ax.legend()
     plt.tight_layout()
 
     edm.save_figure(
