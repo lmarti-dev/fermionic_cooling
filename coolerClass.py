@@ -156,6 +156,7 @@ class Cooler:
         alphas: np.ndarray,
         sweep_values: Iterable[float],
         n_rep: int = 1,
+        fidelity_threshold: float = 0.9999,
     ):
         initial_density_matrix = self.total_initial_state
         if not cirq.is_hermitian(initial_density_matrix):
@@ -201,6 +202,16 @@ class Cooler:
                 self.update_message(
                     "step", f"step: {step} coupling: {env_coupling:.4f}"
                 )
+
+                # if we've almost reached fidelity 1, then quit
+                if sys_fidelity >= fidelity_threshold:
+                    final_sys_density_matrix = trace_out_env(
+                        rho=total_density_matrix,
+                        n_sys_qubits=len(self.sys_qubits),
+                        n_env_qubits=len(self.env_qubits),
+                    )
+                    return fidelities, energies, final_sys_density_matrix
+
         final_sys_density_matrix = trace_out_env(
             rho=total_density_matrix,
             n_sys_qubits=len(self.sys_qubits),

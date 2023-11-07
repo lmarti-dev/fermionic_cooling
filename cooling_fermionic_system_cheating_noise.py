@@ -26,13 +26,13 @@ from data_manager import ExperimentDataManager
 
 
 def __main__(args):
-    data_folder = "/home/eckstein/Desktop/projects/data/"
+    data_folder = "C:/Users/Moi4/Desktop/current/FAU/phd/code/vqe/data"
 
     # whether we want to skip all saving data
     dry_run = False
     edm = ExperimentDataManager(
         data_folder=data_folder,
-        experiment_name="cooling_check_noise_w_reps",
+        experiment_name="cooling_check_noise_vs_alpha",
         notes="trying out the effect of noise on cheat couplers",
         dry_run=dry_run,
     )
@@ -226,8 +226,8 @@ def probe_alpha_with_noise(
     env_ham: cirq.PauliSum,
     env_eig_states: np.ndarray,
 ):
-    noise_range = 10 ** np.linspace(-9, 1, 20)
-    weaken_couplings = 10 ** np.linspace(0, 4, 20)
+    noise_range = 10 ** np.linspace(-4, 1, 10)
+    weaken_couplings = 10 ** np.arange(0, 5)
     end_fidelities = np.zeros((len(weaken_couplings), len(noise_range)))
     for wc_ind, weaken_coupling in enumerate(weaken_couplings):
         for noise_ind, noise in enumerate(noise_range):
@@ -279,15 +279,17 @@ def probe_alpha_with_noise(
                 alphas=alphas,
                 evolution_times=evolution_times,
                 sweep_values=sweep_values,
-                n_rep=1,
+                n_rep=10,
             )
 
             jobj = {
+                "noise": noise,
+                "weaken_coupling": int(weaken_coupling),
                 "fidelities": fidelities,
                 "energies": energies,
             }
             edm.save_dict_to_experiment(
-                filename=f"data_noise_{weaken_coupling}_{noise:.4f}", jobj=jobj
+                filename=f"data_noise_{weaken_coupling:.3f}_{noise:.4f}", jobj=jobj
             )
 
             end_fidelities[wc_ind, noise_ind] = fidelities[-1]
@@ -298,7 +300,7 @@ def probe_alpha_with_noise(
             end_fidelities[wc_ind, :],
             "x--",
             linewidth=2,
-            label=f"alpha/{weaken_coupling}",
+            label=rf"$\alpha/{weaken_coupling:.3f}$",
         )
     ax.set_xlabel("Noise coefficient [-]")
     ax.set_ylabel("Final fidelity")
