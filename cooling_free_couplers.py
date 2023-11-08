@@ -162,33 +162,62 @@ def __main__(args):
 
     stop_omega = 0.5 * min_gap
 
-    fidelities, sys_energies, omegas, env_energies = cooler.big_brain_cool(
-        start_omega=start_omega,
-        stop_omega=stop_omega,
-        ansatz_options=ansatz_options,
-        n_rep=n_rep,
-        weaken_coupling=weaken_coupling,
-    )
+    method = "zip"
 
-    jobj = {
-        "fidelities": fidelities,
-        "sys_energies": sys_energies,
-    }
-    edm.save_dict_to_experiment(filename=f"cooling_free", jobj=jobj)
+    if method == "bigbrain":
+        fidelities, sys_energies, omegas, env_energies = cooler.big_brain_cool(
+            start_omega=start_omega,
+            stop_omega=stop_omega,
+            ansatz_options=ansatz_options,
+            n_rep=n_rep,
+            weaken_coupling=weaken_coupling,
+        )
 
-    fig = cooler.plot_controlled_cooling(
-        fidelities,
-        sys_energies,
-        omegas,
-        env_energies,
-        eigenspectrums=[
+        jobj = {
+            "fidelities": fidelities,
+            "sys_energies": sys_energies,
+        }
+        edm.save_dict_to_experiment(filename=f"cooling_free", jobj=jobj)
+
+        fig = cooler.plot_controlled_cooling(
+            fidelities,
             sys_energies,
-        ],
-    )
-    edm.save_figure(
-        fig,
-    )
-    plt.show()
+            omegas,
+            env_energies,
+            eigenspectrums=[
+                sys_energies,
+            ],
+        )
+        edm.save_figure(
+            fig,
+        )
+        plt.show()
+    elif method == "zip":
+        sweep_values = get_cheat_sweep(sys_eig_energies, n_steps)
+        fidelities, energies, final_sys_density_matrix = cooler.zip_cool(
+            alphas=alphas,
+            evolution_times=evolution_times,
+            sweep_values=sweep_values,
+            n_rep=10,
+        )
+
+        jobj = {
+            "fidelities": fidelities,
+            "energies": energies,
+        }
+        edm.save_dict_to_experiment(filename=f"cooling_free_couplers", jobj=jobj)
+
+        fig = cooler.plot_generic_cooling(
+            energies,
+            fidelities,
+            suptitle="Cooling 2$\\times$2 Fermi-Hubbard",
+        )
+
+        edm.save_figure(
+            fig,
+        )
+
+        plt.show()
 
 
 if __name__ == "__main__":

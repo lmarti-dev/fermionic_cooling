@@ -205,6 +205,7 @@ class Cooler:
 
                 # if we've almost reached fidelity 1, then quit
                 if sys_fidelity >= fidelity_threshold:
+                    print(f"above fidelity threshold, quitting with: {sys_fidelity}")
                     final_sys_density_matrix = trace_out_env(
                         rho=total_density_matrix,
                         n_sys_qubits=len(self.sys_qubits),
@@ -633,9 +634,9 @@ class Cooler:
         nrows = 2 + len(supplementary_data)
         fig, axes = plt.subplots(nrows=nrows, figsize=(5, 3))
 
-        axes[0].plot(range(len(fidelities)), fidelities, color="k", linewidth=2)
-        axes[0].set_ylabel(r"$|\langle \psi_{cool} | \psi_{gs} \rangle|^2$", labelpad=0)
-        axes[0].set_xlabel(r"$Steps$", labelpad=0)
+        axes[0].plot(range(len(fidelities)), fidelities, "kx--", linewidth=2)
+        axes[0].set_ylabel(r"$|\langle \psi_{cool} | \psi_{gs} \rangle|^2$")
+        axes[0].set_xlabel(r"$Steps$")
         axes[1].plot(
             range(len(sys_energies)),
             (np.array(sys_energies) - self.sys_ground_energy)
@@ -643,7 +644,7 @@ class Cooler:
             color="k",
             linewidth=2,
         )
-        axes[1].set_ylabel(r"$\frac{E_{cool}-E_0}{|E_0|}$", labelpad=0)
+        axes[1].set_ylabel(r"$\frac{E_{cool}-E_0}{|E_0|}$")
         for ind, k in enumerate(supplementary_data.keys()):
             axes[ind + 2].plot(
                 range(len(supplementary_data[k])),
@@ -656,7 +657,6 @@ class Cooler:
         if suptitle:
             fig.suptitle(suptitle)
 
-        plt.show()
         return fig
 
     def probe_evolution_times(self, alphas, sweep_values, N_slices: int):

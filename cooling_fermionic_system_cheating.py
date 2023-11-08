@@ -205,6 +205,7 @@ def __main__(args):
     edm.save_figure(
         fig,
     )
+    plt.show()
 
 
 if __name__ == "__main__":
