@@ -620,8 +620,8 @@ class Cooler:
                 )
             else:
                 ax_bottom.legend(bbox_to_anchor=(0.2, 2))
-
-        plt.show()
+        plt.tight_layout()
+        return fig
 
     def plot_generic_cooling(
         self,

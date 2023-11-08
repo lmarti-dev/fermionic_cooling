@@ -153,17 +153,9 @@ def __main__(args):
         sys_env_coupler_data=couplers,
         verbosity=5,
     )
-
-    # probe_times(edm, cooler, alphas, sweep_values)
     n_rep = 2
-    # fidelities, energies, _ = cooler.zip_cool(
-    #     alphas=alphas,
-    #     evolution_times=evolution_times,
-    #     sweep_values=sweep_values,
-    #     n_rep=5,
-    # )
 
-    ansatz_options = {"beta": 1e-3, "mu": 0.01, "c": 1e-4}
+    ansatz_options = {"beta": 1e-2, "mu": 0.01, "c": 1e-2}
     weaken_coupling = 100
 
     start_omega = 1.01 * spectrum_width
@@ -184,24 +176,19 @@ def __main__(args):
     }
     edm.save_dict_to_experiment(filename=f"cooling_free", jobj=jobj)
 
-    # end_fidelities[n_rep, noise_ind] = fidelities[-1]
-    # fig, ax = plt.subplots()
-    # for rep in range(n_rep):
-    #     ax.plot(
-    #         noise_range, end_fidelities[rep, :], "x--", linewidth=2, label=f"rep: {rep}"
-    #     )
-    # ax.set_xlabel("Noise coefficient [-]")
-    # ax.set_ylabel("Final fidelity")
-    # ax.set_xscale("log")
-    # ax.legend()
-
-    # plt.tight_layout()
-
-    # edm.save_figure(
-    #     fig,
-    # )
-
-    # plt.show()
+    fig = cooler.plot_controlled_cooling(
+        fidelities,
+        sys_energies,
+        omegas,
+        env_energies,
+        eigenspectrums=[
+            sys_energies,
+        ],
+    )
+    edm.save_figure(
+        fig,
+    )
+    plt.show()
 
 
 if __name__ == "__main__":
