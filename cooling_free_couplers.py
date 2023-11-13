@@ -14,7 +14,12 @@ from cooling_building_blocks import (
     get_cheat_coupler_list,
 )
 
-from cooling_utils import expectation_wrapper, ketbra, state_fidelity_to_eigenstates
+from cooling_utils import (
+    expectation_wrapper,
+    ketbra,
+    state_fidelity_to_eigenstates,
+    get_min_gap,
+)
 from fauvqe.utilities import jw_eigenspectrum_at_particle_number, spin_dicke_state
 import cirq
 from openfermion import get_sparse_operator, jw_hartree_fock_state
@@ -25,19 +30,14 @@ import matplotlib.pyplot as plt
 from data_manager import ExperimentDataManager
 
 
-def get_min_gap(l):
-    unique_vals = sorted(set(l))
-    return abs(unique_vals[0] - unique_vals[1])
-
-
 def __main__(args):
-    data_folder = "C:/Users/Moi4/Desktop/current/FAU/phd/code/vqe/data"
+    data_folder = "/home/eckstein/Desktop/projects/data/"
 
     # whether we want to skip all saving data
-    dry_run = True
+    dry_run = False
     edm = ExperimentDataManager(
         data_folder=data_folder,
-        experiment_name="cooling_check_noise_vs_alpha",
+        experiment_name="cooling_free_couplers",
         notes="trying out the effect of noise on cheat couplers",
         dry_run=dry_run,
     )
@@ -90,8 +90,8 @@ def __main__(args):
         n_electrons=n_electrons,
         n_sys_qubits=n_sys_qubits,
         n_env_qubits=n_env_qubits,
-        sys_eigenspectrum=sys_eig_energies,
-        env_eigenergies=env_eig_energies,
+        sys_eig_energies=sys_eig_energies,
+        env_eig_energies=env_eig_energies,
         model=model.to_json_dict()["constructor_params"],
     )
 
@@ -155,37 +155,40 @@ def __main__(args):
     )
     n_rep = 2
 
-    ansatz_options = {"beta": 1e-2, "mu": 0.01, "c": 1e-2}
+    print(f"coupler dim: {cooler.sys_env_coupler_data_dims}")
+
+    ansatz_options = {"beta": 1e-3, "mu": 0.01, "c": 1e-2}
     weaken_coupling = 100
 
     start_omega = 1.01 * spectrum_width
 
     stop_omega = 0.5 * min_gap
 
-    method = "zip"
+    method = "bigbrain"
 
     if method == "bigbrain":
-        fidelities, sys_energies, omegas, env_energies = cooler.big_brain_cool(
+        fidelities, sys_ev_energies, omegas, env_ev_energies = cooler.big_brain_cool(
             start_omega=start_omega,
             stop_omega=stop_omega,
             ansatz_options=ansatz_options,
             n_rep=n_rep,
             weaken_coupling=weaken_coupling,
+            # coupler_energies=free_sys_eig_energies[1:],
         )
 
         jobj = {
             "fidelities": fidelities,
-            "sys_energies": sys_energies,
+            "sys_energies": sys_ev_energies,
         }
         edm.save_dict_to_experiment(filename=f"cooling_free", jobj=jobj)
 
         fig = cooler.plot_controlled_cooling(
-            fidelities,
-            sys_energies,
-            omegas,
-            env_energies,
+            fidelities=fidelities,
+            sys_energies=sys_ev_energies,
+            env_energies=env_ev_energies,
+            omegas=omegas,
             eigenspectrums=[
-                sys_energies,
+                sys_eig_energies,
             ],
         )
         edm.save_figure(

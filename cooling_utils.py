@@ -17,6 +17,11 @@ from fauvqe.utilities import flatten
 # Some of them are a bit less trivial
 
 
+def get_min_gap(l):
+    unique_vals = sorted(set(l))
+    return abs(unique_vals[0] - unique_vals[1])
+
+
 def get_transition_rates(eigenspectrum):
     transitions = np.array(
         list(

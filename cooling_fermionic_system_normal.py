@@ -17,7 +17,7 @@ from cooling_building_blocks import (
     get_hamiltonian_coupler,
     get_cheat_coupler,
 )
-from cooling_utils import expectation_wrapper
+from cooling_utils import expectation_wrapper, get_min_gap
 from openfermion import get_sparse_operator, jw_hartree_fock_state
 
 from fauvqe.models.fermiHubbardModel import FermiHubbardModel
@@ -64,14 +64,14 @@ def get_hybrid_eigenspectra(
 
 def __main__(args):
     # model stuff
-    model = FermiHubbardModel(x_dimension=2, y_dimension=2, tunneling=1, coulomb=2)
-    n_electrons = [2, 1]
+    model = FermiHubbardModel(x_dimension=2, y_dimension=1, tunneling=1, coulomb=2)
+    n_electrons = [1, 1]
     is_subspace_gs_global(model, n_electrons)
     sys_qubits = model.flattened_qubits
     n_sys_qubits = len(sys_qubits)
 
     sys_initial_state = pick_ground_state("hartree_fock", n_sys_qubits, n_electrons)
-    sys_eigenspectrum, sys_eigenstates = jw_eigenspectrum_at_particle_number(
+    sys_eig_energies, sys_eig_states = jw_eigenspectrum_at_particle_number(
         sparse_operator=get_sparse_operator(
             model.fock_hamiltonian,
             n_qubits=len(model.flattened_qubits),
@@ -79,8 +79,8 @@ def __main__(args):
         particle_number=n_electrons,
         expanded=True,
     )
-    sys_ground_state = sys_eigenstates[:, np.argmin(sys_eigenspectrum)]
-    sys_ground_energy = np.min(sys_eigenspectrum)
+    sys_ground_state = sys_eig_states[:, np.argmin(sys_eig_energies)]
+    sys_ground_energy = np.min(sys_eig_energies)
 
     sys_initial_energy = expectation_wrapper(
         model.hamiltonian, sys_initial_state, model.flattened_qubits
@@ -102,7 +102,7 @@ def __main__(args):
     # n_env_qubits = n_sys_qubits
     n_env_qubits = 1
 
-    env_qubits, env_ground_state, env_ham, env_energies, env_eig_states = get_Z_env(
+    env_qubits, env_ground_state, env_ham, env_eig_energies, env_eig_states = get_Z_env(
         n_qubits=n_env_qubits
     )
 
@@ -112,12 +112,11 @@ def __main__(args):
     # coupler_list = [
     #     get_moving_fsim_coupler_list(sys_qubits, env_qubits),
     #     get_moving_ZY_coupler_list(sys_qubits, env_qubits),
-    # ]
-    # coupler_list = get_moving_ZY_coupler_list(sys_qubits, env_qubits)
+    #
     # get environment ham sweep values
-    spectrum_width = max(sys_eigenspectrum) - min(sys_eigenspectrum)
+    spectrum_width = max(sys_eig_energies) - min(sys_eig_energies)
 
-    min_gap = sorted(np.abs(np.diff(sys_eigenspectrum)))[0]
+    min_gap = get_min_gap(sys_eig_energies)
 
     # call cool
 
@@ -134,8 +133,8 @@ def __main__(args):
         verbosity=7,
     )
 
-    n_rep = 1
-    ansatz_options = {"beta": 1e-3, "mu": 0.01, "c": 1e-4}
+    n_rep = 2
+    ansatz_options = {"beta": 1e-2, "mu": 0.01, "c": 1e-4}
     weaken_coupling = 100
 
     start_omega = 1.05 * spectrum_width
@@ -143,7 +142,7 @@ def __main__(args):
 
     print("start: {:.4f} stop: {:.4f}".format(start_omega, stop_omega))
 
-    fidelities, sys_energies, omegas, env_energies = cooler.big_brain_cool(
+    fidelities, sys_ev_energies, omegas, env_ev_energies = cooler.big_brain_cool(
         start_omega=start_omega,
         stop_omega=stop_omega,
         ansatz_options=ansatz_options,
@@ -155,13 +154,16 @@ def __main__(args):
 
     cooler.plot_controlled_cooling(
         fidelities=fidelities,
-        sys_energies=sys_energies,
-        env_energies=env_energies,
+        sys_energies=sys_ev_energies,
+        env_energies=env_ev_energies,
         omegas=omegas,
         eigenspectrums=[
-            sys_eigenspectrum,
+            sys_eig_energies,
         ],
     )
+    import matplotlib.pyplot as plt
+
+    plt.show()
 
 
 if __name__ == "__main__":
