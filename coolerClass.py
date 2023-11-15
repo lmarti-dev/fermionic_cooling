@@ -436,9 +436,7 @@ class Cooler:
                 step += 1
                 self.update_message(
                     "epsi",
-                    "epsi: {:.3e} prev: {:.3f} fridge E: {:.3e}".format(
-                        epsilon, omega + epsilon, env_energy
-                    ),
+                    f"epsi: {epsilon:.3e} prev: {omega+epsilon:.3f} fridge E: {env_energy:.3e} start: {start_omega:.3f} stop: {stop_omega:.3f}",
                     message_level=5,
                 )
 

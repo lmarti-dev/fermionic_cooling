@@ -19,7 +19,9 @@ from fauvqe.utilities import flatten
 
 def get_min_gap(l):
     unique_vals = sorted(set(l))
-    return abs(unique_vals[0] - unique_vals[1])
+    diff = np.diff(unique_vals)
+    min_gap = np.min(diff)
+    return min_gap
 
 
 def get_transition_rates(eigenspectrum):
