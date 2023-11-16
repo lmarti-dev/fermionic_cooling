@@ -134,7 +134,7 @@ def __main__(args):
     )
 
     n_rep = 2
-    ansatz_options = {"beta": 1e-2, "mu": 0.01, "c": 1e-4}
+    ansatz_options = {"beta": 1e-2, "mu": 0.01, "c": 1e-3}
     weaken_coupling = 100
 
     start_omega = 1.05 * spectrum_width

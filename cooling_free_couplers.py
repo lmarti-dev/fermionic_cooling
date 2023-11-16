@@ -43,14 +43,26 @@ def __main__(args):
     )
     # model stuff
     model = FermiHubbardModel(x_dimension=2, y_dimension=2, tunneling=1, coulomb=2)
-    n_electrons = [2, 1]
+    n_electrons = [2, 2]
+
+    free_sys_eig_energies, free_sys_eig_states = jw_eigenspectrum_at_particle_number(
+        sparse_operator=get_sparse_operator(
+            model.non_interacting_model.fock_hamiltonian,
+            n_qubits=len(model.flattened_qubits),
+        ),
+        particle_number=n_electrons,
+        expanded=True,
+    )
+
     sys_qubits = model.flattened_qubits
     n_sys_qubits = len(sys_qubits)
     sys_hartree_fock = jw_hartree_fock_state(
         n_orbitals=n_sys_qubits, n_electrons=sum(n_electrons)
     )
+
+    sys_slater_state = free_sys_eig_states[:, 0]
     sys_dicke = spin_dicke_state(
-        n_qubits=n_sys_qubits, Nf=n_electrons, right_to_left=True
+        n_qubits=n_sys_qubits, Nf=n_electrons, right_to_left=False
     )
     sys_initial_state = ketbra(sys_hartree_fock)
     sys_eig_energies, sys_eig_states = jw_eigenspectrum_at_particle_number(
@@ -64,6 +76,15 @@ def __main__(args):
     sys_ground_state = sys_eig_states[:, np.argmin(sys_eig_energies)]
     sys_ground_energy = np.min(sys_eig_energies)
 
+    eig_fids = state_fidelity_to_eigenstates(
+        state=sys_initial_state, eigenstates=sys_eig_states
+    )
+    print("Initial populations")
+    for fid, sys_eig_energy in zip(eig_fids, sys_eig_energies):
+        print(
+            f"fid: {np.abs(fid):.4f} gap: {np.abs(sys_eig_energy-sys_eig_energies[0]):.3f}"
+        )
+    print(f"sum fids {sum(eig_fids)}")
     sys_initial_energy = expectation_wrapper(
         model.hamiltonian, sys_initial_state, model.flattened_qubits
     )
@@ -102,15 +123,6 @@ def __main__(args):
             "font.size": 15,
             "figure.figsize": (5, 4),
         }
-    )
-
-    free_sys_eig_energies, free_sys_eig_states = jw_eigenspectrum_at_particle_number(
-        sparse_operator=get_sparse_operator(
-            model.non_interacting_model.fock_hamiltonian,
-            n_qubits=len(model.flattened_qubits),
-        ),
-        particle_number=n_electrons,
-        expanded=True,
     )
 
     couplers = get_cheat_coupler_list(
@@ -153,11 +165,11 @@ def __main__(args):
         sys_env_coupler_data=couplers,
         verbosity=5,
     )
-    n_rep = 2
+    n_rep = 1
 
     print(f"coupler dim: {cooler.sys_env_coupler_data_dims}")
 
-    ansatz_options = {"beta": 1e-3, "mu": 0.01, "c": 1e-2}
+    ansatz_options = {"beta": 1, "mu": 100, "c": 30}
     weaken_coupling = 100
 
     start_omega = 1.01 * spectrum_width
@@ -167,13 +179,16 @@ def __main__(args):
     method = "bigbrain"
 
     if method == "bigbrain":
+        coupler_transitions = np.abs(
+            np.array(free_sys_eig_energies[1:]) - free_sys_eig_energies[0]
+        )
         fidelities, sys_ev_energies, omegas, env_ev_energies = cooler.big_brain_cool(
             start_omega=start_omega,
             stop_omega=stop_omega,
             ansatz_options=ansatz_options,
             n_rep=n_rep,
             weaken_coupling=weaken_coupling,
-            # coupler_energies=free_sys_eig_energies[1:],
+            coupler_transitions=coupler_transitions,
         )
 
         jobj = {
