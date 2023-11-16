@@ -2,6 +2,9 @@ import cirq
 import numpy as np
 from cooling_utils import ndarray_to_psum, get_transition_rates
 from math import prod
+from fauvqe.models.fermiHubbardModel import FermiHubbardModel
+from fauvqe.utilities import jw_eigenspectrum_at_particle_number
+from openfermion import get_sparse_operator
 
 # This file contains a lot of legos to help with the cooling sims,
 # for example common environment hamiltonians, sweeps, and couplers
@@ -211,3 +214,41 @@ def get_hamiltonian_coupler(hamiltonian: cirq.PauliSum, env_qubits):
     for pstr in hamiltonian:
         coupler_list.append(pstr * YY_coupler)
     return coupler_list
+
+
+def get_perturbed_free_couplers(
+    model: FermiHubbardModel,
+    n_electrons: list,
+    env_eig_states: np.ndarray,
+    env_qubits: list[cirq.Qid],
+    noise: float = 0,
+    to_psum: bool = False,
+):
+    sys_eig_energies, sys_eig_states = jw_eigenspectrum_at_particle_number(
+        sparse_operator=get_sparse_operator(
+            model.fock_hamiltonian,
+            n_qubits=len(model.flattened_qubits),
+        ),
+        particle_number=n_electrons,
+        expanded=True,
+    )
+    couplers = []
+    env_up = np.outer(env_eig_states[:, 1], np.conjugate(env_eig_states[:, 0]))
+    for k in range(1, sys_eig_states.shape[1]):
+        # |sys_0Xsys_k| O |env_1Xenv_0|
+        coupler = np.kron(
+            np.outer(sys_eig_states[:, 0], np.conjugate(sys_eig_states[:, k])),
+            env_up,
+        )
+        if abs(noise) > 0:
+            noisy_coupler = np.random.rand(*coupler.shape)
+            coupler = coupler + (noise * noisy_coupler)
+        coupler = coupler + np.conjugate(np.transpose(coupler))
+        if to_psum:
+            coupler = ndarray_to_psum(
+                coupler, qubits=(*model.flattened_qubits, *env_qubits)
+            )
+        couplers.append(coupler)
+
+    # bigger first to match cheat sweep
+    return list(reversed(couplers))
