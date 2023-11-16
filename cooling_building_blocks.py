@@ -203,7 +203,7 @@ def control_function(
     """
     if f is None:
         f = lambda x: 1
-    return abs(beta * f(omega) / ((t_fridge / omega) ** mu + c))
+    return abs(beta * f(omega) / (np.exp(mu / np.log10(1e-20 + t_fridge) ** 2) + c))
     # return abs(beta * f(omega) * np.exp(-((t_fridge * c) ** mu)))
 
 

@@ -323,6 +323,7 @@ class Cooler:
         n_rep: int = 1,
         ansatz_options: dict = {},
         weaken_coupling: float = 100,
+        coupler_transitions: list = None,
     ):
         initial_density_matrix = self.total_initial_state
         if not cirq.is_hermitian(initial_density_matrix):
@@ -337,6 +338,7 @@ class Cooler:
         sys_fidelity = self.sys_fidelity(self.sys_initial_state)
         sys_energy = self.sys_energy(self.sys_initial_state)
         env_energy = self.env_energy(self.total_initial_state)
+        n_qubits = len(self.sys_hamiltonian.qubits)
 
         self.update_message(
             "figs",
@@ -349,7 +351,6 @@ class Cooler:
         for rep in range(n_rep):
             self.update_message("rep", s="rep n. {}".format(rep), message_level=5)
             omega = start_omega
-            step = 0
 
             # create first rep array
             fidelities.append([])
@@ -365,18 +366,37 @@ class Cooler:
 
             # check number of couplers in list
             coupler_number = self.get_coupler_number(rep)
-
+            overall_steps = 0
             while omega > stop_omega:
+                self.update_message("ovstep", f"overall steps: {overall_steps}")
+
                 # set alpha and t
-                n_qubits = len(self.sys_hamiltonian.qubits)
                 alpha = omega / (weaken_coupling * n_qubits)
 
                 # there's not factor of two here, it's all correct
                 evolution_time = np.pi / alpha
 
-                # cool with all couplers for a given gap
-
-                for coupler_index in range(coupler_number):
+                if coupler_transitions is not None:
+                    assert len(coupler_transitions) == coupler_number
+                    # cool with couplers for a given gap ONLY IF THEIR ENERGY IS CLOSE
+                    coupler_omega_dist = np.abs(coupler_transitions - omega)
+                    threshold = 2
+                    # [0] because where returns a tuple
+                    coupler_indices = np.where(coupler_omega_dist <= threshold)[0]
+                    if len(coupler_indices) == 0:
+                        # either we use all coupler in omega steppes or none
+                        coupler_indices = range(coupler_number)
+                        coupler_indices = []
+                else:
+                    # cool with all couplers for a given gap
+                    coupler_indices = range(coupler_number)
+                measured_env_energies = []
+                for coupler_index in coupler_indices:
+                    overall_steps += 1
+                    self.update_message(
+                        "cind",
+                        f"Eff. num. of coupler: {len(coupler_indices):.1f}, coupler {coupler_index:.1f}",
+                    )
                     self.sys_env_coupler_easy_setter(
                         coupler_index=coupler_index, rep=rep
                     )
@@ -394,12 +414,6 @@ class Cooler:
                         evolution_time=evolution_time,
                     )
 
-                    # append values
-                    fidelities[rep].append(sys_fidelity)
-                    sys_energies[rep].append(sys_energy)
-                    omegas[rep].append(omega)
-                    env_energies[rep].append(env_energy)
-
                     # print stats on evolution
                     self.update_message(
                         "fidgs",
@@ -408,23 +422,37 @@ class Cooler:
                         ),
                         message_level=5,
                     )
+                    measured_env_energies.append(env_energy)
+
+                # make sure that we update the control func with the highest env_energy
+                # becuase we are concerned with the best coupler
+                # if one coupler works we better slow down
+                if measured_env_energies:
+                    env_energy = np.max(measured_env_energies)
+                else:
+                    env_energy = 0
+                # append values
+                fidelities[rep].append(sys_fidelity)
+                sys_energies[rep].append(sys_energy)
+                omegas[rep].append(omega)
+                env_energies[rep].append(env_energy)
 
                 # update the control function
                 epsilon = control_function(
-                    omega=omega, t_fridge=env_energy, **ansatz_options
+                    omega=omega,
+                    t_fridge=env_energy,
+                    **ansatz_options,
                 )
                 # if epsilon is zero or some NaN, default to 1000 step linear evolution
                 if epsilon == 0:
-                    epsilon = 1e-3 * (start_omega - stop_omega)
-                omega = omega - epsilon
-                step += 1
+                    epsilon = 1e-6 * (start_omega - stop_omega)
                 self.update_message(
                     "epsi",
-                    "epsi: {:.3e} prev: {:.3f} fridge E: {:.3e}".format(
-                        epsilon, omega + epsilon, env_energy
-                    ),
+                    f"ε: {epsilon:.3e} ω: {omega:.3f} fridge E: {env_energy:.3e} start: {start_omega:.3f} stop: {stop_omega:.3f}",
                     message_level=5,
                 )
+
+                omega = omega - epsilon
 
         return fidelities, sys_energies, omegas, env_energies
 
@@ -555,6 +583,7 @@ class Cooler:
 
         plot_temp = False
         ax_bottom = axes[1]
+        spectrum_cmap = plt.get_cmap("hsv", len(eigenspectrums))
 
         if plot_temp:
             twin_ax_bottom = ax_bottom.twinx()
@@ -577,15 +606,13 @@ class Cooler:
                 omega_halfs,
                 y_values,
                 color=cmap(rep),
-                linewidth=1,
+                linewidth=2,
                 label="Rep. {}".format(rep + 1),
             )
             if plot_temp:
                 twin_ax_bottom.plot(
                     omegas[rep], env_energies[rep], color="red", linewidth=2
                 )
-
-        spectrum_cmap = plt.get_cmap("hsv", len(eigenspectrums))
         for ind, spectrum in enumerate(eigenspectrums):
             transitions = get_transition_rates(spectrum)
             ax_bottom.vlines(
@@ -594,9 +621,8 @@ class Cooler:
                 ymax=np.nanmax(y_values[np.isfinite(y_values)]),
                 linestyle="--",
                 color=spectrum_cmap(ind),
-                linewidth=0.5,
+                linewidth=1,
             )
-
         axes[0].set_ylabel(r"$|\langle \psi_{cool} | \psi_{gs} \rangle|^2$", labelpad=0)
         axes[0].set_xlabel("step")
 
@@ -621,7 +647,6 @@ class Cooler:
                 )
             else:
                 ax_bottom.legend(bbox_to_anchor=(0.2, 2))
-        plt.tight_layout()
         return fig
 
     def plot_generic_cooling(

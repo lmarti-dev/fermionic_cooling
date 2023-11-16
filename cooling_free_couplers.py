@@ -14,7 +14,12 @@ from cooling_building_blocks import (
     get_cheat_coupler_list,
 )
 
-from cooling_utils import expectation_wrapper, ketbra, state_fidelity_to_eigenstates
+from cooling_utils import (
+    expectation_wrapper,
+    ketbra,
+    state_fidelity_to_eigenstates,
+    get_min_gap,
+)
 from fauvqe.utilities import jw_eigenspectrum_at_particle_number, spin_dicke_state
 import cirq
 from openfermion import get_sparse_operator, jw_hartree_fock_state
@@ -25,32 +30,39 @@ import matplotlib.pyplot as plt
 from data_manager import ExperimentDataManager
 
 
-def get_min_gap(l):
-    unique_vals = sorted(set(l))
-    return abs(unique_vals[0] - unique_vals[1])
-
-
 def __main__(args):
-    data_folder = "C:/Users/Moi4/Desktop/current/FAU/phd/code/vqe/data"
+    data_folder = "/home/eckstein/Desktop/projects/data/"
 
     # whether we want to skip all saving data
-    dry_run = True
+    dry_run = False
     edm = ExperimentDataManager(
         data_folder=data_folder,
-        experiment_name="cooling_check_noise_vs_alpha",
+        experiment_name="cooling_free_couplers",
         notes="trying out the effect of noise on cheat couplers",
         dry_run=dry_run,
     )
     # model stuff
     model = FermiHubbardModel(x_dimension=2, y_dimension=2, tunneling=1, coulomb=2)
-    n_electrons = [2, 1]
+    n_electrons = [2, 2]
+
+    free_sys_eig_energies, free_sys_eig_states = jw_eigenspectrum_at_particle_number(
+        sparse_operator=get_sparse_operator(
+            model.non_interacting_model.fock_hamiltonian,
+            n_qubits=len(model.flattened_qubits),
+        ),
+        particle_number=n_electrons,
+        expanded=True,
+    )
+
     sys_qubits = model.flattened_qubits
     n_sys_qubits = len(sys_qubits)
     sys_hartree_fock = jw_hartree_fock_state(
         n_orbitals=n_sys_qubits, n_electrons=sum(n_electrons)
     )
+
+    sys_slater_state = free_sys_eig_states[:, 0]
     sys_dicke = spin_dicke_state(
-        n_qubits=n_sys_qubits, Nf=n_electrons, right_to_left=True
+        n_qubits=n_sys_qubits, Nf=n_electrons, right_to_left=False
     )
     sys_initial_state = ketbra(sys_hartree_fock)
     sys_eig_energies, sys_eig_states = jw_eigenspectrum_at_particle_number(
@@ -64,6 +76,15 @@ def __main__(args):
     sys_ground_state = sys_eig_states[:, np.argmin(sys_eig_energies)]
     sys_ground_energy = np.min(sys_eig_energies)
 
+    eig_fids = state_fidelity_to_eigenstates(
+        state=sys_initial_state, eigenstates=sys_eig_states
+    )
+    print("Initial populations")
+    for fid, sys_eig_energy in zip(eig_fids, sys_eig_energies):
+        print(
+            f"fid: {np.abs(fid):.4f} gap: {np.abs(sys_eig_energy-sys_eig_energies[0]):.3f}"
+        )
+    print(f"sum fids {sum(eig_fids)}")
     sys_initial_energy = expectation_wrapper(
         model.hamiltonian, sys_initial_state, model.flattened_qubits
     )
@@ -90,8 +111,8 @@ def __main__(args):
         n_electrons=n_electrons,
         n_sys_qubits=n_sys_qubits,
         n_env_qubits=n_env_qubits,
-        sys_eigenspectrum=sys_eig_energies,
-        env_eigenergies=env_eig_energies,
+        sys_eig_energies=sys_eig_energies,
+        env_eig_energies=env_eig_energies,
         model=model.to_json_dict()["constructor_params"],
     )
 
@@ -102,15 +123,6 @@ def __main__(args):
             "font.size": 15,
             "figure.figsize": (5, 4),
         }
-    )
-
-    free_sys_eig_energies, free_sys_eig_states = jw_eigenspectrum_at_particle_number(
-        sparse_operator=get_sparse_operator(
-            model.non_interacting_model.fock_hamiltonian,
-            n_qubits=len(model.flattened_qubits),
-        ),
-        particle_number=n_electrons,
-        expanded=True,
     )
 
     couplers = get_cheat_coupler_list(
@@ -153,39 +165,45 @@ def __main__(args):
         sys_env_coupler_data=couplers,
         verbosity=5,
     )
-    n_rep = 2
+    n_rep = 1
 
-    ansatz_options = {"beta": 1e-2, "mu": 0.01, "c": 1e-2}
+    print(f"coupler dim: {cooler.sys_env_coupler_data_dims}")
+
+    ansatz_options = {"beta": 1, "mu": 100, "c": 30}
     weaken_coupling = 100
 
     start_omega = 1.01 * spectrum_width
 
     stop_omega = 0.5 * min_gap
 
-    method = "zip"
+    method = "bigbrain"
 
     if method == "bigbrain":
-        fidelities, sys_energies, omegas, env_energies = cooler.big_brain_cool(
+        coupler_transitions = np.abs(
+            np.array(free_sys_eig_energies[1:]) - free_sys_eig_energies[0]
+        )
+        fidelities, sys_ev_energies, omegas, env_ev_energies = cooler.big_brain_cool(
             start_omega=start_omega,
             stop_omega=stop_omega,
             ansatz_options=ansatz_options,
             n_rep=n_rep,
             weaken_coupling=weaken_coupling,
+            coupler_transitions=coupler_transitions,
         )
 
         jobj = {
             "fidelities": fidelities,
-            "sys_energies": sys_energies,
+            "sys_energies": sys_ev_energies,
         }
         edm.save_dict_to_experiment(filename=f"cooling_free", jobj=jobj)
 
         fig = cooler.plot_controlled_cooling(
-            fidelities,
-            sys_energies,
-            omegas,
-            env_energies,
+            fidelities=fidelities,
+            sys_energies=sys_ev_energies,
+            env_energies=env_ev_energies,
+            omegas=omegas,
             eigenspectrums=[
-                sys_energies,
+                sys_eig_energies,
             ],
         )
         edm.save_figure(

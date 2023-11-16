@@ -26,13 +26,13 @@ from data_manager import ExperimentDataManager
 
 
 def __main__(args):
-    data_folder = "C:/Users/Moi4/Desktop/current/FAU/phd/code/vqe/data"
+    data_folder = "/home/eckstein/Desktop/projects/data/"
 
     # whether we want to skip all saving data
     dry_run = False
     edm = ExperimentDataManager(
         data_folder=data_folder,
-        experiment_name="cooling_check_noise_vs_alpha",
+        experiment_name="cooling_check_noise_vs_reps",
         notes="trying out the effect of noise on cheat couplers",
         dry_run=dry_run,
     )
