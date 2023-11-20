@@ -7,7 +7,7 @@ sys.path.append("/home/Refik/Data/My_files/Dropbox/PhD/repos/fauvqe/")
 import cirq
 import numpy as np
 from coolerClass import Cooler, get_total_spectra_at_given_omega
-from cooling_building_blocks import (
+from fermionic_cooling.building_blocks import (
     get_moving_ZY_coupler_list,
     get_moving_ZYZY_coupler_list,
     get_Z_env,
@@ -17,7 +17,7 @@ from cooling_building_blocks import (
     get_hamiltonian_coupler,
     get_cheat_coupler,
 )
-from cooling_utils import expectation_wrapper, get_min_gap
+from fermionic_cooling.utils import expectation_wrapper, get_min_gap
 from openfermion import get_sparse_operator, jw_hartree_fock_state
 
 from fauvqe.models.fermiHubbardModel import FermiHubbardModel
