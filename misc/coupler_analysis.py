@@ -7,7 +7,7 @@ sys.path.append("/home/Refik/Data/My_files/Dropbox/PhD/repos/fauvqe/")
 import cirq
 import numpy as np
 from coolerClass import Cooler, get_total_spectra_at_given_omega
-from fermionic_cooling.building_blocks import (
+from building_blocks import (
     get_moving_fsim_coupler_list,
     get_moving_paulipauli_coupler_list,
     get_moving_ZY_coupler_list,
@@ -15,7 +15,7 @@ from fermionic_cooling.building_blocks import (
     get_Z_env,
     get_ZY_coupler,
 )
-from fermionic_cooling.utils import (
+from utils import (
     expectation_wrapper,
     print_coupler_fidelity_to_ground_state_projectors,
     coupler_fidelity_to_ground_state_projectors,

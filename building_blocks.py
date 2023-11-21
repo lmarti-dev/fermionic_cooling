@@ -1,6 +1,6 @@
 import cirq
 import numpy as np
-from fermionic_cooling.utils import ndarray_to_psum, get_transition_rates
+from utils import ndarray_to_psum, get_transition_rates
 from math import prod
 from fauvqe.models.fermiHubbardModel import FermiHubbardModel
 from fauvqe.utilities import jw_eigenspectrum_at_particle_number
