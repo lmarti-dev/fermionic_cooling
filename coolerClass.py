@@ -23,7 +23,7 @@ import matplotlib.cm as cm
 import matplotlib.colors as colors
 import matplotlib.pyplot as plt
 import numpy as np
-from cooling_utils import (
+from fermionic_cooling.utils import (
     expectation_wrapper,
     get_transition_rates,
     has_increased,
@@ -35,7 +35,7 @@ from cooling_utils import (
     get_list_depth,
     coupler_fidelity_to_ground_state_projectors,
 )
-from cooling_building_blocks import control_function
+from fermionic_cooling.building_blocks import control_function
 from tqdm import tqdm
 
 from fauvqe.utilities import (

@@ -2,7 +2,7 @@ import sys
 
 sys.path.append("/home/Refik/Data/My_files/Dropbox/PhD/repos/fauvqe/")
 
-from coolerClass import (
+from fermionic_cooling.coolerClass import (
     mean_gap,
     get_log_sweep,
     get_cheat_sweep,

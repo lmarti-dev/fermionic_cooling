@@ -38,7 +38,7 @@ def __main__(args):
     edm = ExperimentDataManager(
         data_folder=data_folder,
         experiment_name="cooling_free_couplers",
-        notes="trying out the effect of noise on cheat couplers",
+        notes="using the noninteracting coupler",
         dry_run=dry_run,
     )
     # model stuff
