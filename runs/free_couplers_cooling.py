@@ -7,14 +7,14 @@ from fauvqe.models.fermiHubbardModel import FermiHubbardModel
 
 from coolerClass import Cooler
 
-from fermionic_cooling.building_blocks import (
+from building_blocks import (
     get_cheat_sweep,
     get_cheat_coupler,
     get_Z_env,
     get_cheat_coupler_list,
 )
 
-from fermionic_cooling.utils import (
+from utils import (
     expectation_wrapper,
     ketbra,
     state_fidelity_to_eigenstates,
@@ -169,7 +169,7 @@ def __main__(args):
 
     print(f"coupler dim: {cooler.sys_env_coupler_data_dims}")
 
-    ansatz_options = {"beta": 1, "mu": 100, "c": 30}
+    ansatz_options = {"beta": 1, "mu": 100, "c": 100}
     weaken_coupling = 100
 
     start_omega = 1.01 * spectrum_width
