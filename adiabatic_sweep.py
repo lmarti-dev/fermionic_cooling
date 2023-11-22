@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 from scipy.linalg import expm
 from scipy.sparse.linalg import expm_multiply
 import numpy as np
@@ -111,11 +110,4 @@ def run_sweep(
 
 
 def run_sparse_sweep():
-=======
-import cirq
-import numpy as np
-
-
-def adiabatic_sweep(initial_state: np.ndarray, H0: cirq.PauliSum, H1: cirq.PauliSum):
->>>>>>> f2eaba45c8a4f45475f4cb9925ef037cdd534f59
     pass
