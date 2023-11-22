@@ -35,7 +35,7 @@ def __main__():
     )
     # model stuff
     model = FermiHubbardModel(x_dimension=2, y_dimension=2, tunneling=1, coulomb=2)
-    n_electrons = [2, 2]
+    n_electrons = [2, 1]
 
     qubits = model.flattened_qubits
     n_qubits = len(qubits)
@@ -60,11 +60,10 @@ def __main__():
         f"initial fidelity: {fidelity(slater_state,ground_state,qid_shape=(2,)*n_qubits)}"
     )
 
-    quit()
     ham_start = fermion_to_dense(model.non_interacting_model.fock_hamiltonian)
     ham_stop = fermion_to_dense(model.fock_hamiltonian)
     n_steps = 1000
-    total_time = 10000
+    total_time = 10
 
     fidelities, instant_fidelities = run_sweep(
         initial_state=initial_state,
