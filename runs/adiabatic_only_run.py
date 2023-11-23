@@ -12,9 +12,7 @@ from fauvqe.utilities import (
     spin_dicke_state,
     jw_get_true_ground_state_at_particle_number,
 )
-from helpers.qubit_tools import (
-    get_closest_quadratic_degenerate_ground_state,
-)
+from utils import get_closest_noninteracting_degenerate_ground_state, get_min_gap
 
 from openfermion import get_sparse_operator, jw_hartree_fock_state
 import matplotlib.pyplot as plt
@@ -35,7 +33,7 @@ def __main__():
     )
     # model stuff
     model = FermiHubbardModel(x_dimension=2, y_dimension=2, tunneling=1, coulomb=2)
-    n_electrons = [2, 1]
+    n_electrons = [2, 2]
 
     qubits = model.flattened_qubits
     n_qubits = len(qubits)
@@ -43,27 +41,29 @@ def __main__():
         n_orbitals=n_qubits, n_electrons=sum(n_electrons)
     )
 
-    slater_energy, slater_state = get_closest_quadratic_degenerate_ground_state(
-        fermion_operator=model.fock_hamiltonian, n_qubits=n_qubits, Nf=n_electrons
+    slater_energy, slater_state = get_closest_noninteracting_degenerate_ground_state(
+        model=model, n_qubits=n_qubits, Nf=n_electrons
     )
+
     dicke_state = spin_dicke_state(
         n_qubits=n_qubits, Nf=n_electrons, right_to_left=False
     )
 
-    ground_energy, ground_state = jw_get_true_ground_state_at_particle_number(
-        sparse_operator=get_sparse_operator(model.fock_hamiltonian, n_qubits=n_qubits),
+    ground_energies, ground_states = jw_eigenspectrum_at_particle_number(
+        sparse_operator=get_sparse_operator(model.fock_hamiltonian),
         particle_number=n_electrons,
+        expanded=True,
     )
-
+    ground_state = ground_states[:, 0]
     initial_state = slater_state
     print(
-        f"initial fidelity: {fidelity(slater_state,ground_state,qid_shape=(2,)*n_qubits)}"
+        f"initial fidelity: {fidelity(initial_state,ground_state,qid_shape=(2,)*n_qubits)}"
     )
 
     ham_start = fermion_to_dense(model.non_interacting_model.fock_hamiltonian)
     ham_stop = fermion_to_dense(model.fock_hamiltonian)
-    n_steps = 1000
-    total_time = 10
+    n_steps = 10000
+    total_time = 1 / (get_min_gap(ground_energies, threshold=1e-8) ** 2)
 
     fidelities, instant_fidelities = run_sweep(
         initial_state=initial_state,

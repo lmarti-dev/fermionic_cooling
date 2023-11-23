@@ -7,20 +7,60 @@ import cirq
 
 import numpy as np
 
-from openfermion import FermionOperator
+from openfermion import FermionOperator, get_sparse_operator
 from scipy.sparse.linalg import eigsh, expm, expm_multiply
 
-from fauvqe.utilities import flatten
+from fauvqe.utilities import (
+    flatten,
+    jw_get_true_ground_state_at_particle_number,
+    jw_eigenspectrum_at_particle_number,
+)
+from fauvqe.models.fermiHubbardModel import FermiHubbardModel
 
 # this file contains general utils for the cooling.
 # Some of them are simply convenience functions
 # Some of them are a bit less trivial
 
 
-def get_min_gap(l):
+def get_closest_noninteracting_degenerate_ground_state(
+    model: FermiHubbardModel, n_qubits: int, Nf: list
+):
+    sparse_fermion_operator = get_sparse_operator(
+        model.fock_hamiltonian, n_qubits=n_qubits
+    )
+    ground_energy, ground_state = jw_get_true_ground_state_at_particle_number(
+        sparse_fermion_operator, Nf
+    )
+    sparse_quadratic_fermion_operator = get_sparse_operator(
+        model.non_interacting_model.fock_hamiltonian,
+        n_qubits=n_qubits,
+    )
+    slater_eigenenergies, slater_eigenstates = jw_eigenspectrum_at_particle_number(
+        sparse_quadratic_fermion_operator, Nf, expanded=True
+    )
+    slater_ground_energy = slater_eigenenergies[0]
+    degeneracy = sum(
+        (
+            np.isclose(slater_ground_energy, eigenenergy)
+            for eigenenergy in slater_eigenenergies
+        )
+    )
+    fidelities = []
+    if degeneracy > 1:
+        print("ground state is {}-fold degenerate".format(degeneracy))
+        for ind in range(degeneracy):
+            fidelities.append(cirq.fidelity(slater_eigenstates[:, ind], ground_state))
+        max_ind = np.argmax(fidelities)
+        print(f"degenerate fidelities: {fidelities}, max: {max_ind}")
+        return slater_ground_energy, slater_eigenstates[:, max_ind]
+    else:
+        return slater_ground_energy, slater_eigenstates[:, 0]
+
+
+def get_min_gap(l: list, threshold: float = 0):
     unique_vals = sorted(set(l))
-    diff = np.diff(unique_vals)
-    min_gap = np.min(diff)
+    diff = np.array(list(set(np.abs(np.diff(unique_vals)))))
+    min_gap = np.min(diff[diff > threshold])
     return min_gap
 
 
