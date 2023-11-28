@@ -80,6 +80,10 @@ def run_sweep(
         sweep_hamiltonian=sweep_hamiltonian, n_steps=n_steps, n_electrons=n_electrons
     )
 
+    _, initial_ground_state = jw_get_true_ground_state_at_particle_number(
+        sparse_operator=csc_matrix(ham_start),
+        particle_number=n_electrons,
+    )
     _, final_ground_state = jw_get_true_ground_state_at_particle_number(
         sparse_operator=csc_matrix(ham_stop),
         particle_number=n_electrons,
@@ -90,7 +94,7 @@ def run_sweep(
     instant_fidelities = []
 
     initial_fid = fidelity(state, final_ground_state, qid_shape=qid_shape)
-    initial_instant_fid = fidelity(state, next(ground_states), qid_shape=qid_shape)
+    initial_instant_fid = fidelity(state, initial_ground_state, qid_shape=qid_shape)
 
     fidelities.append(initial_fid)
     instant_fidelities.append(initial_instant_fid)
@@ -105,7 +109,9 @@ def run_sweep(
         fidelities.append(fid)
         instant_fidelities.append(instant_fid)
 
-        print(f"step {ind}: fid: {fid:.4f} init. inst. fid: {instant_fid:.4f}\r")
+        print(
+            f"step {ind}: fid: {fid:.4f} init. inst. fid: {instant_fid:.4f}", end="\r"
+        )
     return fidelities, instant_fidelities
 
 
