@@ -37,27 +37,20 @@ def get_sweep_hamiltonian(
 def get_instantaneous_ground_states(
     sweep_hamiltonian: callable, n_steps: int, n_electrons: list
 ):
-    ground_states = []
-    ground_energies = []
     for step in range(n_steps + 1):
         sparse_operator = csc_matrix(sweep_hamiltonian(step / n_steps))
         ground_energy, ground_state = jw_get_true_ground_state_at_particle_number(
             sparse_operator=sparse_operator, particle_number=n_electrons
         )
-        ground_states.append(ground_state)
-        ground_energies.append(ground_energy)
-
-    return ground_energies, ground_states
+        yield ground_state
 
 
 def get_trotterized_sweep_unitaries(
     sweep_hamiltonian: callable, n_steps: int, total_time: float
 ):
-    unitaries = []
     for step in range(n_steps + 1):
         unitary = expm(-1j * (total_time / n_steps) * sweep_hamiltonian(step / n_steps))
-        unitaries.append(unitary)
-    return unitaries
+        yield unitary
 
 
 def run_sweep(
@@ -77,20 +70,27 @@ def run_sweep(
 
     sweep_hamiltonian = get_sweep_hamiltonian(ham_start=ham_start, ham_stop=ham_stop)
 
+    print(f"Preparing {n_steps} unitaries")
     unitaries = get_trotterized_sweep_unitaries(
         sweep_hamiltonian=sweep_hamiltonian, n_steps=n_steps, total_time=total_time
     )
 
-    _, ground_states = get_instantaneous_ground_states(
+    print(f"Preparing {n_steps} instantaneous ground states")
+    ground_states = get_instantaneous_ground_states(
         sweep_hamiltonian=sweep_hamiltonian, n_steps=n_steps, n_electrons=n_electrons
+    )
+
+    _, final_ground_state = jw_get_true_ground_state_at_particle_number(
+        sparse_operator=csc_matrix(ham_stop),
+        particle_number=n_electrons,
     )
 
     # compute fidelities to final ground state and instant.
     fidelities = []
     instant_fidelities = []
 
-    initial_fid = fidelity(state, ground_states[-1], qid_shape=qid_shape)
-    initial_instant_fid = fidelity(state, ground_states[0], qid_shape=qid_shape)
+    initial_fid = fidelity(state, final_ground_state, qid_shape=qid_shape)
+    initial_instant_fid = fidelity(state, next(ground_states), qid_shape=qid_shape)
 
     fidelities.append(initial_fid)
     instant_fidelities.append(initial_instant_fid)
@@ -99,8 +99,8 @@ def run_sweep(
     for ind, unitary in enumerate(unitaries):
         state = np.matmul(unitary, state)
 
-        fid = fidelity(state, ground_states[-1], qid_shape=qid_shape)
-        instant_fid = fidelity(state, ground_states[ind], qid_shape=qid_shape)
+        fid = fidelity(state, final_ground_state, qid_shape=qid_shape)
+        instant_fid = fidelity(state, next(ground_states), qid_shape=qid_shape)
 
         fidelities.append(fid)
         instant_fidelities.append(instant_fid)

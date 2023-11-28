@@ -62,7 +62,7 @@ def __main__():
 
     ham_start = fermion_to_dense(model.non_interacting_model.fock_hamiltonian)
     ham_stop = fermion_to_dense(model.fock_hamiltonian)
-    n_steps = 10000
+    n_steps = int(1e5)
     total_time = 1 / (get_min_gap(ground_energies, threshold=1e-8) ** 2)
 
     fidelities, instant_fidelities = run_sweep(
