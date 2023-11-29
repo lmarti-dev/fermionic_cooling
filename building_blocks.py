@@ -183,6 +183,7 @@ def get_moving_fsim_coupler_list(
 def control_function(
     omega: float,
     t_fridge: float,
+    t_mean: float,
     beta: float = 1,
     mu: float = 1,
     c: float = 1e-5,
@@ -203,7 +204,9 @@ def control_function(
     """
     if f is None:
         f = lambda x: 1
-    return abs(beta * f(omega) / (np.exp(mu / np.log10(1e-20 + t_fridge) ** 2) + c))
+    return abs(
+        beta * f(omega) / (np.exp(mu / np.log10(1e-20 + t_fridge) ** 2) + c)
+    ) * np.abs(-np.log10(t_mean / t_fridge))
     # return abs(beta * f(omega) * np.exp(-((t_fridge * c) ** mu)))
 
 

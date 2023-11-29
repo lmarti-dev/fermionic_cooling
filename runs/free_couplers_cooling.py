@@ -34,7 +34,7 @@ def __main__(args):
     data_folder = "/home/eckstein/Desktop/projects/data/"
 
     # whether we want to skip all saving data
-    dry_run = False
+    dry_run = True
     edm = ExperimentDataManager(
         data_folder=data_folder,
         experiment_name="cooling_free_couplers",
@@ -169,7 +169,7 @@ def __main__(args):
 
     print(f"coupler dim: {cooler.sys_env_coupler_data_dims}")
 
-    ansatz_options = {"beta": 1, "mu": 100, "c": 100}
+    ansatz_options = {"beta": 1, "mu": 100, "c": 10}
     weaken_coupling = 100
 
     start_omega = 1.01 * spectrum_width

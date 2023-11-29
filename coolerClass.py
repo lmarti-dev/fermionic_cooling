@@ -438,9 +438,11 @@ class Cooler:
                 env_energies[rep].append(env_energy)
 
                 # update the control function
+                mean_env_energy = np.mean(env_energies[rep])
                 epsilon = control_function(
                     omega=omega,
                     t_fridge=env_energy,
+                    t_mean=mean_env_energy,
                     **ansatz_options,
                 )
                 # if epsilon is zero or some NaN, default to 1000 step linear evolution
