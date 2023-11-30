@@ -97,7 +97,7 @@ class Cooler:
         self.msg = {}
 
     def print_msg(self):
-        if self.verbosity:
+        if self.verbosity and self.msg != {}:
             print("\n".join(self.msg.values()))
             print("\033[F" * (1 + len(self.msg.keys())))
 
@@ -348,6 +348,7 @@ class Cooler:
             message_level=8,
         )
 
+        total_cooling_time = 0
         for rep in range(n_rep):
             self.update_message("rep", s="rep n. {}".format(rep), message_level=5)
             omega = start_omega
@@ -368,13 +369,17 @@ class Cooler:
             coupler_number = self.get_coupler_number(rep)
             overall_steps = 0
             while omega > stop_omega:
-                self.update_message("ovstep", f"overall steps: {overall_steps}")
+                self.update_message(
+                    "ovstep",
+                    f"overall steps: {overall_steps}, total cool. time: {total_cooling_time:.2f}",
+                )
 
                 # set alpha and t
                 alpha = omega / (weaken_coupling * n_qubits)
 
                 # there's not factor of two here, it's all correct
                 evolution_time = np.pi / alpha
+                total_cooling_time += evolution_time
 
                 if coupler_transitions is not None:
                     assert len(coupler_transitions) == coupler_number
@@ -561,6 +566,8 @@ class Cooler:
         sys_energies: list,
         env_energies: list,
         omegas: list,
+        weaken_coupling: float,
+        n_qubits: int,
         eigenspectrums: list[list],
         suptitle: str = None,
     ):
@@ -586,6 +593,7 @@ class Cooler:
         plot_temp = False
         ax_bottom = axes[1]
         spectrum_cmap = plt.get_cmap("hsv", len(eigenspectrums))
+        xtick_is_time = True
 
         if plot_temp:
             twin_ax_bottom = ax_bottom.twinx()
@@ -594,8 +602,12 @@ class Cooler:
                 len_prev = 0
             else:
                 len_prev += len(fidelities[rep - 1])
+            xticks = np.arange(len_prev, len_prev + len(fidelities[rep]))
+            if xtick_is_time:
+                xticks *= weaken_coupling * np.pi * n_qubits
+                xticks = np.divide(xticks, omegas[rep])
             axes[0].plot(
-                range(len_prev, len_prev + len(fidelities[rep])),
+                xticks,
                 fidelities[rep],
                 color=cmap(rep),
                 linewidth=2,

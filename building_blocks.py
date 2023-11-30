@@ -183,10 +183,10 @@ def get_moving_fsim_coupler_list(
 def control_function(
     omega: float,
     t_fridge: float,
-    t_mean: float,
+    t_mean: float = None,
     beta: float = 1,
-    mu: float = 1,
-    c: float = 1e-5,
+    mu: float = 10,
+    c: float = 100,
     f: callable = None,
 ):
     """Creates an ansatz for the derivative of omega, the strength of the environment. This is all control theory stuff, and I'm too dumb to get it
@@ -204,9 +204,14 @@ def control_function(
     """
     if f is None:
         f = lambda x: 1
-    return abs(
-        beta * f(omega) / (np.exp(mu / np.log10(1e-20 + t_fridge) ** 2) + c)
-    ) * np.abs(-np.log10(t_mean / t_fridge))
+    if t_mean is not None:
+        accelerate = np.abs(-np.log10(t_mean / t_fridge))
+    else:
+        accelerate = 1
+    return (
+        abs(beta * f(omega) / (np.exp(mu / np.log10(1e-20 + t_fridge) ** 2) + c))
+        * accelerate
+    )
     # return abs(beta * f(omega) * np.exp(-((t_fridge * c) ** mu)))
 
 

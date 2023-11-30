@@ -31,7 +31,7 @@ from data_manager import ExperimentDataManager
 
 
 def __main__(args):
-    data_folder = "/home/eckstein/Desktop/projects/data/"
+    data_folder = "C:/Users/Moi4/Desktop/current/FAU/phd/data"
 
     # whether we want to skip all saving data
     dry_run = True
@@ -43,7 +43,8 @@ def __main__(args):
     )
     # model stuff
     model = FermiHubbardModel(x_dimension=2, y_dimension=2, tunneling=1, coulomb=2)
-    n_electrons = [2, 2]
+    n_qubits = len(model.flattened_qubits)
+    n_electrons = [2, 1]
 
     free_sys_eig_energies, free_sys_eig_states = jw_eigenspectrum_at_particle_number(
         sparse_operator=get_sparse_operator(
@@ -140,7 +141,7 @@ def __main__(args):
     # get environment ham sweep values
     spectrum_width = max(sys_eig_energies) - min(sys_eig_energies)
 
-    min_gap = get_min_gap(free_sys_eig_energies)
+    min_gap = get_min_gap(free_sys_eig_energies, threshold=1e-3)
 
     n_steps = len(couplers)
     # sweep_values = get_log_sweep(spectrum_width, n_steps)
@@ -169,8 +170,8 @@ def __main__(args):
 
     print(f"coupler dim: {cooler.sys_env_coupler_data_dims}")
 
-    ansatz_options = {"beta": 1, "mu": 100, "c": 10}
-    weaken_coupling = 100
+    ansatz_options = {"beta": 1, "mu": 2, "c": 100}
+    weaken_coupling = 10
 
     start_omega = 1.01 * spectrum_width
 
@@ -202,6 +203,8 @@ def __main__(args):
             sys_energies=sys_ev_energies,
             env_energies=env_ev_energies,
             omegas=omegas,
+            weaken_coupling=weaken_coupling,
+            n_qubits=n_qubits,
             eigenspectrums=[
                 sys_eig_energies,
             ],

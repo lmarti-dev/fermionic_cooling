@@ -7,13 +7,15 @@ import cirq
 
 import numpy as np
 
-from openfermion import FermionOperator, get_sparse_operator
+from openfermion import FermionOperator, get_sparse_operator, jw_hartree_fock_state
 from scipy.sparse.linalg import eigsh, expm, expm_multiply
 
 from fauvqe.utilities import (
     flatten,
     jw_get_true_ground_state_at_particle_number,
     jw_eigenspectrum_at_particle_number,
+    normalize_vec,
+    spin_dicke_state,
 )
 from fauvqe.models.fermiHubbardModel import FermiHubbardModel
 
@@ -38,23 +40,32 @@ def get_closest_noninteracting_degenerate_ground_state(
     slater_eigenenergies, slater_eigenstates = jw_eigenspectrum_at_particle_number(
         sparse_quadratic_fermion_operator, Nf, expanded=True
     )
-    slater_ground_energy = slater_eigenenergies[0]
+
+    return get_closest_degenerate_ground_state(
+        ref_state=ground_state,
+        comp_energies=slater_eigenenergies,
+        comp_states=slater_eigenstates,
+    )
+
+
+def get_closest_degenerate_ground_state(ref_state, comp_energies, comp_states):
+    ix = np.argsort(comp_energies)
+    comp_states = comp_states[:, ix]
+    comp_energies = comp_energies[ix]
+    comp_ground_energy = comp_energies[0]
     degeneracy = sum(
-        (
-            np.isclose(slater_ground_energy, eigenenergy)
-            for eigenenergy in slater_eigenenergies
-        )
+        (np.isclose(comp_ground_energy, eigenenergy) for eigenenergy in comp_energies)
     )
     fidelities = []
     if degeneracy > 1:
         print("ground state is {}-fold degenerate".format(degeneracy))
         for ind in range(degeneracy):
-            fidelities.append(cirq.fidelity(slater_eigenstates[:, ind], ground_state))
+            fidelities.append(cirq.fidelity(comp_states[:, ind], ref_state))
         max_ind = np.argmax(fidelities)
         print(f"degenerate fidelities: {fidelities}, max: {max_ind}")
-        return slater_ground_energy, slater_eigenstates[:, max_ind]
+        return comp_ground_energy, comp_states[:, max_ind], max_ind
     else:
-        return slater_ground_energy, slater_eigenstates[:, 0]
+        return comp_ground_energy, comp_states[:, 0], 0
 
 
 def get_min_gap(l: list, threshold: float = 0):
@@ -343,3 +354,98 @@ def print_coupler_fidelity_to_ground_state_projectors(
     for ind, fid in enumerate(fidelities):
         print(f"|ψ₀Xψ({ind+1})|: {np.real(fid):.5f}", end=", ")
     print("\n")
+
+
+def extrapolate_ground_state_non_interacting_fermi_hubbard(
+    model: FermiHubbardModel, n_electrons: list, n_points: int, deg: int = 1
+):
+    coefficients = np.zeros((n_points, 2 ** len(model.flattened_qubits)))
+    interval = np.linspace(1e-8, 1e-7, n_points)
+    for ind, epsilon in enumerate(interval):
+        params = model.to_json_dict()["constructor_params"]
+        params["coulomb"] = epsilon
+        model_eps = FermiHubbardModel(**params)
+        _, ground_state = jw_get_true_ground_state_at_particle_number(
+            get_sparse_operator(model_eps.fock_hamiltonian), particle_number=n_electrons
+        )
+        coefficients[ind, :] = ground_state
+
+    poly = np.polyfit(interval, coefficients, deg)
+    ground_state_extrapolated = np.polyval(poly, 0)
+
+    return normalize_vec(ground_state_extrapolated)
+
+
+def get_slater_spectrum(model: FermiHubbardModel, n_electrons: list):
+    slater_energies, slater_eigenstates = jw_eigenspectrum_at_particle_number(
+        sparse_operator=get_sparse_operator(
+            model.non_interacting_model.fock_hamiltonian
+        ),
+        particle_number=n_electrons,
+        expanded=True,
+    )
+    return slater_energies, slater_eigenstates
+
+
+def get_dicke_state(n_qubits, n_electrons):
+    dicke_state = spin_dicke_state(
+        n_qubits=n_qubits, Nf=n_electrons, right_to_left=False
+    )
+    return dicke_state
+
+
+def get_closest_slater(model: FermiHubbardModel, n_electrons: list):
+    (
+        slater_energy,
+        slater_state,
+        max_ind,
+    ) = get_closest_noninteracting_degenerate_ground_state(
+        model=model, n_qubits=len(model.flattened_qubits), Nf=n_electrons
+    )
+    return slater_energy, slater_state, max_ind
+
+
+def get_hartree_fock(n_qubits: int, n_electrons: list):
+    hartree_fock = jw_hartree_fock_state(
+        n_orbitals=n_qubits, n_electrons=sum(n_electrons)
+    )
+
+    return hartree_fock
+
+
+def get_close_ground_state(model: FermiHubbardModel, n_electrons: list, coulomb: float):
+    params = model.to_json_dict()["constructor_params"]
+    params["coulomb"] = coulomb
+    close_model = FermiHubbardModel(**params)
+    (
+        close_ground_energy,
+        close_ground_state,
+    ) = jw_get_true_ground_state_at_particle_number(
+        sparse_operator=get_sparse_operator(close_model.fock_hamiltonian),
+        particle_number=n_electrons,
+    )
+    return close_ground_energy, close_ground_state
+
+
+def get_extrapolated_superposition(
+    model: FermiHubbardModel, n_electrons: list, coulomb: float
+):
+    eigenenergies, eigenstates = jw_eigenspectrum_at_particle_number(
+        sparse_operator=get_sparse_operator(
+            model.non_interacting_model.fock_hamiltonian
+        ),
+        particle_number=n_electrons,
+        expanded=True,
+    )
+    indices = [
+        ind
+        for ind in range(len(eigenenergies))
+        if np.isclose(eigenenergies[ind], eigenenergies[0])
+    ]
+    _, close_ground_state = get_close_ground_state(
+        model=model, n_electrons=n_electrons, coulomb=coulomb
+    )
+    coefficients = []
+    for ind in indices:
+        coefficients.append(np.vdot(eigenstates[:, ind], close_ground_state))
+    return eigenstates[:, indices] @ np.array(coefficients)

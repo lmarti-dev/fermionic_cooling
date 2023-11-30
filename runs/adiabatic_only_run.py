@@ -9,15 +9,19 @@ from data_manager import ExperimentDataManager
 
 from fauvqe.utilities import (
     jw_eigenspectrum_at_particle_number,
-    spin_dicke_state,
-    jw_get_true_ground_state_at_particle_number,
 )
-from utils import get_closest_noninteracting_degenerate_ground_state, get_min_gap
+from utils import (
+    get_closest_noninteracting_degenerate_ground_state,
+    get_min_gap,
+    extrapolate_ground_state_non_interacting_fermi_hubbard,
+    get_extrapolated_superposition,
+)
 
 from openfermion import get_sparse_operator, jw_hartree_fock_state
 import matplotlib.pyplot as plt
 
 from cirq import fidelity
+import numpy as np
 
 
 def __main__():
@@ -35,37 +39,36 @@ def __main__():
     model = FermiHubbardModel(x_dimension=2, y_dimension=2, tunneling=1, coulomb=2)
     n_electrons = [2, 2]
 
-    qubits = model.flattened_qubits
-    n_qubits = len(qubits)
-    hartree_fock = jw_hartree_fock_state(
-        n_orbitals=n_qubits, n_electrons=sum(n_electrons)
+    n_qubits = len(model.flattened_qubits)
+
+    extrapolated_ground_state = extrapolate_ground_state_non_interacting_fermi_hubbard(
+        model=model, n_electrons=n_electrons, n_points=5, deg=1
     )
 
-    slater_energy, slater_state = get_closest_noninteracting_degenerate_ground_state(
-        model=model, n_qubits=n_qubits, Nf=n_electrons
-    )
-
-    dicke_state = spin_dicke_state(
-        n_qubits=n_qubits, Nf=n_electrons, right_to_left=False
-    )
-
-    ground_energies, ground_states = jw_eigenspectrum_at_particle_number(
+    eigenenergies, eigenstates = jw_eigenspectrum_at_particle_number(
         sparse_operator=get_sparse_operator(model.fock_hamiltonian),
         particle_number=n_electrons,
         expanded=True,
     )
-    ground_state = ground_states[:, 0]
-    initial_state = slater_state
+
+    ground_state = eigenstates[:, 0]
+    initial_state = get_extrapolated_superposition(
+        model=model, n_electrons=n_electrons, coulomb=1e-6
+    )
     print(
         f"initial fidelity: {fidelity(initial_state,ground_state,qid_shape=(2,)*n_qubits)}"
     )
 
     ham_start = fermion_to_dense(model.non_interacting_model.fock_hamiltonian)
     ham_stop = fermion_to_dense(model.fock_hamiltonian)
-    n_steps = int(1e5)
-    total_time = 1 / (get_min_gap(ground_energies, threshold=1e-8) ** 2)
 
-    fidelities, instant_fidelities = run_sweep(
+    # total steps
+    n_steps = int(1e2)
+    # total time
+    total_time = 1 / (get_min_gap(eigenenergies, threshold=1e-12) ** 2)
+
+    print(f"Simulating for {total_time} time and {n_steps} steps")
+    fidelities, instant_fidelities, final_ground_state = run_sweep(
         initial_state=initial_state,
         ham_start=ham_start,
         ham_stop=ham_stop,
@@ -85,10 +88,8 @@ def __main__():
 
     fig, ax = plt.subplots()
 
-    ax.plot(range(len(fidelities)), fidelities, label="fid. to gs")
-    ax.plot(
-        range(len(instant_fidelities)), instant_fidelities, label="fid. to instant. gs"
-    )
+    ax.plot(range(len(fidelities)), fidelities, label="g.s.")
+    ax.plot(range(len(instant_fidelities)), instant_fidelities, label="instant. g.s.")
     ax.set_xlabel("Steps")
     ax.set_ylabel("Fidelity")
     ax.legend()
