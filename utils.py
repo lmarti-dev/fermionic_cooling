@@ -48,7 +48,11 @@ def get_closest_noninteracting_degenerate_ground_state(
     )
 
 
-def get_closest_degenerate_ground_state(ref_state, comp_energies, comp_states):
+def get_closest_degenerate_ground_state(
+    ref_state: np.ndarray,
+    comp_energies: np.ndarray,
+    comp_states: np.ndarray,
+):
     ix = np.argsort(comp_energies)
     comp_states = comp_states[:, ix]
     comp_energies = comp_energies[ix]
