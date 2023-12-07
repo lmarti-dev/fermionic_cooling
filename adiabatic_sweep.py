@@ -23,7 +23,7 @@ def ham_to_sparse(ham):
 
 def get_sweep_hamiltonian(
     ham_start: np.ndarray, ham_stop: np.ndarray, sparse: bool = False
-):
+) -> callable:
     if sparse:
         ham_start = ham_to_sparse(ham_start)
         ham_stop = ham_to_sparse(ham_stop)

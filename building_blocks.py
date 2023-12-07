@@ -23,6 +23,7 @@ def get_cheat_coupler_list(
 ):
     couplers = []
     env_up = np.outer(env_eig_states[:, 1], np.conjugate(env_eig_states[:, 0]))
+    # in case there are multiple ground states we can cool to (if I may say so)
     for gs_index in gs_indices:
         for k in range(1, sys_eig_states.shape[1]):
             # |sys_0Xsys_k| O |env_1Xenv_0|
@@ -77,9 +78,11 @@ def get_log_sweep(spectrum_width: np.ndarray, n_steps: int, n_rep: int = 1):
     )
 
 
-def get_cheat_sweep(spectrum: np.ndarray, n_steps: int = None):
+def get_cheat_sweep(spectrum: np.ndarray, n_steps: int = None, n_rep: int = None):
     res = []
     if n_steps is None:
+        n_rep = n_rep
+    elif n_rep is None:
         n_rep = 1
     else:
         n_rep = int(n_steps / (len(spectrum) - 1))

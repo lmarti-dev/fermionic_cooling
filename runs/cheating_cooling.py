@@ -77,6 +77,7 @@ def __main__(args):
     )
     # model stuff
     model = FermiHubbardModel(x_dimension=2, y_dimension=2, tunneling=1, coulomb=2)
+
     n_electrons = [2, 2]
     sys_qubits = model.flattened_qubits
     n_sys_qubits = len(sys_qubits)
@@ -152,13 +153,13 @@ def __main__(args):
 
     min_gap = sorted(np.abs(np.diff(sys_eig_energies)))[0]
 
-    n_steps = 50
+    n_steps = len(couplers)
     # sweep_values = get_log_sweep(spectrum_width, n_steps)
     sweep_values = get_cheat_sweep(sys_eig_energies, n_steps)
     # np.random.shuffle(sweep_values)
     # coupling strength value
     alphas = sweep_values / 100
-    evolution_times = 2.5 * np.pi / (alphas)
+    evolution_times = 2.5 * np.pi / np.abs(alphas)
     # evolution_time = 1e-3
 
     # call cool

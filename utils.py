@@ -151,7 +151,9 @@ def time_evolve_density_matrix(
     start = time.time()
     if method == "expm_multiply":
         # can be extremely slow
+        # Ur
         Ut_rho = expm_multiply(A=-1j * t * ham, B=rho)
+        # (U(Ur)*)*
         Ut_rho_Utd = dagger(expm_multiply(A=-1j * t * ham, B=dagger(Ut_rho)))
     elif method == "expm":
         Ut = expm(-1j * t * ham)
