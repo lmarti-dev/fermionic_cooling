@@ -1,35 +1,30 @@
-from adiabatic_sweep import (
-    run_sweep,
-    get_sweep_hamiltonian,
-    fermion_to_dense,
+import matplotlib.pyplot as plt
+import numpy as np
+from adiabatic_sweep import fermion_to_dense, get_sweep_hamiltonian, run_sweep
+from adiabaticCooler import AdiabaticCooler
+from building_blocks import (
+    control_function,
+    get_cheat_coupler_list,
+    get_cheat_sweep,
+    get_Z_env,
 )
-from fauvqe.models.fermiHubbardModel import FermiHubbardModel
+from cirq import PauliSum, Qid
+from coolerClass import Cooler
+from openfermion import get_sparse_operator, jordan_wigner, jw_hartree_fock_state
 from utils import (
     get_extrapolated_superposition,
+    get_min_gap,
     get_slater_spectrum,
     ketbra,
     trace_out_env,
-    get_min_gap,
 )
-from coolerClass import Cooler
-from adiabaticCooler import AdiabaticCooler
-import numpy as np
+
+from fauvqe.models.fermiHubbardModel import FermiHubbardModel
 from fauvqe.utilities import (
     jw_eigenspectrum_at_particle_number,
     jw_get_true_ground_state_at_particle_number,
     wrapping_slice,
 )
-
-import matplotlib.pyplot as plt
-from openfermion import get_sparse_operator, jw_hartree_fock_state, jordan_wigner
-
-from building_blocks import (
-    get_Z_env,
-    get_cheat_coupler_list,
-    control_function,
-    get_cheat_sweep,
-)
-from cirq import Qid, PauliSum
 
 # there are five cases
 # 1. sweep only (done)
@@ -273,7 +268,7 @@ def combined_run():
 
     spectrum_width = np.abs(np.max(sys_eig_energies) - np.min(sys_eig_energies))
     total_time = spectrum_width / (get_min_gap(sys_eig_energies, threshold=1e-12) ** 2)
-    n_steps = 10
+    n_steps = 100
 
     sys_ground_state = sys_eig_states[:, 0]
     env_qubits, env_ground_state, env_ham, env_eig_energies, env_eig_states = get_Z_env(
@@ -288,15 +283,14 @@ def combined_run():
     )
 
     # omegas = get_cheat_sweep(spectrum=slater_eig_energies, n_rep=2)
-    spectrum = slater_eig_energies
-    omegas = np.array(
-        (
-            get_min_gap(
-                spectrum,
-                threshold=1e-5,
-            ),
-        )
-        * n_steps
+    spectrum = sys_eig_energies
+    omegas = np.linspace(
+        1e-7,
+        get_min_gap(
+            spectrum,
+            threshold=1e-5,
+        ),
+        n_steps,
     )
 
     sys_hartree_fock = jw_hartree_fock_state(
@@ -319,12 +313,16 @@ def combined_run():
         ham_start=ham_start,
         ham_stop=ham_stop,
     )
-    weaken_coupling = 10
+    weaken_coupling = 100
 
     alphas = omegas / (weaken_coupling * len(adiabatic_cooler.sys_qubits))
     # evolution_times = 2.5 * np.pi / np.abs(alphas)
     evolution_times = (total_time / n_steps,) * n_steps
-
+    (
+        sweep_fidelities,
+        _,
+        _,
+    ) = adiabatic_cooler.adiabatic_sweep(total_time=total_time, n_steps=n_steps)
     (
         sys_fidelities,
         sys_energies,
@@ -339,12 +337,13 @@ def combined_run():
     fig, ax = plt.subplots()
     x = np.linspace(0, total_time, n_steps)
 
-    ax.plot(x, sys_fidelities, "r", label="Fidelity")
+    ax.plot(x, sweep_fidelities, "r", label="Sweep")
+    ax.plot(x, sys_fidelities, "b", label="Cool + sweep")
     # ax.plot(x, sys_energies, "b", label="Sys. energy")
     # ax.plot(x, env_energies, "b", label="Env. energy")
 
     ax.set_xlabel("Time")
-    ax.set_ylabel("[-]")
+    ax.set_ylabel("Fidelity")
     ax.legend()
     plt.show()
 

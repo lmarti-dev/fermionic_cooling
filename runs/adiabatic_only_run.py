@@ -2,6 +2,7 @@ from adiabatic_sweep import (
     run_sweep,
     get_sweep_hamiltonian,
     fermion_to_dense,
+    get_instantaneous_ground_states,
 )
 from fauvqe.models.fermiHubbardModel import FermiHubbardModel
 
@@ -51,12 +52,12 @@ def __main__():
         expanded=True,
     )
 
-    ground_state = eigenstates[:, 0]
-    initial_state = get_extrapolated_superposition(
+    final_ground_state = eigenstates[:, 0]
+    initial_ground_state = get_extrapolated_superposition(
         model=model, n_electrons=n_electrons, coulomb=1e-6
     )
     print(
-        f"initial fidelity: {fidelity(initial_state,ground_state,qid_shape=(2,)*n_qubits)}"
+        f"initial fidelity: {fidelity(initial_ground_state,final_ground_state,qid_shape=(2,)*n_qubits)}"
     )
 
     ham_start = fermion_to_dense(model.non_interacting_model.fock_hamiltonian)
@@ -67,12 +68,17 @@ def __main__():
     # total time
     total_time = 1 / (get_min_gap(eigenenergies, threshold=1e-12) ** 2)
 
+    instantaneous_ground_states = get_instantaneous_ground_states(
+        ham_start=ham_start, ham_stop=ham_stop, n_steps=n_steps, n_electrons=n_electrons
+    )
+
     print(f"Simulating for {total_time} time and {n_steps} steps")
     fidelities, instant_fidelities, final_ground_state = run_sweep(
-        initial_state=initial_state,
+        initial_state=initial_ground_state,
         ham_start=ham_start,
         ham_stop=ham_stop,
-        n_electrons=n_electrons,
+        final_ground_state=final_ground_state,
+        instantaneous_ground_states=instantaneous_ground_states,
         n_steps=n_steps,
         total_time=total_time,
     )

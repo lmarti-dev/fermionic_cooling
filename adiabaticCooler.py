@@ -4,8 +4,8 @@ from adiabatic_sweep import fermion_to_dense, get_sweep_hamiltonian, run_sweep
 from scipy.linalg import expm
 from scipy.sparse.linalg import expm_multiply
 
-from fermionic_cooling.coolerClass import Cooler
-from fermionic_cooling.utils import trace_out_env, time_evolve_density_matrix
+from coolerClass import Cooler
+from utils import trace_out_env, time_evolve_density_matrix
 
 
 def get_trotterized_sweep_cooling_unitaries(
@@ -47,6 +47,26 @@ class AdiabaticCooler(Cooler):
             + env_coupling * self.env_hamiltonian.matrix(qubits=self.total_qubits)
             + float(alpha) * coupler
         )
+
+    def adiabatic_sweep(
+        self,
+        total_time: float,
+        n_steps: int,
+        instantaneous_ground_states: np.ndarray = None,
+    ):
+        ham_start = self.ham_start.matrix(self.sys_qubits)
+        ham_stop = self.ham_stop.matrix(self.sys_qubits)
+        print(f"Simulating for {total_time} time and {n_steps} steps")
+        fidelities, instant_fidelities, final_ground_state = run_sweep(
+            initial_state=self.sys_initial_state,
+            ham_start=ham_start,
+            ham_stop=ham_stop,
+            final_ground_state=self.sys_ground_state,
+            instantaneous_ground_states=instantaneous_ground_states,
+            n_steps=n_steps,
+            total_time=total_time,
+        )
+        return fidelities, instant_fidelities, final_ground_state
 
     def adiabatic_cool(
         self,
@@ -91,7 +111,7 @@ class AdiabaticCooler(Cooler):
             env_energy = self.env_energy(total_density_matrix)
 
             print(
-                f"step: {step} time {sum(evolution_times[:step]):.3f}/{total_time:.3f} fid. {sys_fidelity:.3f} ene. {sys_energy:.3f}",
+                f"step: {step} time {sum(evolution_times[:step]):.3f}/{total_time:.3f} fid. {sys_fidelity:.3f} env. ene:{env_energy:.3f}",
                 end="\r",
             )
 
