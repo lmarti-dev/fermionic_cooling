@@ -604,7 +604,7 @@ class Cooler:
                 len_prev += len(fidelities[rep - 1])
             xticks = np.arange(len_prev, len_prev + len(fidelities[rep]))
             if xtick_is_time:
-                xticks *= weaken_coupling * np.pi * n_qubits
+                xticks = xticks / float(weaken_coupling * np.pi * n_qubits)
                 xticks = np.divide(xticks, omegas[rep])
             axes[0].plot(
                 xticks,

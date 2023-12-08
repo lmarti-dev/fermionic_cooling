@@ -32,7 +32,7 @@ from data_manager import ExperimentDataManager
 
 def __main__(args):
     # whether we want to skip all saving data
-    dry_run = False
+    dry_run = True
     edm = ExperimentDataManager(
         experiment_name="cooling_free_couplers",
         notes="using the noninteracting coupler",
@@ -167,7 +167,7 @@ def __main__(args):
 
     print(f"coupler dim: {cooler.sys_env_coupler_data_dims}")
 
-    ansatz_options = {"beta": 1, "mu": 5, "c": 100}
+    ansatz_options = {"beta": 1, "mu": 1000, "c": 100}
     weaken_coupling = 10
 
     start_omega = 1.01 * spectrum_width

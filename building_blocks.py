@@ -191,6 +191,7 @@ def control_function(
     mu: float = 10,
     c: float = 100,
     f: callable = None,
+    use_accelerate: bool = False,
 ):
     """Creates an ansatz for the derivative of omega, the strength of the environment. This is all control theory stuff, and I'm too dumb to get it
 
@@ -207,13 +208,13 @@ def control_function(
     """
     if f is None:
         f = lambda x: 1
-    if t_mean is not None:
-        accelerate = np.srqt(t_mean / t_fridge)
+    if t_mean is not None and use_accelerate:
+        accelerate = (t_mean / t_fridge) ** (0.5)
     else:
         accelerate = 1
-    return (
-        abs(beta * f(omega) / (np.exp(mu * (t_fridge / omega)) ** 2) + c) * accelerate
-    )
+
+    return 1e-3 * (-np.log10(t_fridge))
+    return abs(beta * f(omega) / (np.exp(mu * t_fridge / omega) + c)) * accelerate
 
     # return abs(beta * f(omega) * np.exp(-((t_fridge * c) ** mu)))
 
