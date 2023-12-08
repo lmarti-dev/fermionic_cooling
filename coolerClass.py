@@ -628,9 +628,8 @@ class Cooler:
                     omegas[rep], env_energies[rep], color="red", linewidth=2
                 )
         for ind, spectrum in enumerate(eigenspectrums):
-            transitions = get_transition_rates(spectrum)
             ax_bottom.vlines(
-                transitions,
+                spectrum,
                 ymin=0,
                 ymax=np.nanmax(y_values[np.isfinite(y_values)]),
                 linestyle="--",

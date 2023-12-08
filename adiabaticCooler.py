@@ -79,6 +79,15 @@ class AdiabaticCooler(Cooler):
         sys_fidelities = []
         sys_energies = []
         env_energies = []
+
+        sys_fidelity = self.sys_fidelity(self.sys_initial_state)
+        sys_energy = self.sys_energy(self.sys_initial_state)
+        env_energy = self.env_energy(total_density_matrix)
+
+        sys_fidelities.append(sys_fidelity)
+        sys_energies.append(sys_energy)
+        env_energies.append(env_energy)
+
         total_time = sum(evolution_times)
         self.sys_env_coupler_easy_setter(coupler_index=0, rep=None)
         print("cooling adiabatically")
@@ -111,7 +120,7 @@ class AdiabaticCooler(Cooler):
             env_energy = self.env_energy(total_density_matrix)
 
             print(
-                f"step: {step} time {sum(evolution_times[:step]):.3f}/{total_time:.3f} fid. {sys_fidelity:.3f} env. ene:{env_energy:.3f}",
+                f"step: {step} time {sum(evolution_times[:step]):.3f}/{total_time:.3f} fid. {sys_fidelity:.3f} env. ene:{env_energy/omega:.3f}",
                 end="\r",
             )
 

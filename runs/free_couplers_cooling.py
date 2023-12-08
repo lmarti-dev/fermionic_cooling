@@ -31,12 +31,9 @@ from data_manager import ExperimentDataManager
 
 
 def __main__(args):
-    data_folder = "C:/Users/Moi4/Desktop/current/FAU/phd/data"
-
     # whether we want to skip all saving data
-    dry_run = True
+    dry_run = False
     edm = ExperimentDataManager(
-        data_folder=data_folder,
         experiment_name="cooling_free_couplers",
         notes="using the noninteracting coupler",
         dry_run=dry_run,
@@ -44,7 +41,7 @@ def __main__(args):
     # model stuff
     model = FermiHubbardModel(x_dimension=2, y_dimension=2, tunneling=1, coulomb=2)
     n_qubits = len(model.flattened_qubits)
-    n_electrons = [2, 1]
+    n_electrons = [2, 2]
 
     free_sys_eig_energies, free_sys_eig_states = jw_eigenspectrum_at_particle_number(
         sparse_operator=get_sparse_operator(
@@ -170,7 +167,7 @@ def __main__(args):
 
     print(f"coupler dim: {cooler.sys_env_coupler_data_dims}")
 
-    ansatz_options = {"beta": 1, "mu": 2, "c": 100}
+    ansatz_options = {"beta": 1, "mu": 5, "c": 100}
     weaken_coupling = 10
 
     start_omega = 1.01 * spectrum_width
@@ -189,7 +186,7 @@ def __main__(args):
             ansatz_options=ansatz_options,
             n_rep=n_rep,
             weaken_coupling=weaken_coupling,
-            coupler_transitions=coupler_transitions,
+            coupler_transitions=None,
         )
 
         jobj = {
@@ -206,7 +203,7 @@ def __main__(args):
             weaken_coupling=weaken_coupling,
             n_qubits=n_qubits,
             eigenspectrums=[
-                sys_eig_energies,
+                sys_eig_energies - sys_eig_energies[0],
             ],
         )
         edm.save_figure(

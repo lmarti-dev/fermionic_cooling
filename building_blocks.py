@@ -208,13 +208,13 @@ def control_function(
     if f is None:
         f = lambda x: 1
     if t_mean is not None:
-        accelerate = np.abs(-np.log10(t_mean / t_fridge))
+        accelerate = np.srqt(t_mean / t_fridge)
     else:
         accelerate = 1
     return (
-        abs(beta * f(omega) / (np.exp(mu / np.log10(1e-20 + t_fridge) ** 2) + c))
-        * accelerate
+        abs(beta * f(omega) / (np.exp(mu * (t_fridge / omega)) ** 2) + c) * accelerate
     )
+
     # return abs(beta * f(omega) * np.exp(-((t_fridge * c) ** mu)))
 
 

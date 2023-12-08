@@ -1,6 +1,11 @@
 import matplotlib.pyplot as plt
 import numpy as np
-from adiabatic_sweep import fermion_to_dense, get_sweep_hamiltonian, run_sweep
+from adiabatic_sweep import (
+    fermion_to_dense,
+    get_sweep_hamiltonian,
+    run_sweep,
+    get_instantaneous_ground_states,
+)
 from adiabaticCooler import AdiabaticCooler
 from building_blocks import (
     control_function,
@@ -238,13 +243,19 @@ def sweep_then_cooling(
 
 
 def combined_run():
-    model = FermiHubbardModel(x_dimension=2, y_dimension=2, tunneling=1, coulomb=2)
+    tunneling = 1
+    coulomb = 2
+    model = FermiHubbardModel(
+        x_dimension=2, y_dimension=2, tunneling=tunneling, coulomb=coulomb
+    )
     close_model = FermiHubbardModel(
         x_dimension=2, y_dimension=2, tunneling=1, coulomb=1e-5
     )
 
     n_electrons = [2, 2]
     n_env_qubits = 1
+    n_steps = 100
+    weaken_coupling = 5
 
     sys_qubits = model.flattened_qubits
     n_sys_qubits = len(model.flattened_qubits)
@@ -267,15 +278,17 @@ def combined_run():
     )
 
     spectrum_width = np.abs(np.max(sys_eig_energies) - np.min(sys_eig_energies))
-    total_time = spectrum_width / (get_min_gap(sys_eig_energies, threshold=1e-12) ** 2)
-    n_steps = 100
+    total_time = (
+        5 * spectrum_width / (get_min_gap(sys_eig_energies, threshold=1e-12) ** 2)
+    )
 
     sys_ground_state = sys_eig_states[:, 0]
     env_qubits, env_ground_state, env_ham, env_eig_energies, env_eig_states = get_Z_env(
         n_qubits=n_env_qubits
     )
+
     couplers = get_cheat_coupler_list(
-        sys_eig_states=slater_eig_states[:, :2],
+        sys_eig_states=sys_eig_states[:, :2],
         env_eig_states=env_eig_states,
         qubits=sys_qubits + env_qubits,
         gs_indices=(0,),
@@ -284,20 +297,33 @@ def combined_run():
 
     # omegas = get_cheat_sweep(spectrum=slater_eig_energies, n_rep=2)
     spectrum = sys_eig_energies
-    omegas = np.linspace(
-        1e-7,
-        get_min_gap(
-            spectrum,
-            threshold=1e-5,
-        ),
-        n_steps,
-    )
 
+    omegas = np.zeros((n_steps,))
+    couplers = []
+    env_up = np.outer(env_eig_states[:, 1], np.conjugate(env_eig_states[:, 0]))
+    for ind, c in enumerate(np.linspace(0, coulomb, n_steps)):
+        m = FermiHubbardModel(
+            x_dimension=2, y_dimension=2, tunneling=tunneling, coulomb=c
+        )
+        m_eig_energies, m_eig_states = jw_eigenspectrum_at_particle_number(
+            sparse_operator=get_sparse_operator(m.fock_hamiltonian),
+            particle_number=n_electrons,
+            expanded=True,
+        )
+        omegas[ind] = np.abs(m_eig_energies[1] - m_eig_energies[0])
+        coupler = np.kron(
+            np.outer(m_eig_states[:, 0], np.conjugate(m_eig_states[:, 0])),
+            env_up,
+        )
+        coupler = coupler + np.conjugate(np.transpose(coupler))
+        couplers.append(coupler)
+    print(omegas)
     sys_hartree_fock = jw_hartree_fock_state(
         n_orbitals=n_sys_qubits, n_electrons=sum(n_electrons)
     )
 
-    sys_initial_state = ketbra(slater_eig_states[:, 2])
+    slater_superpos = np.sum(slater_eig_states[:, :4], axis=1)
+    sys_initial_state = ketbra(slater_superpos / np.linalg.norm(slater_superpos))
 
     adiabatic_cooler = AdiabaticCooler(
         sys_hamiltonian=model.non_interacting_model.hamiltonian,
@@ -313,7 +339,6 @@ def combined_run():
         ham_start=ham_start,
         ham_stop=ham_stop,
     )
-    weaken_coupling = 100
 
     alphas = omegas / (weaken_coupling * len(adiabatic_cooler.sys_qubits))
     # evolution_times = 2.5 * np.pi / np.abs(alphas)
@@ -335,7 +360,7 @@ def combined_run():
     )
 
     fig, ax = plt.subplots()
-    x = np.linspace(0, total_time, n_steps)
+    x = np.linspace(0, total_time, n_steps + 1)
 
     ax.plot(x, sweep_fidelities, "r", label="Sweep")
     ax.plot(x, sys_fidelities, "b", label="Cool + sweep")
