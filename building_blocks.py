@@ -213,8 +213,11 @@ def control_function(
     else:
         accelerate = 1
 
-    return 1e-3 * (-np.log10(t_fridge))
-    return abs(beta * f(omega) / (np.exp(mu * t_fridge / omega) + c)) * accelerate
+    # return 1e-3 * (-np.log10(t_fridge))
+    return (
+        abs(beta * f(omega) / (np.exp(mu / (1 - np.log10(t_fridge / omega))) + c))
+        * accelerate
+    )
 
     # return abs(beta * f(omega) * np.exp(-((t_fridge * c) ** mu)))
 

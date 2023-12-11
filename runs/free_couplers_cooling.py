@@ -32,7 +32,7 @@ from data_manager import ExperimentDataManager
 
 def __main__(args):
     # whether we want to skip all saving data
-    dry_run = True
+    dry_run = False
     edm = ExperimentDataManager(
         experiment_name="cooling_free_couplers",
         notes="using the noninteracting coupler",
@@ -62,7 +62,11 @@ def __main__(args):
     sys_dicke = spin_dicke_state(
         n_qubits=n_sys_qubits, Nf=n_electrons, right_to_left=False
     )
+    sys_mixed_state = np.ones(2**n_sys_qubits) / (2 ** (n_sys_qubits / 2))
+
+    # initial state setting
     sys_initial_state = ketbra(sys_hartree_fock)
+
     sys_eig_energies, sys_eig_states = jw_eigenspectrum_at_particle_number(
         sparse_operator=get_sparse_operator(
             model.fock_hamiltonian,
@@ -138,7 +142,7 @@ def __main__(args):
     # get environment ham sweep values
     spectrum_width = max(sys_eig_energies) - min(sys_eig_energies)
 
-    min_gap = get_min_gap(free_sys_eig_energies, threshold=1e-3)
+    min_gap = get_min_gap(free_sys_eig_energies, threshold=1e-6)
 
     n_steps = len(couplers)
     # sweep_values = get_log_sweep(spectrum_width, n_steps)
@@ -167,12 +171,12 @@ def __main__(args):
 
     print(f"coupler dim: {cooler.sys_env_coupler_data_dims}")
 
-    ansatz_options = {"beta": 1, "mu": 1000, "c": 100}
-    weaken_coupling = 10
+    ansatz_options = {"beta": 1, "mu": 30, "c": 2}
+    weaken_coupling = 100
 
     start_omega = 1.01 * spectrum_width
 
-    stop_omega = 0.5 * min_gap
+    stop_omega = 0.2 * min_gap
 
     method = "bigbrain"
 
@@ -186,7 +190,7 @@ def __main__(args):
             ansatz_options=ansatz_options,
             n_rep=n_rep,
             weaken_coupling=weaken_coupling,
-            coupler_transitions=None,
+            coupler_transitions=coupler_transitions,
         )
 
         jobj = {

@@ -600,12 +600,18 @@ class Cooler:
         for rep in range(len(env_energies)):
             if rep == 0:
                 len_prev = 0
+                sum_omega = 0
             else:
                 len_prev += len(fidelities[rep - 1])
-            xticks = np.arange(len_prev, len_prev + len(fidelities[rep]))
+                sum_omega += sum(omegas[rep - 1])
+
             if xtick_is_time:
-                xticks = xticks / float(weaken_coupling * np.pi * n_qubits)
-                xticks = np.divide(xticks, omegas[rep])
+                xticks = np.divide(
+                    weaken_coupling * np.pi * n_qubits, omegas[rep] + sum_omega
+                )
+            else:
+                xticks = np.arange(len_prev, len_prev + len(fidelities[rep]))
+
             axes[0].plot(
                 xticks,
                 fidelities[rep],
