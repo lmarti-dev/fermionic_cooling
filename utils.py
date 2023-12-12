@@ -72,8 +72,8 @@ def get_closest_degenerate_ground_state(
         return comp_ground_energy, comp_states[:, 0], 0
 
 
-def get_min_gap(l: list, threshold: float = 0):
-    unique_vals = sorted(set(l))
+def get_min_gap(_list: list, threshold: float = 0):
+    unique_vals = sorted(set(_list))
     diff = np.array(list(set(np.abs(np.diff(unique_vals)))))
     min_gap = np.min(diff[diff > threshold])
     return min_gap
@@ -145,7 +145,11 @@ def time_evolve_state(ham: np.ndarray, ket: np.ndarray, t: float):
 
 
 def time_evolve_density_matrix(
-    ham: np.ndarray, rho: np.ndarray, t: float, method: str = "expm_multiply"
+    ham: np.ndarray,
+    rho: np.ndarray,
+    t: float,
+    method: str = "expm_multiply",
+    verbose: bool = False,
 ):
     # print("timing...")
     start = time.time()
@@ -159,7 +163,8 @@ def time_evolve_density_matrix(
         Ut = expm(-1j * t * ham)
         Ut_rho_Utd = Ut @ rho @ Ut.transpose().conjugate()
     end = time.time()
-    # print("time evolution took: {} sec".format(end - start))
+    if verbose:
+        print("time evolution took: {} sec".format(end - start))
     if not cirq.is_hermitian(Ut_rho_Utd):
         raise ValueError("time-evolved density matrix is not hermitian")
     return Ut_rho_Utd
@@ -170,20 +175,20 @@ def get_ground_state(ham: cirq.PauliSum, qubits: Iterable[cirq.Qid]) -> np.ndarr
     return ground_state
 
 
-def get_list_depth(l, depth=0):
-    if isinstance(l, (list, tuple)):
-        return get_list_depth(l[0], depth=depth + 1)
+def get_list_depth(_list, depth=0):
+    if isinstance(_list, (list, tuple)):
+        return get_list_depth(_list[0], depth=depth + 1)
     return depth
 
 
-def depth_indexing(l, indices: Iterator):
+def depth_indexing(_list, indices: Iterator):
     # get l[a][b][c][d] until indices or list depth is exhausted
     ind = next(indices, None)
-    if isinstance(l, (list, tuple)):
+    if isinstance(_list, (list, tuple)):
         if ind is None:
             raise ValueError("Indices shorter than list depth")
-        return depth_indexing(l[ind], indices)
-    return l
+        return depth_indexing(_list[ind], indices)
+    return _list
 
 
 def two_tensors_partial_trace(rho: np.ndarray, n1: int, n2: int):

@@ -207,7 +207,7 @@ def control_function(
         float: absolute value of the gradient ansatz
     """
     if f is None:
-        f = lambda x: 1
+        f = 1
     if t_mean is not None and use_accelerate:
         accelerate = (t_mean / t_fridge) ** (0.5)
     else:

@@ -1,7 +1,7 @@
 import sys
 
 # tsk tsk
-sys.path.append("/home/Refik/Data/My_files/Dropbox/PhD/repos/fauvqe/")
+# sys.path.append("/home/Refik/Data/My_files/Dropbox/PhD/repos/fauvqe/")
 
 from fauvqe.models.fermiHubbardModel import FermiHubbardModel
 
@@ -66,13 +66,10 @@ def probe_times(
 
 
 def __main__(args):
-    data_folder = "C:/Users/Moi4/Desktop/current/FAU/phd/code/vqe/data"
-
     # whether we want to skip all saving data
-    dry_run = False
+    dry_run = True
     edm = ExperimentDataManager(
-        data_folder=data_folder,
-        experiment_name="cooling_cheat_both_gs",
+        experiment_name="cooling_cheat_measure_temp",
         dry_run=dry_run,
     )
     # model stuff
@@ -179,7 +176,7 @@ def __main__(args):
 
     # probe_times(edm, cooler, alphas, sweep_values)
 
-    fidelities, energies, final_sys_density_matrix = cooler.zip_cool(
+    fidelities, sys_energies, env_energies, final_sys_density_matrix = cooler.zip_cool(
         alphas=alphas,
         evolution_times=evolution_times,
         sweep_values=sweep_values,
@@ -187,24 +184,33 @@ def __main__(args):
 
     jobj = {
         "fidelities": fidelities,
-        "energies": energies,
+        "sys_energies": sys_energies,
+        "env_energies": env_energies,
         # "final_sys_density_matrix": final_sys_density_matrix,
     }
     edm.save_dict_to_experiment(jobj=jobj)
 
     print("Final Fidelity: {}".format(fidelities[-1]))
 
-    fids = state_fidelity_to_eigenstates(final_sys_density_matrix, sys_eig_states)
+    fids_initl = state_fidelity_to_eigenstates(sys_initial_state, sys_eig_states)
+    fids_final = state_fidelity_to_eigenstates(final_sys_density_matrix, sys_eig_states)
 
-    for ind, (fid, energy) in enumerate(zip(fids, sys_eig_energies)):
-        print(f"<final state|E_{ind}>**2: {np.abs(fid):.5f} energy: {energy:.3f}")
+    for ind, (fid_init, fid_final, energy) in enumerate(
+        zip(fids_initl, fids_final, sys_eig_energies)
+    ):
+        print(
+            f"<psi|E_{ind}>**2: {np.abs(fid_init):.5f} {np.abs(fid_final):.5f} energy: {energy:.3f}"
+        )
 
-    print(f"sum of fidelities: {sum(fids)}")
+    print(f"sum of final. fidelities: {sum(fids_final)}")
+    print(f"sum of env_energies: {np.sum(env_energies)}")
 
     fig = cooler.plot_generic_cooling(
-        energies,
         fidelities,
-        {"eigenspectrum": sys_eig_energies, "omegas": sweep_values},
+        {
+            "sys. \n energies": sys_energies,
+            "env. \n energies norm.": np.divide(env_energies, sweep_values),
+        },
         suptitle="Cooling 2$\\times$2 Fermi-Hubbard",
     )
     edm.save_figure(

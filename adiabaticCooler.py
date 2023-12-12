@@ -1,9 +1,7 @@
 import cirq
 import numpy as np
-from adiabatic_sweep import fermion_to_dense, get_sweep_hamiltonian, run_sweep
+from adiabatic_sweep import get_sweep_hamiltonian, run_sweep
 from scipy.linalg import expm
-from scipy.sparse.linalg import expm_multiply
-
 from coolerClass import Cooler
 from utils import trace_out_env, time_evolve_density_matrix
 

@@ -25,26 +25,16 @@ import matplotlib.pyplot as plt
 import numpy as np
 from utils import (
     expectation_wrapper,
-    get_transition_rates,
-    has_increased,
     is_density_matrix,
     ketbra,
     time_evolve_density_matrix,
     trace_out_env,
     depth_indexing,
     get_list_depth,
-    coupler_fidelity_to_ground_state_projectors,
 )
 from building_blocks import control_function
-from tqdm import tqdm
 
-from fauvqe.utilities import (
-    ket_in_subspace,
-    flatten,
-    jw_eigenspectrum_at_particle_number,
-)
-
-from openfermion import get_sparse_operator
+from fauvqe.utilities import ket_in_subspace
 
 
 class Cooler:
@@ -148,7 +138,7 @@ class Cooler:
         # if no index given pick the first element
         if indices is None:
             indices = (0,) * self.sys_env_coupler_data_dims
-        return depth_indexing(l=self.sys_env_coupler_data, indices=iter(indices))
+        return depth_indexing(_list=self.sys_env_coupler_data, indices=iter(indices))
 
     def zip_cool(
         self,
@@ -164,10 +154,12 @@ class Cooler:
         total_density_matrix = initial_density_matrix
 
         fidelities = []
-        energies = []
+        sys_energies = []
+        env_energies = []
 
         sys_fidelity = self.sys_fidelity(self.sys_initial_state)
         sys_energy = self.sys_energy(self.sys_initial_state)
+        env_energy = self.env_energy(self.total_initial_state)
 
         self.update_message(
             "fidgs",
@@ -178,20 +170,27 @@ class Cooler:
         )
 
         fidelities.append(sys_fidelity)
-        energies.append(sys_energy)
+        sys_energies.append(sys_energy)
+        env_energies.append(env_energy)
         for rep in range(n_rep):
             self.update_message("repn", f"rep: {rep}")
             for step, env_coupling in enumerate(sweep_values):
                 # set one coupler for one gap
                 self.sys_env_coupler_easy_setter(coupler_index=step, rep=None)
-                sys_fidelity, sys_energy, _, total_density_matrix = self.cooling_step(
+                (
+                    sys_fidelity,
+                    sys_energy,
+                    env_energy,
+                    total_density_matrix,
+                ) = self.cooling_step(
                     total_density_matrix=total_density_matrix,
                     env_coupling=env_coupling,
                     alpha=alphas[step],
                     evolution_time=evolution_times[step],
                 )
                 fidelities.append(sys_fidelity)
-                energies.append(sys_energy)
+                sys_energies.append(sys_energy)
+                env_energies.append(env_energy)
                 self.update_message(
                     "fidgs",
                     "fidelity to gs: {:.4f}, energy diff of traced out rho: {:.4f}".format(
@@ -211,14 +210,19 @@ class Cooler:
                         n_sys_qubits=len(self.sys_qubits),
                         n_env_qubits=len(self.env_qubits),
                     )
-                    return fidelities, energies, final_sys_density_matrix
+                    return (
+                        fidelities,
+                        sys_energies,
+                        env_energies,
+                        final_sys_density_matrix,
+                    )
 
         final_sys_density_matrix = trace_out_env(
             rho=total_density_matrix,
             n_sys_qubits=len(self.sys_qubits),
             n_env_qubits=len(self.env_qubits),
         )
-        return fidelities, energies, final_sys_density_matrix
+        return fidelities, sys_energies, env_energies, final_sys_density_matrix
 
     def cool(
         self,
@@ -673,33 +677,38 @@ class Cooler:
 
     def plot_generic_cooling(
         self,
-        sys_energies: list,
         fidelities: list,
         supplementary_data: dict = {},
         suptitle: str = None,
     ):
-        nrows = 2 + len(supplementary_data)
+        plt.rcParams.update(
+            {
+                "font.family": r"serif",  # use serif/main font for text elements
+                "text.usetex": True,  # use inline math for ticks
+                "pgf.rcfonts": False,  # don't setup fonts from rc parameters
+                "pgf.preamble": "\n".join(
+                    [
+                        r"\usepackage{url}",  # load additional packages
+                        r"\usepackage{lmodern}",  # unicode math setup
+                    ]
+                ),
+                "figure.figsize": (5, 3),
+            }
+        )
+        nrows = 1 + len(supplementary_data)
         fig, axes = plt.subplots(nrows=nrows, figsize=(5, 3))
 
         axes[0].plot(range(len(fidelities)), fidelities, "kx--", linewidth=2)
         axes[0].set_ylabel(r"$|\langle \psi_{cool} | \psi_{gs} \rangle|^2$")
         axes[0].set_xlabel(r"$Steps$")
-        axes[1].plot(
-            range(len(sys_energies)),
-            (np.array(sys_energies) - self.sys_ground_energy)
-            / np.abs(self.sys_ground_energy),
-            color="k",
-            linewidth=2,
-        )
-        axes[1].set_ylabel(r"$\frac{E_{cool}-E_0}{|E_0|}$")
         for ind, k in enumerate(supplementary_data.keys()):
-            axes[ind + 2].plot(
+            axes[ind + 1].plot(
                 range(len(supplementary_data[k])),
                 supplementary_data[k],
                 color="k",
-                linewidth=2,
+                linewidth=1.66,
             )
-            axes[ind + 2].set_ylabel(k)
+            axes[ind + 1].set_ylabel(k)
 
         if suptitle:
             fig.suptitle(suptitle)
