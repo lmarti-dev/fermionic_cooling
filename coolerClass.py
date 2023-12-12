@@ -607,7 +607,8 @@ class Cooler:
 
             if xtick_is_time:
                 xticks = np.divide(
-                    weaken_coupling * np.pi * n_qubits, omegas[rep] + sum_omega
+                    weaken_coupling * np.pi * n_qubits,
+                    np.array(omegas[rep]) + float(sum_omega),
                 )
             else:
                 xticks = np.arange(len_prev, len_prev + len(fidelities[rep]))

@@ -190,7 +190,7 @@ def __main__(args):
             ansatz_options=ansatz_options,
             n_rep=n_rep,
             weaken_coupling=weaken_coupling,
-            coupler_transitions=coupler_transitions,
+            coupler_transitions=None,
         )
 
         jobj = {
