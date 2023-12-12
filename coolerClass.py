@@ -610,8 +610,10 @@ class Cooler:
                     weaken_coupling * np.pi * n_qubits,
                     np.array(omegas[rep]) + float(sum_omega),
                 )
+                xlabel_up = "Time"
             else:
                 xticks = np.arange(len_prev, len_prev + len(fidelities[rep]))
+                xlabel_up = "Steps"
 
             axes[0].plot(
                 xticks,
@@ -644,7 +646,7 @@ class Cooler:
                 linewidth=1,
             )
         axes[0].set_ylabel(r"$|\langle \psi_{cool} | \psi_{gs} \rangle|^2$", labelpad=0)
-        axes[0].set_xlabel("step")
+        axes[0].set_xlabel(xlabel_up)
 
         ax_bottom.set_ylabel(r"$(\frac{\mathrm{d}}{\mathrm{ds}}\omega)^{-2}$")
         ax_bottom.tick_params(axis="y")  # , labelcolor="blue")
