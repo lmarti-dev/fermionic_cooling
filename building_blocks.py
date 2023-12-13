@@ -13,6 +13,16 @@ from openfermion import get_sparse_operator
 # depending on the environment energy
 
 
+def get_cheat_thermalizers(
+    sys_thermal_state: np.ndarray,
+    sys_eig_states,
+    env_thermal_state: np.ndarray,
+    env_eig_states,
+    qubits: list[cirq.Qid] = None,
+):
+    pass
+
+
 def get_cheat_coupler_list(
     sys_eig_states,
     env_eig_states,

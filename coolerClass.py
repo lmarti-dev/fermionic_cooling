@@ -678,6 +678,8 @@ class Cooler:
     def plot_generic_cooling(
         self,
         fidelities: list,
+        initial_pops: list,
+        env_energies: list,
         supplementary_data: dict = {},
         suptitle: str = None,
     ):
@@ -695,20 +697,29 @@ class Cooler:
                 "figure.figsize": (5, 3),
             }
         )
-        nrows = 1 + len(supplementary_data)
+        nrows = 2 + len(supplementary_data)
         fig, axes = plt.subplots(nrows=nrows, figsize=(5, 3))
 
         axes[0].plot(range(len(fidelities)), fidelities, "kx--", linewidth=2)
         axes[0].set_ylabel(r"$|\langle \psi_{cool} | \psi_{gs} \rangle|^2$")
         axes[0].set_xlabel(r"$Steps$")
-        for ind, k in enumerate(supplementary_data.keys()):
-            axes[ind + 1].plot(
-                range(len(supplementary_data[k])),
-                supplementary_data[k],
-                color="k",
-                linewidth=1.66,
-            )
-            axes[ind + 1].set_ylabel(k)
+        axes[1].plot(
+            range(len(initial_pops)),
+            list(reversed(initial_pops)),
+            "r",
+            label="initial pops",
+        )
+        axes[1].plot(range(len(env_energies)), env_energies, "b", label="env. energy")
+        axes[1].legend()
+        if supplementary_data:
+            for ind, k in enumerate(supplementary_data.keys()):
+                axes[ind + 2].plot(
+                    range(len(supplementary_data[k])),
+                    supplementary_data[k],
+                    color="k",
+                    linewidth=1.66,
+                )
+                axes[ind + 1].set_ylabel(k)
 
         if suptitle:
             fig.suptitle(suptitle)

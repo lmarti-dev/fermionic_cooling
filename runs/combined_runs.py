@@ -364,8 +364,6 @@ def combined_run():
 
     ax.plot(x, sweep_fidelities, "r", label="Sweep")
     ax.plot(x, sys_fidelities, "b", label="Cool + sweep")
-    # ax.plot(x, sys_energies, "b", label="Sys. energy")
-    # ax.plot(x, env_energies, "b", label="Env. energy")
 
     ax.set_xlabel("Time")
     ax.set_ylabel("Fidelity")

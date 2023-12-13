@@ -1,68 +1,25 @@
 import sys
 
-# tsk tsk
-# sys.path.append("/home/Refik/Data/My_files/Dropbox/PhD/repos/fauvqe/")
-
-from fauvqe.models.fermiHubbardModel import FermiHubbardModel
-
-from coolerClass import Cooler
-
+import matplotlib.pyplot as plt
+import numpy as np
 from building_blocks import (
-    get_cheat_sweep,
     get_cheat_coupler,
-    get_Z_env,
     get_cheat_coupler_list,
+    get_cheat_sweep,
+    get_Z_env,
 )
-
+from thermalizer import Thermalizer
+from openfermion import get_sparse_operator, jw_hartree_fock_state
 from utils import (
-    expectation_wrapper,
     ketbra,
     state_fidelity_to_eigenstates,
 )
-from fauvqe.utilities import jw_eigenspectrum_at_particle_number, spin_dicke_state
-import cirq
-from openfermion import get_sparse_operator, jw_hartree_fock_state
-import numpy as np
-import matplotlib.pyplot as plt
-
 
 from data_manager import ExperimentDataManager
-from scipy.ndimage.filters import gaussian_filter1d
+from fauvqe.models.fermiHubbardModel import FermiHubbardModel
+from fauvqe.utilities import jw_eigenspectrum_at_particle_number, spin_dicke_state
 
-
-def probe_times(
-    edm: ExperimentDataManager,
-    cooler: Cooler,
-    alphas: np.ndarray,
-    sweep_values: np.ndarray,
-):
-    (
-        fidelities,
-        energies,
-        final_sys_density_matrix,
-        env_energy_dynamics,
-    ) = cooler.probe_evolution_times(
-        alphas=alphas,
-        sweep_values=sweep_values,
-        N_slices=50,
-    )
-    fig, ax = plt.subplots(figsize=(5, 3))
-    for ind, tup in enumerate(env_energy_dynamics):
-        time = np.array(tup[0]) * (alphas[ind] / np.pi)
-        env_energy = np.array(tup[1]) / sweep_values[ind]
-        ysmoothed = gaussian_filter1d(env_energy, sigma=2)
-        ax.plot(time, ysmoothed, label=f"$\Delta E:{sweep_values[ind]:.3f}$")
-    # ax.legend()
-    ax.set_xlabel("time")
-    ax.set_ylabel("env_energy")
-    jobj = {
-        "fidelities": fidelities,
-        "energies": energies,
-        "env_energy_dynamics": env_energy_dynamics,
-    }
-    edm.save_dict_to_experiment(jobj=jobj)
-    edm.save_figure(fig)
-    plt.show()
+from scipy.linalg import expm
 
 
 def __main__(args):
@@ -96,23 +53,6 @@ def __main__(args):
     sys_ground_state = sys_eig_states[:, np.argmin(sys_eig_energies)]
     sys_ground_energy = np.min(sys_eig_energies)
 
-    sys_initial_energy = expectation_wrapper(
-        model.hamiltonian, sys_initial_state, model.flattened_qubits
-    )
-    sys_ground_energy_exp = expectation_wrapper(
-        model.hamiltonian, sys_ground_state, model.flattened_qubits
-    )
-
-    fidelity = cirq.fidelity(
-        sys_initial_state,
-        sys_ground_state,
-        qid_shape=(2,) * (len(model.flattened_qubits)),
-    )
-    print("initial fidelity: {}".format(fidelity))
-    print("ground energy from spectrum: {}".format(sys_ground_energy))
-    print("ground energy from model: {}".format(sys_ground_energy_exp))
-    print("initial energy from model: {}".format(sys_initial_energy))
-
     n_env_qubits = 1
     env_qubits, env_ground_state, env_ham, env_eig_energies, env_eig_states = get_Z_env(
         n_qubits=n_env_qubits
@@ -126,42 +66,41 @@ def __main__(args):
         env_eigenergies=env_eig_energies,
         model=model.to_json_dict()["constructor_params"],
     )
-    # coupler
-    # coupler = cirq.Y(sys_qubits[0]) * cirq.Y(env_qubits[0])  # Interaction only on Qubit 0?
-    # coupler = get_cheat_coupler(
-    #     sys_eig_states=sys_eig_states,
-    #     env_eig_states=env_eig_states,
-    #     qubits=sys_qubits + env_qubits,
-    #     gs_indices=(0,),
-    # )  # Interaction only on Qubit 0?
+
+    beta = 10
+
+    thermal_env_density = expm(-beta * env_ham.matrix(qubits=env_qubits))
+    thermal_env_density /= np.trace(thermal_env_density)
+    thermal_sys_density = expm(-beta * model.hamiltonian.matrix(qubits=sys_qubits))
+    thermal_sys_density /= np.trace(thermal_sys_density)
+
     couplers = get_cheat_coupler_list(
         sys_eig_states=sys_eig_states,
         env_eig_states=env_eig_states,
         qubits=sys_qubits + env_qubits,
         gs_indices=(0,),
     )  # Interaction only on Qubit 0?
+
+    couplers = [np.kron(thermal_sys_density, thermal_env_density)]
+
     print("coupler done")
 
     print(f"number of couplers: {len(couplers)}")
-    # coupler = get_cheat_coupler(sys_eigenstates, env_eigenstates)
-
-    # get environment ham sweep values
     spectrum_width = max(sys_eig_energies) - min(sys_eig_energies)
 
     min_gap = sorted(np.abs(np.diff(sys_eig_energies)))[0]
 
     n_steps = len(couplers)
-    # sweep_values = get_log_sweep(spectrum_width, n_steps)
     sweep_values = get_cheat_sweep(sys_eig_energies, n_steps)
-    # np.random.shuffle(sweep_values)
-    # coupling strength value
+
     alphas = sweep_values / 100
     evolution_times = 2.5 * np.pi / np.abs(alphas)
     # evolution_time = 1e-3
 
     # call cool
 
-    cooler = Cooler(
+    thermalizer = Thermalizer(
+        beta=beta,
         sys_hamiltonian=model.hamiltonian,
         n_electrons=n_electrons,
         sys_qubits=model.flattened_qubits,
@@ -176,7 +115,12 @@ def __main__(args):
 
     # probe_times(edm, cooler, alphas, sweep_values)
 
-    fidelities, sys_energies, env_energies, final_sys_density_matrix = cooler.zip_cool(
+    (
+        fidelities,
+        sys_energies,
+        env_energies,
+        final_sys_density_matrix,
+    ) = thermalizer.zip_cool(
         alphas=alphas,
         evolution_times=evolution_times,
         sweep_values=sweep_values,
@@ -205,7 +149,7 @@ def __main__(args):
     print(f"sum of final. fidelities: {sum(fids_final)}")
     print(f"sum of env_energies: {np.sum(env_energies)}")
 
-    fig = cooler.plot_generic_cooling(
+    fig = thermalizer.plot_generic_cooling(
         fidelities,
         initial_pops=fids_initl,
         env_energies=env_energies,

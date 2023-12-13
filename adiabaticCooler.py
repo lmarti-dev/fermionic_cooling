@@ -21,6 +21,7 @@ class AdiabaticCooler(Cooler):
         self,
         ham_start: cirq.PauliSum,
         ham_stop: cirq.PauliSum,
+        *args,
         **kwargs,
     ):
         self.ham_start = ham_start
@@ -29,7 +30,7 @@ class AdiabaticCooler(Cooler):
             ham_start=ham_start, ham_stop=ham_stop
         )
 
-        super().__init__(**kwargs)
+        super().__init__(*args, **kwargs)
 
     def set_sys_sweep_hamiltonian(self, step: int):
         self.sys_hamiltonian = self.sweep_hamiltonian(step)
