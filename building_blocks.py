@@ -117,7 +117,7 @@ def get_Z_env(n_qubits):
     # environment stuff
     env_qubits = cirq.LineQubit.range(n_qubits)
     n_env_qubits = len(env_qubits)
-    env_ham = -sum((cirq.Z(q) for q in env_qubits)) / 2 + n_env_qubits / 2
+    env_ham = -sum((cirq.Z(q) for q in env_qubits)) / (2 * n_env_qubits) + 1 / 2
     env_ground_state = np.zeros((2**n_env_qubits))
     env_ground_state[0] = 1
     env_matrix = env_ham.matrix(qubits=env_qubits)
