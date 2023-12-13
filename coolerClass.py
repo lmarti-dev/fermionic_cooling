@@ -559,8 +559,9 @@ class Cooler:
             # add depol noise
             spin_conserving = True
             if spin_conserving is True:
-                Nf = [2, 2]
-                rho_err = spin_dicke_mixed_state(n_qubits=len(self.sys_qubits), Nf=Nf)
+                rho_err = spin_dicke_mixed_state(
+                    n_qubits=len(self.sys_qubits), Nf=self.n_electrons
+                )
             else:
                 rho_err = np.eye(len(traced_density_matrix))
 
