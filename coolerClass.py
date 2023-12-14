@@ -34,7 +34,14 @@ from utils import (
 )
 from building_blocks import control_function
 
-from fauvqe.utilities import ket_in_subspace
+from fauvqe.utilities import (
+    ket_in_subspace,
+    flatten,
+    jw_eigenspectrum_at_particle_number,
+    spin_dicke_mixed_state,
+)
+
+from openfermion import get_sparse_operator
 
 
 class Cooler:
@@ -523,6 +530,7 @@ class Cooler:
         alpha: float,
         env_coupling: float,
         evolution_time: float,
+        depol_noise: float = 1e-5,
     ):
         cooling_hamiltonian = self.cooling_hamiltonian(env_coupling, alpha)
 
@@ -547,6 +555,19 @@ class Cooler:
             n_sys_qubits=len(self.sys_qubits),
             n_env_qubits=len(self.env_qubits),
         )
+        if depol_noise is not None:
+            # add depol noise
+            spin_conserving = True
+            if spin_conserving is True:
+                rho_err = spin_dicke_mixed_state(
+                    n_qubits=len(self.sys_qubits), Nf=self.n_electrons
+                )
+            else:
+                rho_err = np.eye(len(traced_density_matrix))
+
+            traced_density_matrix = (
+                1 - depol_noise
+            ) * traced_density_matrix + depol_noise * rho_err
 
         # renormalizing to avoid errors
         traced_density_matrix /= np.trace(traced_density_matrix)
