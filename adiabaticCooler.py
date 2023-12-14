@@ -53,6 +53,8 @@ class AdiabaticCooler(Cooler):
         n_steps: int,
         instantaneous_ground_states: np.ndarray = None,
     ):
+        # TODO: either get rid of inst gs, or compute them directly
+        # current solution is ugly
         ham_start = self.ham_start.matrix(self.sys_qubits)
         ham_stop = self.ham_stop.matrix(self.sys_qubits)
         print(f"Simulating for {total_time} time and {n_steps} steps")

@@ -1,25 +1,28 @@
 from coolerClass import Cooler
 import numpy as np
-from utils import time_evolve_density_matrix, trace_out_env
-from scipy.linalg import expm
+from utils import (
+    time_evolve_density_matrix,
+    trace_out_env,
+)
 from cirq import fidelity
 
 
 class Thermalizer(Cooler):
-    def __init__(self, beta: float, *args, **kwargs):
+    def __init__(
+        self,
+        beta: float,
+        thermal_env_density: np.ndarray,
+        thermal_sys_density: np.ndarray,
+        *args,
+        **kwargs
+    ):
         self.beta = beta
 
         super().__init__(*args, **kwargs)
 
         # set thermal states
-        self.thermal_env_density = expm(
-            -self.beta * self.env_hamiltonian.matrix(qubits=self.env_qubits)
-        )
-        self.thermal_env_density /= np.trace(self.thermal_env_density)
-        self.thermal_sys_density = expm(
-            -self.beta * self.sys_hamiltonian.matrix(qubits=self.sys_qubits)
-        )
-        self.thermal_sys_density /= np.trace(self.thermal_sys_density)
+        self.thermal_env_density = thermal_env_density
+        self.thermal_sys_density = thermal_sys_density
 
     def sys_fidelity(self, state: np.ndarray):
         return fidelity(

@@ -9,6 +9,7 @@ import numpy as np
 
 from openfermion import FermionOperator, get_sparse_operator, jw_hartree_fock_state
 from scipy.sparse.linalg import eigsh, expm, expm_multiply
+from scipy.sparse import csc_matrix
 
 from fauvqe.utilities import (
     flatten,
@@ -460,3 +461,32 @@ def get_extrapolated_superposition(
     for ind in indices:
         coefficients.append(np.vdot(eigenstates[:, ind], close_ground_state))
     return eigenstates[:, indices] @ np.array(coefficients)
+
+
+def thermal_density_matrix_at_particle_number(
+    beta: float, sparse_operator: csc_matrix, particle_number: list
+):
+    eig_energies, eig_states = jw_eigenspectrum_at_particle_number(
+        sparse_operator=sparse_operator,
+        particle_number=particle_number,
+        expanded=True,
+    )
+    thermal_density = expm(
+        -beta
+        * (
+            np.sum(
+                (
+                    eig_energies[ind] * ketbra(eig_states[:, ind])
+                    for ind in range(eig_states.shape[1])
+                )
+            )
+        )
+    )
+    thermal_density /= np.trace(thermal_density)
+    return thermal_density
+
+
+def thermal_density_matrix(beta: float, ham: cirq.PauliSum, qubits: list[cirq.Qid]):
+    thermal_density = expm(-beta * ham.matrix(qubits=qubits))
+    thermal_density /= np.trace(thermal_density)
+    return thermal_density
