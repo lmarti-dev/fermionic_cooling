@@ -212,7 +212,6 @@ def control_function(
     beta: float = 1,
     mu: float = 10,
     c: float = 100,
-    f: callable = None,
     use_accelerate: bool = False,
 ):
     """Creates an ansatz for the derivative of omega, the strength of the environment. This is all control theory stuff, and I'm too dumb to get it
@@ -223,23 +222,17 @@ def control_function(
         mu (float): the power of t_fridge
         c (float): the stabilisation variable/minimal temp
         t_fridge (float): the energy expectation of the environment
-        f (callable, optional): the function wrapping omega. Defaults to identity.
 
     Returns:
         float: absolute value of the gradient ansatz
     """
-    if f is None:
-        f = 1
     if t_mean is not None and use_accelerate:
         accelerate = (t_mean / t_fridge) ** (0.5)
     else:
         accelerate = 1
 
     # return 1e-3 * (-np.log10(t_fridge))
-    return (
-        abs(beta * f(omega) / (np.exp(mu / (1 - np.log10(t_fridge / omega))) + c))
-        * accelerate
-    )
+    return abs(beta / (np.exp(mu / (1 - np.log10(t_fridge / omega))) + c)) * accelerate
 
     # return abs(beta * f(omega) * np.exp(-((t_fridge * c) ** mu)))
 

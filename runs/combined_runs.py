@@ -255,7 +255,7 @@ def combined_run():
     n_electrons = [2, 2]
     n_env_qubits = 1
     n_steps = 100
-    weaken_coupling = 5
+    weaken_coupling = 20
 
     sys_qubits = model.flattened_qubits
     n_sys_qubits = len(model.flattened_qubits)

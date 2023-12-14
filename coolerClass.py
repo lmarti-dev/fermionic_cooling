@@ -530,7 +530,7 @@ class Cooler:
         alpha: float,
         env_coupling: float,
         evolution_time: float,
-        depol_noise: float = 1e-5,
+        depol_noise: float = 1e-2,
     ):
         cooling_hamiltonian = self.cooling_hamiltonian(env_coupling, alpha)
 
