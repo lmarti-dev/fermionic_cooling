@@ -3,7 +3,7 @@ import sys
 import matplotlib.pyplot as plt
 import numpy as np
 from building_blocks import (
-    get_cheat_coupler,
+    get_cheat_thermalizers,
     get_cheat_coupler_list,
     get_cheat_sweep,
     get_Z_env,
@@ -13,13 +13,13 @@ from openfermion import get_sparse_operator, jw_hartree_fock_state
 from utils import (
     ketbra,
     state_fidelity_to_eigenstates,
+    thermal_density_matrix_at_particle_number,
+    thermal_density_matrix,
 )
 
 from data_manager import ExperimentDataManager
 from fauvqe.models.fermiHubbardModel import FermiHubbardModel
 from fauvqe.utilities import jw_eigenspectrum_at_particle_number, spin_dicke_state
-
-from scipy.linalg import expm
 
 
 def __main__(args):
@@ -69,29 +69,28 @@ def __main__(args):
 
     beta = 10
 
-    thermal_env_density = expm(-beta * env_ham.matrix(qubits=env_qubits))
-    thermal_env_density /= np.trace(thermal_env_density)
-    thermal_sys_density = expm(-beta * model.hamiltonian.matrix(qubits=sys_qubits))
-    thermal_sys_density /= np.trace(thermal_sys_density)
-
-    couplers = get_cheat_coupler_list(
+    thermal_env_density = thermal_density_matrix(
+        beta=beta, ham=env_ham, qubits=env_qubits
+    )
+    thermal_sys_density = thermal_density_matrix_at_particle_number(
+        beta=beta,
+        sparse_operator=get_sparse_operator(model.fock_hamiltonian),
+        particle_number=n_electrons,
+    )
+    couplers = get_cheat_thermalizers(
         sys_eig_states=sys_eig_states,
         env_eig_states=env_eig_states,
-        qubits=sys_qubits + env_qubits,
-        gs_indices=(0,),
-    )  # Interaction only on Qubit 0?
+    )
 
-    couplers = [np.kron(thermal_sys_density, thermal_env_density)]
+    couplers = [
+        np.sum(couplers),
+    ]
 
     print("coupler done")
 
     print(f"number of couplers: {len(couplers)}")
-    spectrum_width = max(sys_eig_energies) - min(sys_eig_energies)
 
-    min_gap = sorted(np.abs(np.diff(sys_eig_energies)))[0]
-
-    n_steps = len(couplers)
-    sweep_values = get_cheat_sweep(sys_eig_energies, n_steps)
+    sweep_values = get_cheat_sweep(sys_eig_energies, n_rep=1)
 
     alphas = sweep_values / 100
     evolution_times = 2.5 * np.pi / np.abs(alphas)
@@ -101,6 +100,8 @@ def __main__(args):
 
     thermalizer = Thermalizer(
         beta=beta,
+        thermal_env_density=thermal_env_density,
+        thermal_sys_density=thermal_sys_density,
         sys_hamiltonian=model.hamiltonian,
         n_electrons=n_electrons,
         sys_qubits=model.flattened_qubits,
@@ -138,16 +139,22 @@ def __main__(args):
 
     fids_initl = state_fidelity_to_eigenstates(sys_initial_state, sys_eig_states)
     fids_final = state_fidelity_to_eigenstates(final_sys_density_matrix, sys_eig_states)
+    fids_thermal = state_fidelity_to_eigenstates(thermal_sys_density, sys_eig_states)
 
-    for ind, (fid_init, fid_final, energy) in enumerate(
-        zip(fids_initl, fids_final, sys_eig_energies)
+    for ind, (fid_init, fid_final, fid_thermal) in enumerate(
+        zip(fids_initl, fids_final, fids_thermal)
     ):
         print(
-            f"<psi|E_{ind}>**2: {np.abs(fid_init):.5f} {np.abs(fid_final):.5f} energy: {energy:.3f}"
+            f"<φ|{ind}>: init:{np.abs(fid_init):.3f} fin:{np.abs(fid_final):.3f} ther:{np.abs(fid_thermal):.3f}"
         )
 
     print(f"sum of final. fidelities: {sum(fids_final)}")
     print(f"sum of env_energies: {np.sum(env_energies)}")
+
+    thermal_energy = np.sum(
+        np.array([ene * np.exp(-beta * ene) for ene in sys_eig_energies])
+    ) / np.sum(np.array([np.exp(-beta * ene) for ene in sys_eig_energies]))
+    print(f"final sys ene: {sys_energies[-1]}, thermal energy: {thermal_energy}")
 
     fig = thermalizer.plot_generic_cooling(
         fidelities,
