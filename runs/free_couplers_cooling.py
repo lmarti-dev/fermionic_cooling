@@ -34,7 +34,7 @@ def __main__(args):
     # whether we want to skip all saving data
     dry_run = False
     edm = ExperimentDataManager(
-        experiment_name="cooling_free_couplers",
+        experiment_name="cooling_free_couplers_depolnoise_1e2",
         notes="using the noninteracting coupler",
         dry_run=dry_run,
     )
@@ -144,13 +144,6 @@ def __main__(args):
 
     min_gap = get_min_gap(free_sys_eig_energies, threshold=1e-6)
 
-    n_steps = len(couplers)
-    # sweep_values = get_log_sweep(spectrum_width, n_steps)
-    sweep_values = get_cheat_sweep(free_sys_eig_energies, n_steps)
-    # np.random.shuffle(sweep_values)
-    # coupling strength value
-    alphas = sweep_values / 100
-    evolution_times = 2.5 * np.pi / (alphas)
     # evolution_time = 1e-3
 
     # call cool
@@ -215,7 +208,10 @@ def __main__(args):
         )
         plt.show()
     elif method == "zip":
+        n_steps = len(couplers)
         sweep_values = get_cheat_sweep(sys_eig_energies, n_steps)
+        alphas = sweep_values / 100
+        evolution_times = 2.5 * np.pi / (alphas)
         fidelities, energies, final_sys_density_matrix = cooler.zip_cool(
             alphas=alphas,
             evolution_times=evolution_times,
