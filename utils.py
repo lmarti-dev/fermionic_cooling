@@ -371,6 +371,20 @@ def print_coupler_fidelity_to_ground_state_projectors(
 def extrapolate_ground_state_non_interacting_fermi_hubbard(
     model: FermiHubbardModel, n_electrons: list, n_points: int, deg: int = 1
 ):
+    """This function finds the ground state of n_points weakly interacting FH models,
+     and extrapolate via a polyfit to the non-interacting ground state.
+     Currently useless (physically speaking).
+
+
+    Args:
+        model (FermiHubbardModel): _description_
+        n_electrons (list): _description_
+        n_points (int): _description_
+        deg (int, optional): _description_. Defaults to 1.
+
+    Returns:
+        _type_: _description_
+    """
     coefficients = np.zeros((n_points, 2 ** len(model.flattened_qubits)))
     interval = np.linspace(1e-8, 1e-7, n_points)
     for ind, epsilon in enumerate(interval):
@@ -442,6 +456,19 @@ def get_close_ground_state(model: FermiHubbardModel, n_electrons: list, coulomb:
 def get_extrapolated_superposition(
     model: FermiHubbardModel, n_electrons: list, coulomb: float
 ):
+    """This creates an approximation of the interacting ground state
+    for given values of coulomb in terms of the degenerate non-interacting ground states
+
+    Args:
+        model (FermiHubbardModel): _description_
+        n_electrons (list): _description_
+        coulomb (float): _description_
+
+    Returns:
+        state (np.array): the extrapolated ground state
+    """
+
+    # get spectrum of the non interacting model
     eigenenergies, eigenstates = jw_eigenspectrum_at_particle_number(
         sparse_operator=get_sparse_operator(
             model.non_interacting_model.fock_hamiltonian
@@ -449,11 +476,15 @@ def get_extrapolated_superposition(
         particle_number=n_electrons,
         expanded=True,
     )
+
+    # get indices of the degenerate gs
     indices = [
         ind
         for ind in range(len(eigenenergies))
         if np.isclose(eigenenergies[ind], eigenenergies[0])
     ]
+
+    # get the close gs
     _, close_ground_state = get_close_ground_state(
         model=model, n_electrons=n_electrons, coulomb=coulomb
     )

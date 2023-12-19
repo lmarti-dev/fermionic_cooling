@@ -25,6 +25,18 @@ from cirq import fidelity
 import numpy as np
 
 
+def plot_fidelity(fidelities, instant_fidelities):
+    fig, ax = plt.subplots()
+
+    ax.plot(range(len(fidelities)), fidelities, label="g.s.")
+    ax.plot(range(len(instant_fidelities)), instant_fidelities, label="instant. g.s.")
+    ax.set_xlabel("Steps")
+    ax.set_ylabel("Fidelity")
+    ax.legend()
+
+    plt.show()
+
+
 def __main__():
     data_folder = "C:/Users/Moi4/Desktop/current/FAU/phd/data"
 
@@ -52,10 +64,19 @@ def __main__():
         expanded=True,
     )
 
-    final_ground_state = eigenstates[:, 0]
-    initial_ground_state = get_extrapolated_superposition(
+    slater_eigenenergies, slater_eigenstates = jw_eigenspectrum_at_particle_number(
+        sparse_operator=get_sparse_operator(
+            model.non_interacting_model.fock_hamiltonian
+        ),
+        particle_number=n_electrons,
+        expanded=True,
+    )
+    extrapolated_superposition = get_extrapolated_superposition(
         model=model, n_electrons=n_electrons, coulomb=1e-6
     )
+
+    final_ground_state = eigenstates[:, 0]
+    initial_ground_state = slater_eigenstates[:, 2]
     print(
         f"initial fidelity: {fidelity(initial_ground_state,final_ground_state,qid_shape=(2,)*n_qubits)}"
     )
@@ -66,14 +87,17 @@ def __main__():
     # total steps
     n_steps = int(1e2)
     # total time
-    total_time = 1 / (get_min_gap(eigenenergies, threshold=1e-12) ** 2)
+    spectrum_width = np.max(eigenenergies) - np.min(eigenenergies)
+    total_time = (
+        10 * spectrum_width / (get_min_gap(eigenenergies, threshold=1e-12) ** 2)
+    )
 
     instantaneous_ground_states = get_instantaneous_ground_states(
         ham_start=ham_start, ham_stop=ham_stop, n_steps=n_steps, n_electrons=n_electrons
     )
 
     print(f"Simulating for {total_time} time and {n_steps} steps")
-    fidelities, instant_fidelities, final_ground_state = run_sweep(
+    fidelities, instant_fidelities, final_ground_state, populations = run_sweep(
         initial_state=initial_ground_state,
         ham_start=ham_start,
         ham_stop=ham_stop,
@@ -81,6 +105,7 @@ def __main__():
         instantaneous_ground_states=instantaneous_ground_states,
         n_steps=n_steps,
         total_time=total_time,
+        get_populations=True,
     )
 
     plt.rcParams.update(
@@ -92,13 +117,15 @@ def __main__():
         }
     )
 
+    # pops
     fig, ax = plt.subplots()
-
-    ax.plot(range(len(fidelities)), fidelities, label="g.s.")
-    ax.plot(range(len(instant_fidelities)), instant_fidelities, label="instant. g.s.")
+    for pop in populations:
+        ax.plot(range(len(pop)), pop, linewidth=0.5)
+    ax.plot(range(len(fidelities)), fidelities, "k--", linewidth=3, label="Fidelity")
     ax.set_xlabel("Steps")
     ax.set_ylabel("Fidelity")
-    ax.legend()
+    ax.set_yscale("log")
+    ax.set_ybound(1e-7, 1)
 
     plt.show()
 

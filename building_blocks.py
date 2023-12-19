@@ -19,7 +19,6 @@ def get_cheat_thermalizers(
 ):
     couplers = []
     env_up = np.outer(env_eig_states[:, 1], np.conjugate(env_eig_states[:, 0]))
-    env_down = np.outer(env_eig_states[:, 0], np.conjugate(env_eig_states[:, 1]))
     # in case there are multiple ground states we can cool to (if I may say so)
     for j in range(0, sys_eig_states.shape[1]):
         for k in range(j, sys_eig_states.shape[1]):

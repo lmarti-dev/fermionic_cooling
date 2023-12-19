@@ -1,10 +1,11 @@
-from scipy.linalg import expm
-from scipy.sparse.linalg import expm_multiply
 import numpy as np
-from cirq import fidelity, PauliSum
-from fauvqe.utilities import jw_get_true_ground_state_at_particle_number
-from scipy.sparse import csc_matrix
+from cirq import PauliSum, fidelity
 from openfermion import FermionOperator, get_sparse_operator
+from scipy.linalg import expm
+from scipy.sparse import csc_matrix
+from scipy.sparse.linalg import expm_multiply
+
+from fauvqe.utilities import flatten, jw_get_true_ground_state_at_particle_number
 
 
 def fermion_to_dense(ham: FermionOperator):
@@ -67,6 +68,7 @@ def run_sweep(
     instantaneous_ground_states: np.ndarray,
     n_steps: int,
     total_time: float,
+    get_populations: bool = True,
 ):
     # set state to initial value
     state = initial_state
@@ -91,6 +93,10 @@ def run_sweep(
     initial_fid = fidelity(state, final_ground_state, qid_shape=qid_shape)
     initial_instant_fid = fidelity(state, initial_state, qid_shape=qid_shape)
 
+    if get_populations:
+        end_energies, end_spectrum = np.linalg.eigh(ham_stop)
+        populations = np.zeros((2**n_qubits, n_steps))
+
     fidelities.append(initial_fid)
     instant_fidelities.append(initial_instant_fid)
 
@@ -102,7 +108,24 @@ def run_sweep(
             state = np.matmul(state, np.conjugate(unitary.T))
         elif len(state.shape) > 2:
             raise ValueError(f"Expected state size 1 or 2, got {state.size}")
+        if get_populations:
+            state_pops = []
+            for ind_spec in range(end_spectrum.shape[1]):
+                # just numpy being stupid with dimensions
+                eig_state = np.array(end_spectrum[:, ind_spec])
+                eig_state = eig_state.squeeze()
+                state_pops.append(
+                    fidelity(
+                        state1=state,
+                        state2=eig_state,
+                        qid_shape=qid_shape,
+                    )
+                )
+            populations[:, ind] = state_pops
+
         fid = fidelity(state, final_ground_state, qid_shape=qid_shape)
+        fidelities.append(fid)
+
         instant_fid = -1
         if instantaneous_ground_states is not None:
             instant_fid = fidelity(
@@ -110,11 +133,11 @@ def run_sweep(
             )
             instant_fidelities.append(instant_fid)
 
-        fidelities.append(fid)
-
         print(
             f"step {ind}: fid: {fid:.4f} init. inst. fid: {instant_fid:.4f}", end="\r"
         )
+    if get_populations:
+        return fidelities, instant_fidelities, final_ground_state, populations
     return fidelities, instant_fidelities, final_ground_state
 
 
