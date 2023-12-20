@@ -254,8 +254,8 @@ def combined_run():
 
     n_electrons = [2, 2]
     n_env_qubits = 1
-    n_steps = 100
-    weaken_coupling = 20
+    n_steps = 1000
+    weaken_coupling = 5
 
     sys_qubits = model.flattened_qubits
     n_sys_qubits = len(model.flattened_qubits)
@@ -279,7 +279,7 @@ def combined_run():
 
     spectrum_width = np.abs(np.max(sys_eig_energies) - np.min(sys_eig_energies))
     total_time = (
-        5 * spectrum_width / (get_min_gap(sys_eig_energies, threshold=1e-12) ** 2)
+        10 * spectrum_width / (get_min_gap(sys_eig_energies, threshold=1e-12) ** 2)
     )
 
     sys_ground_state = sys_eig_states[:, 0]
@@ -310,7 +310,8 @@ def combined_run():
             particle_number=n_electrons,
             expanded=True,
         )
-        omegas[ind] = np.abs(m_eig_energies[1] - m_eig_energies[0])
+        unique_energies = np.array(list(sorted((set(m_eig_energies)))))
+        omegas[ind] = np.abs(unique_energies[1] - unique_energies[0])
         coupler = np.kron(
             np.outer(m_eig_states[:, 0], np.conjugate(m_eig_states[:, 0])),
             env_up,
@@ -322,8 +323,9 @@ def combined_run():
         n_orbitals=n_sys_qubits, n_electrons=sum(n_electrons)
     )
 
-    slater_superpos = np.sum(slater_eig_states[:, :4], axis=1)
-    sys_initial_state = ketbra(slater_superpos / np.linalg.norm(slater_superpos))
+    slater_superpos = np.sum(slater_eig_states[:, 1:3], axis=1)
+    slater_superpos /= np.linalg.norm(slater_superpos)
+    sys_initial_state = ketbra(slater_eig_states[:, 0])
 
     adiabatic_cooler = AdiabaticCooler(
         sys_hamiltonian=model.non_interacting_model.hamiltonian,
