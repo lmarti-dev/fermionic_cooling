@@ -432,6 +432,7 @@ class Cooler:
                         env_coupling=omega,
                         alpha=alpha,
                         evolution_time=evolution_time,
+                        reset=reset,
                     )
 
                     # print stats on evolution
