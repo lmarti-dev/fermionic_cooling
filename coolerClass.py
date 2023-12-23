@@ -390,6 +390,7 @@ class Cooler:
 
                 # there's not factor of two here, it's all correct
                 evolution_time = np.pi / alpha
+                evolution_time /= 10
                 total_cooling_time += evolution_time
 
                 if coupler_transitions is not None:
@@ -417,6 +418,9 @@ class Cooler:
                         coupler_index=coupler_index, rep=rep
                     )
 
+                    reset = False
+                    if coupler_index == coupler_indices[-1]:
+                        reset = True
                     # evolve system and reset ancilla
                     (
                         sys_fidelity,
@@ -428,6 +432,7 @@ class Cooler:
                         env_coupling=omega,
                         alpha=alpha,
                         evolution_time=evolution_time,
+                        reset=reset,
                     )
 
                     # print stats on evolution
@@ -466,7 +471,7 @@ class Cooler:
                     epsilon = 1e-6 * (start_omega - stop_omega)
                 self.update_message(
                     "epsi",
-                    f"ε: {epsilon:.3e} ω: {omega:.3f} fridge E: {env_energy:.3e} start: {start_omega:.3f} stop: {stop_omega:.3f}",
+                    f"ε: {epsilon:.3e} ω: {omega:.3f} Z_fr: {env_energy/omega:.3e} start: {start_omega:.3f} stop: {stop_omega:.3f}",
                     message_level=5,
                 )
 
@@ -530,7 +535,8 @@ class Cooler:
         alpha: float,
         env_coupling: float,
         evolution_time: float,
-        depol_noise: float = 1e-2,
+        depol_noise: float = None,
+        reset: bool = True,
     ):
         cooling_hamiltonian = self.cooling_hamiltonian(env_coupling, alpha)
 
@@ -550,14 +556,16 @@ class Cooler:
             t=evolution_time,
             method="expm",
         )
+
         traced_density_matrix = trace_out_env(
             rho=total_density_matrix,
             n_sys_qubits=len(self.sys_qubits),
             n_env_qubits=len(self.env_qubits),
         )
+
         if depol_noise is not None:
             # add depol noise
-            spin_conserving = True
+            spin_conserving = False
             if spin_conserving is True:
                 rho_err = spin_dicke_mixed_state(
                     n_qubits=len(self.sys_qubits), Nf=self.n_electrons
@@ -578,11 +586,15 @@ class Cooler:
         sys_energy = self.sys_energy(traced_density_matrix)
         env_energy = self.env_energy(total_density_matrix)
 
+        self.print_msg()
+
+        if not reset:
+            return sys_fidelity, sys_energy, env_energy, total_density_matrix
+
         # putting the env back in the ground state
         total_density_matrix = np.kron(
             traced_density_matrix, self.env_ground_density_matrix
         )
-        self.print_msg()
         return sys_fidelity, sys_energy, env_energy, total_density_matrix
 
     def plot_controlled_cooling(
