@@ -413,6 +413,18 @@ def get_slater_spectrum(model: FermiHubbardModel, n_electrons: list):
     return slater_energies, slater_eigenstates
 
 
+def get_onsite_spectrum(model: FermiHubbardModel, n_electrons: list):
+    params = model.to_json_dict()
+    params["constructor_params"]["tunneling"] = 0
+    onsite_model = FermiHubbardModel(**params["constructor_params"])
+    slater_energies, slater_eigenstates = jw_eigenspectrum_at_particle_number(
+        sparse_operator=get_sparse_operator(onsite_model.fock_hamiltonian),
+        particle_number=n_electrons,
+        expanded=True,
+    )
+    return slater_energies, slater_eigenstates
+
+
 def get_dicke_state(n_qubits, n_electrons):
     dicke_state = spin_dicke_state(
         n_qubits=n_qubits, Nf=n_electrons, right_to_left=False

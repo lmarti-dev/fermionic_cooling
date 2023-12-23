@@ -390,7 +390,6 @@ class Cooler:
 
                 # there's not factor of two here, it's all correct
                 evolution_time = np.pi / alpha
-                evolution_time /= 10
                 total_cooling_time += evolution_time
 
                 if coupler_transitions is not None:

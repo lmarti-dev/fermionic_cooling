@@ -20,6 +20,7 @@ from utils import (
     get_extrapolated_superposition,
     get_min_gap,
     get_slater_spectrum,
+    get_onsite_spectrum,
     ketbra,
     trace_out_env,
 )
@@ -40,15 +41,19 @@ from fauvqe.utilities import (
 
 
 def get_couplers_for_sweep(
+    model: FermiHubbardModel,
     n_steps: int,
     which: str,
-    tunneling: float,
-    coulomb: float,
     env_up: np.ndarray,
     n_electrons: list,
+    energy_approx_lvl: int = 1,
 ):
     omegas = np.zeros((n_steps,))
     couplers = []
+
+    params = model.to_json_dict()["constructor_params"]
+    tunneling = params["tunneling"]
+    coulomb = params["coulomb"]
 
     if which == "coulomb":
         cou_vals = np.linspace(0, coulomb, n_steps)
@@ -59,14 +64,19 @@ def get_couplers_for_sweep(
 
     for ind, (tun, cou) in enumerate(zip(tun_vals, cou_vals)):
         model = FermiHubbardModel(
-            x_dimension=2, y_dimension=2, tunneling=tun, coulomb=cou
+            x_dimension=params["x_dimension"],
+            y_dimension=params["y_dimension"],
+            tunneling=tun,
+            coulomb=cou,
         )
         m_eig_energies, m_eig_states = jw_eigenspectrum_at_particle_number(
             sparse_operator=get_sparse_operator(model.fock_hamiltonian),
             particle_number=n_electrons,
             expanded=True,
         )
-        omegas[ind] = np.abs(m_eig_energies[1] - m_eig_energies[0])
+        unique_energies = np.array(list(sorted(set(m_eig_energies))))
+        unique_diffs = np.diff(unique_energies)
+        omegas[ind] = np.mean(np.abs(unique_diffs[:energy_approx_lvl]))
         coupler = np.kron(
             np.outer(m_eig_states[:, 0], np.conjugate(m_eig_states[:, 0])),
             env_up,
@@ -80,24 +90,46 @@ def get_couplers_for_sweep(
 def adiabatic_cooling(which="coulomb"):
     tunneling = 1
     coulomb = 2
+
+    x_dimension = 2
+    y_dimension = 2
+
+    n_electrons = [2, 2]
+
     if which == "coulomb":
         close_model_tunneling = tunneling
         close_model_coulomb = 1e-5
+        start_model_tunneling = tunneling
+        start_model_coulomb = 0
+
     elif which == "tunneling":
         close_model_tunneling = 1e-5
         close_model_coulomb = coulomb
+        start_model_tunneling = 0
+        start_model_coulomb = coulomb
 
     model = FermiHubbardModel(
         x_dimension=2, y_dimension=2, tunneling=tunneling, coulomb=coulomb
     )
     close_model = FermiHubbardModel(
-        x_dimension=2,
-        y_dimension=2,
+        x_dimension=x_dimension,
+        y_dimension=y_dimension,
         tunneling=close_model_tunneling,
         coulomb=close_model_coulomb,
     )
+    close_model = FermiHubbardModel(
+        x_dimension=x_dimension,
+        y_dimension=y_dimension,
+        tunneling=close_model_tunneling,
+        coulomb=close_model_coulomb,
+    )
+    start_model = FermiHubbardModel(
+        x_dimension=x_dimension,
+        y_dimension=y_dimension,
+        tunneling=start_model_tunneling,
+        coulomb=start_model_coulomb,
+    )
 
-    n_electrons = [2, 2]
     n_env_qubits = 1
     n_steps = 1000
     weaken_coupling = 5
@@ -105,12 +137,17 @@ def adiabatic_cooling(which="coulomb"):
     sys_qubits = model.flattened_qubits
     n_sys_qubits = len(model.flattened_qubits)
 
-    ham_start = model.non_interacting_model.hamiltonian
+    ham_start = start_model.hamiltonian
     ham_stop = model.hamiltonian
 
-    slater_eig_energies, slater_eig_states = get_slater_spectrum(
-        model, n_electrons=n_electrons
-    )
+    if which == "coulomb":
+        start_eig_energies, start_eig_states = get_slater_spectrum(
+            model, n_electrons=n_electrons
+        )
+    elif which == "tunneling":
+        start_eig_energies, start_eig_states = get_onsite_spectrum(
+            model, n_electrons=n_electrons
+        )
     sys_eig_energies, sys_eig_states = jw_eigenspectrum_at_particle_number(
         sparse_operator=get_sparse_operator(model.fock_hamiltonian),
         particle_number=n_electrons,
@@ -132,24 +169,15 @@ def adiabatic_cooling(which="coulomb"):
         n_qubits=n_env_qubits
     )
 
-    couplers = get_cheat_coupler_list(
-        sys_eig_states=sys_eig_states[:, :2],
-        env_eig_states=env_eig_states,
-        qubits=sys_qubits + env_qubits,
-        gs_indices=(0,),
-        noise=0,
-    )
-
-    # omegas = get_cheat_sweep(spectrum=slater_eig_energies, n_rep=2)
     env_up = np.outer(env_eig_states[:, 1], np.conjugate(env_eig_states[:, 0]))
 
     couplers, omegas = get_couplers_for_sweep(
+        model=model,
         n_steps=n_steps,
         which=which,
-        tunneling=tunneling,
-        coulomb=coulomb,
         env_up=env_up,
         n_electrons=n_electrons,
+        energy_approx_lvl=3,
     )
 
     spectrum = sys_eig_energies
@@ -157,9 +185,9 @@ def adiabatic_cooling(which="coulomb"):
         n_orbitals=n_sys_qubits, n_electrons=sum(n_electrons)
     )
 
-    slater_superpos = np.sum(slater_eig_states[:, 1:3], axis=1)
+    slater_superpos = np.sum(start_eig_states[:, 1:3], axis=1)
     slater_superpos /= np.linalg.norm(slater_superpos)
-    sys_initial_state = ketbra(slater_eig_states[:, 0])
+    sys_initial_state = ketbra(start_eig_states[:, 0])
 
     adiabatic_cooler = AdiabaticCooler(
         sys_hamiltonian=model.hamiltonian,
