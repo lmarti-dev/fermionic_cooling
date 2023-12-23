@@ -20,15 +20,14 @@ def get_cheat_thermalizers(
     couplers = []
     env_up = np.outer(env_eig_states[:, 1], np.conjugate(env_eig_states[:, 0]))
     # in case there are multiple ground states we can cool to (if I may say so)
-    for j in range(0, sys_eig_states.shape[1]):
-        for k in range(j, sys_eig_states.shape[1]):
-            # |sys_0Xsys_k| O |env_1Xenv_0|
-            coupler = np.kron(
-                np.outer(sys_eig_states[:, j], np.conjugate(sys_eig_states[:, k])),
-                env_up,
-            )
-            coupler = coupler + np.conjugate(np.transpose(coupler))
-            couplers.append(coupler)
+    for j in range(0, sys_eig_states.shape[1] - 1):
+        # |sys_0Xsys_k| O |env_1Xenv_0|
+        coupler = np.kron(
+            np.outer(sys_eig_states[:, j], np.conjugate(sys_eig_states[:, j + 1])),
+            env_up,
+        )
+        coupler = coupler + np.conjugate(np.transpose(coupler))
+        couplers.append(coupler)
 
     # bigger first to match cheat sweep
     return list(reversed(couplers))

@@ -67,7 +67,7 @@ def __main__(args):
         model=model.to_json_dict()["constructor_params"],
     )
 
-    beta = 10
+    beta = 0.1
 
     thermal_env_density = thermal_density_matrix(
         beta=beta, ham=env_ham, qubits=env_qubits
@@ -82,15 +82,17 @@ def __main__(args):
         env_eig_states=env_eig_states,
     )
 
-    couplers = [
-        np.sum(couplers),
-    ]
+    # couplers = [
+    #     np.sum(couplers),
+    # ]
 
     print("coupler done")
 
     print(f"number of couplers: {len(couplers)}")
 
-    sweep_values = get_cheat_sweep(sys_eig_energies, n_rep=1)
+    # SWeep values are here dummy
+    sweep_values = np.array(list(reversed(np.abs(np.diff(sys_eig_energies)))))
+    sweep_values = np.repeat(sweep_values[sweep_values > 1e-8], 3)
 
     alphas = sweep_values / 100
     evolution_times = 2.5 * np.pi / np.abs(alphas)
@@ -154,7 +156,9 @@ def __main__(args):
     thermal_energy = np.sum(
         np.array([ene * np.exp(-beta * ene) for ene in sys_eig_energies])
     ) / np.sum(np.array([np.exp(-beta * ene) for ene in sys_eig_energies]))
-    print(f"final sys ene: {sys_energies[-1]}, thermal energy: {thermal_energy}")
+    print(
+        f"initial_sys_ene: {sys_energies[0]} final sys ene: {sys_energies[-1]}, thermal energy: {thermal_energy}"
+    )
 
     fig = thermalizer.plot_generic_cooling(
         fidelities,
