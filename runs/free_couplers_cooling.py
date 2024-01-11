@@ -35,7 +35,7 @@ def __main__(args):
     dry_run = False
     edm = ExperimentDataManager(
         experiment_name="cooling_free_couplers_depolnoise_1e2",
-        notes="using the noninteracting coupler",
+        notes="using the noninteracting couplers",
         dry_run=dry_run,
     )
     # model stuff
@@ -190,7 +190,7 @@ def __main__(args):
             "fidelities": fidelities,
             "sys_energies": sys_ev_energies,
         }
-        edm.save_dict_to_experiment(filename=f"cooling_free", jobj=jobj)
+        edm.save_dict_to_experiment(filename="cooling_free", jobj=jobj)
 
         fig = cooler.plot_controlled_cooling(
             fidelities=fidelities,
@@ -223,7 +223,7 @@ def __main__(args):
             "fidelities": fidelities,
             "energies": energies,
         }
-        edm.save_dict_to_experiment(filename=f"cooling_free_couplers", jobj=jobj)
+        edm.save_dict_to_experiment(filename="cooling_free_couplers", jobj=jobj)
 
         fig = cooler.plot_generic_cooling(
             energies,
