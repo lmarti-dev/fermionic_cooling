@@ -93,6 +93,15 @@ def __main__(args):
         particle_number=n_electrons,
         expanded=True,
     )
+
+    free_sys_eig_energies, free_sys_eig_states = jw_eigenspectrum_at_particle_number(
+        sparse_operator=get_sparse_operator(
+            model.non_interacting_model.fock_hamiltonian,
+            n_qubits=len(model.flattened_qubits),
+        ),
+        particle_number=n_electrons,
+        expanded=True,
+    )
     sys_ground_state = sys_eig_states[:, np.argmin(sys_eig_energies)]
     sys_ground_energy = np.min(sys_eig_energies)
 
@@ -126,16 +135,8 @@ def __main__(args):
         env_eigenergies=env_eig_energies,
         model=model.to_json_dict()["constructor_params"],
     )
-    # coupler
-    # coupler = cirq.Y(sys_qubits[0]) * cirq.Y(env_qubits[0])  # Interaction only on Qubit 0?
-    # coupler = get_cheat_coupler(
-    #     sys_eig_states=sys_eig_states,
-    #     env_eig_states=env_eig_states,
-    #     qubits=sys_qubits + env_qubits,
-    #     gs_indices=(0,),
-    # )  # Interaction only on Qubit 0?
     couplers = get_cheat_coupler_list(
-        sys_eig_states=sys_eig_states,
+        sys_eig_states=free_sys_eig_states,
         env_eig_states=env_eig_states,
         qubits=sys_qubits + env_qubits,
         gs_indices=(0,),
@@ -151,13 +152,11 @@ def __main__(args):
     min_gap = sorted(np.abs(np.diff(sys_eig_energies)))[0]
 
     n_steps = len(couplers)
-    # sweep_values = get_log_sweep(spectrum_width, n_steps)
-    sweep_values = get_cheat_sweep(sys_eig_energies, n_steps)
+    sweep_values = get_cheat_sweep(free_sys_eig_energies, n_steps)
     # np.random.shuffle(sweep_values)
     # coupling strength value
     alphas = sweep_values / 100
     evolution_times = 2.5 * np.pi / np.abs(alphas)
-    # evolution_time = 1e-3
 
     # call cool
 

@@ -13,9 +13,19 @@ from openfermion import get_sparse_operator
 # depending on the environment energy
 
 
+def get_matrix_coupler(mat: np.ndarray, env_eig_states: np.ndarray) -> np.ndarray:
+    env_up = np.outer(env_eig_states[:, 1], np.conjugate(env_eig_states[:, 0]))
+    coupler = np.kron(
+        mat,
+        env_up,
+    )
+    return coupler + np.conjugate(np.transpose(coupler))
+
+
 def get_cheat_thermalizers(
     sys_eig_states,
     env_eig_states,
+    reverse: bool = True,
 ):
     couplers = []
     env_up = np.outer(env_eig_states[:, 1], np.conjugate(env_eig_states[:, 0]))
@@ -30,7 +40,10 @@ def get_cheat_thermalizers(
         couplers.append(coupler)
 
     # bigger first to match cheat sweep
-    return list(reversed(couplers))
+    if reverse:
+        return list(reversed(couplers))
+    else:
+        return couplers
 
 
 def get_cheat_coupler_list(
@@ -96,6 +109,26 @@ def get_log_sweep(spectrum_width: np.ndarray, n_steps: int, n_rep: int = 1):
     return np.tile(
         spectrum_width * (np.logspace(start=0, stop=-5, base=10, num=n_steps)), n_rep
     )
+
+
+def get_perturbed_sweep(spectrum: np.ndarray, lam: float, decimals: int = 5):
+    sweep_values = []
+    unique_energies = np.unique(spectrum.round(decimals=decimals))
+    for ind in range(len(unique_energies)):
+        degeneracy = sum(
+            [1 if np.isclose(x, unique_energies[ind]) else 0 for x in spectrum]
+        )
+        if degeneracy > 1:
+            values = (
+                unique_energies[ind]
+                + lam * np.linspace(0.01, 1, degeneracy)
+                - unique_energies[0]
+            )
+            sweep_values.extend(values)
+        else:
+            sweep_values.append = unique_energies[ind]
+
+    return np.array(sweep_values[::-1])
 
 
 def get_cheat_sweep(spectrum: np.ndarray, n_steps: int = None, n_rep: int = None):
@@ -211,6 +244,7 @@ def control_function(
     mu: float = 10,
     c: float = 100,
     use_accelerate: bool = False,
+    clamp: bool = True,
 ):
     """Creates an ansatz for the derivative of omega, the strength of the environment. This is all control theory stuff, and I'm too dumb to get it
 
@@ -224,10 +258,16 @@ def control_function(
     Returns:
         float: absolute value of the gradient ansatz
     """
+
+    # get some momentum in the control function
     if t_mean is not None and use_accelerate:
         accelerate = (t_mean / t_fridge) ** (0.5)
     else:
         accelerate = 1
+
+    # disallow values which might be due to bugs
+    if clamp is True:
+        t_fridge = np.clip(t_fridge, 0, 0.1)
 
     # return 1e-3 * (-np.log10(t_fridge))
     return abs(beta / (np.exp(mu / (1 - np.log10(t_fridge / omega))) + c)) * accelerate

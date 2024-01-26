@@ -137,8 +137,8 @@ def run_sweep(
             f"step {ind}: fid: {fid:.4f} init. inst. fid: {instant_fid:.4f}", end="\r"
         )
     if get_populations:
-        return fidelities, instant_fidelities, final_ground_state, populations
-    return fidelities, instant_fidelities, final_ground_state
+        return fidelities, instant_fidelities, final_ground_state, populations, state
+    return fidelities, instant_fidelities, final_ground_state, state
 
 
 def run_sparse_sweep():

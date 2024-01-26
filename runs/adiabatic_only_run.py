@@ -16,6 +16,7 @@ from utils import (
     get_min_gap,
     extrapolate_ground_state_non_interacting_fermi_hubbard,
     get_extrapolated_superposition,
+    state_fidelity_to_eigenstates,
 )
 
 from openfermion import get_sparse_operator, jw_hartree_fock_state
@@ -23,6 +24,9 @@ import matplotlib.pyplot as plt
 
 from cirq import fidelity
 import numpy as np
+
+
+from data_manager import ExperimentDataManager
 
 
 def plot_fidelity(fidelities, instant_fidelities):
@@ -38,19 +42,16 @@ def plot_fidelity(fidelities, instant_fidelities):
 
 
 def __main__():
-    data_folder = "C:/Users/Moi4/Desktop/current/FAU/phd/data"
-
     # whether we want to skip all saving data
     dry_run = True
     edm = ExperimentDataManager(
-        data_folder=data_folder,
         experiment_name="adiabatic_sweep_only",
         notes="trying out adiabatic sweep for fermi hubbard",
         dry_run=dry_run,
     )
     # model stuff
     model = FermiHubbardModel(x_dimension=2, y_dimension=2, tunneling=1, coulomb=2)
-    n_electrons = [2, 2]
+    n_electrons = [2, 1]
 
     n_qubits = len(model.flattened_qubits)
 
@@ -76,7 +77,7 @@ def __main__():
     )
 
     final_ground_state = eigenstates[:, 0]
-    initial_ground_state = slater_eigenstates[:, 2]
+    initial_ground_state = slater_eigenstates[:, 0]
     print(
         f"initial fidelity: {fidelity(initial_ground_state,final_ground_state,qid_shape=(2,)*n_qubits)}"
     )
@@ -89,7 +90,7 @@ def __main__():
     # total time
     spectrum_width = np.max(eigenenergies) - np.min(eigenenergies)
     total_time = (
-        10 * spectrum_width / (get_min_gap(eigenenergies, threshold=1e-12) ** 2)
+        20 * spectrum_width / (get_min_gap(eigenenergies, threshold=1e-12) ** 2)
     )
 
     instantaneous_ground_states = get_instantaneous_ground_states(
@@ -97,7 +98,13 @@ def __main__():
     )
 
     print(f"Simulating for {total_time} time and {n_steps} steps")
-    fidelities, instant_fidelities, final_ground_state, populations = run_sweep(
+    (
+        fidelities,
+        instant_fidelities,
+        final_ground_state,
+        populations,
+        final_state,
+    ) = run_sweep(
         initial_state=initial_ground_state,
         ham_start=ham_start,
         ham_stop=ham_stop,
@@ -107,6 +114,14 @@ def __main__():
         total_time=total_time,
         get_populations=True,
     )
+
+    fid_init = state_fidelity_to_eigenstates(initial_ground_state, eigenstates)
+    fid_final = state_fidelity_to_eigenstates(final_state, eigenstates)
+
+    print("=============")
+
+    for a, b in zip(fid_init, fid_final):
+        print(f"init: {a:.3f} final {b:.3f}")
 
     plt.rcParams.update(
         {
@@ -119,13 +134,31 @@ def __main__():
 
     # pops
     fig, ax = plt.subplots()
-    for pop in populations:
-        ax.plot(range(len(pop)), pop, linewidth=0.5)
-    ax.plot(range(len(fidelities)), fidelities, "k--", linewidth=3, label="Fidelity")
-    ax.set_xlabel("Steps")
+    plot_populations = False
+    if plot_populations:
+        for pop in populations:
+            ax.plot(range(len(pop)), pop, linewidth=0.5)
+    ax.plot(
+        np.linspace(0, total_time, len(fidelities)),
+        fidelities,
+        "r",
+        linewidth=3,
+        label="Fidelity to g.s.",
+    )
+    ax.plot(
+        np.linspace(0, total_time, len(instant_fidelities)),
+        instant_fidelities,
+        "b",
+        linewidth=3,
+        label="Fidelity to instant g.s.",
+    )
+    ax.set_xlabel("Time")
     ax.set_ylabel("Fidelity")
-    ax.set_yscale("log")
-    ax.set_ybound(1e-7, 1)
+    ax.legend()
+    # ax.set_yscale("log")
+    # ax.set_ybound(1e-7, 1)
+
+    edm.save_figure(fig=fig)
 
     plt.show()
 

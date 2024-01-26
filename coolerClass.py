@@ -200,8 +200,8 @@ class Cooler:
                 env_energies.append(env_energy)
                 self.update_message(
                     "fidgs",
-                    "fidelity to gs: {:.4f}, energy diff of traced out rho: {:.4f}".format(
-                        sys_fidelity, sys_energy - self.sys_ground_energy
+                    "fidelity to gs: {:.4f}, dE rho_sys: {:.4f} p(1) env {:.3f}".format(
+                        sys_fidelity, sys_energy - self.sys_ground_energy, env_energy
                     ),
                     message_level=5,
                 )
@@ -609,15 +609,6 @@ class Cooler:
     ):
         plt.rcParams.update(
             {
-                "font.family": r"serif",  # use serif/main font for text elements
-                "text.usetex": True,  # use inline math for ticks
-                "pgf.rcfonts": False,  # don't setup fonts from rc parameters
-                "pgf.preamble": "\n".join(
-                    [
-                        r"\usepackage{url}",  # load additional packages
-                        r"\usepackage{lmodern}",  # unicode math setup
-                    ]
-                ),
                 "figure.figsize": (5, 3),
             }
         )
@@ -629,8 +620,6 @@ class Cooler:
         plot_temp = False
         ax_bottom = axes[1]
         spectrum_cmap = plt.get_cmap("hsv", len(eigenspectrums))
-        xtick_is_time = True
-
         if plot_temp:
             twin_ax_bottom = ax_bottom.twinx()
         for rep in range(len(env_energies)):
@@ -641,15 +630,8 @@ class Cooler:
                 len_prev += len(fidelities[rep - 1])
                 sum_omega += sum(omegas[rep - 1])
 
-            if xtick_is_time:
-                xticks = np.divide(
-                    weaken_coupling * np.pi * n_qubits,
-                    np.array(omegas[rep]) + float(sum_omega),
-                )
-                xlabel_up = "Time"
-            else:
-                xticks = np.arange(len_prev, len_prev + len(fidelities[rep]))
-                xlabel_up = "Steps"
+            xticks = np.arange(len_prev, len_prev + len(fidelities[rep]))
+            xlabel_up = "Steps"
 
             axes[0].plot(
                 xticks,
@@ -681,10 +663,12 @@ class Cooler:
                 color=spectrum_cmap(ind),
                 linewidth=1,
             )
-        axes[0].set_ylabel(r"$|\langle \psi_{cool} | \psi_{gs} \rangle|^2$", labelpad=0)
+        axes[0].set_ylabel(
+            r"$|\langle \psi_{cool} | \psi_{target} \rangle|^2$", labelpad=0
+        )
         axes[0].set_xlabel(xlabel_up)
 
-        ax_bottom.set_ylabel(r"$(\frac{\mathrm{d}}{\mathrm{ds}}\omega)^{-2}$")
+        ax_bottom.set_ylabel(r"$(T_{fridge})^{-2}$")
         ax_bottom.tick_params(axis="y")  # , labelcolor="blue")
         ax_bottom.set_yscale("log")
         ax_bottom.invert_xaxis()
@@ -712,20 +696,12 @@ class Cooler:
         fidelities: list,
         initial_pops: list,
         env_energies: list,
+        n_rep: int,
         supplementary_data: dict = {},
         suptitle: str = None,
     ):
         plt.rcParams.update(
             {
-                "font.family": r"serif",  # use serif/main font for text elements
-                "text.usetex": True,  # use inline math for ticks
-                "pgf.rcfonts": False,  # don't setup fonts from rc parameters
-                "pgf.preamble": "\n".join(
-                    [
-                        r"\usepackage{url}",  # load additional packages
-                        r"\usepackage{lmodern}",  # unicode math setup
-                    ]
-                ),
                 "figure.figsize": (5, 3),
             }
         )
@@ -735,13 +711,27 @@ class Cooler:
         axes[0].plot(range(len(fidelities)), fidelities, "kx--", linewidth=2)
         axes[0].set_ylabel(r"$|\langle \psi_{cool} | \psi_{gs} \rangle|^2$")
         axes[0].set_xlabel(r"$Steps$")
+        cmap = plt.get_cmap("turbo", n_rep)
+        for ind in range(n_rep - 1):
+            axes[1].plot(
+                range(
+                    len(
+                        env_energies[
+                            ind * len(initial_pops) : (ind + 1) * len(initial_pops)
+                        ]
+                    )
+                ),
+                env_energies[ind * len(initial_pops) : (ind + 1) * len(initial_pops)],
+                color=cmap(ind),
+            )
         axes[1].plot(
             range(len(initial_pops)),
             list(reversed(initial_pops)),
-            "r",
-            label="initial pops",
+            color="k",
+            linestyle=":",
+            linewidth=2,
+            label="initial pop.",
         )
-        axes[1].plot(range(len(env_energies)), env_energies, "b", label="env. energy")
         axes[1].legend()
         if supplementary_data:
             for ind, k in enumerate(supplementary_data.keys()):

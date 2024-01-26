@@ -4,21 +4,21 @@ import time
 from typing import Iterable, Iterator
 
 import cirq
-
 import numpy as np
-
 from openfermion import FermionOperator, get_sparse_operator, jw_hartree_fock_state
-from scipy.sparse.linalg import eigsh, expm, expm_multiply
+from scipy.linalg import sqrtm
 from scipy.sparse import csc_matrix
+from scipy.sparse.linalg import eigsh, expm, expm_multiply
 
+from fauvqe.models.fermiHubbardModel import FermiHubbardModel
 from fauvqe.utilities import (
+    chained_matrix_multiplication,
     flatten,
-    jw_get_true_ground_state_at_particle_number,
     jw_eigenspectrum_at_particle_number,
+    jw_get_true_ground_state_at_particle_number,
     normalize_vec,
     spin_dicke_state,
 )
-from fauvqe.models.fermiHubbardModel import FermiHubbardModel
 
 # this file contains general utils for the cooling.
 # Some of them are simply convenience functions
@@ -304,15 +304,67 @@ def ndarray_to_psum(
     return pauli_sum
 
 
-def state_fidelity_to_eigenstates(state: np.ndarray, eigenstates: np.ndarray):
-    # eigenstates have shape N * M where M is the number of eigenstates
-    fids = []
-    for jj in range(eigenstates.shape[1]):
-        fids.append(
-            cirq.fidelity(
-                state, eigenstates[:, jj], qid_shape=(2,) * int(np.log2(len(state)))
-            )
+def fidelity(a: np.ndarray, b: np.ndarray) -> float:
+    """Returns the quantum fidelity between two objects, each of with being either a wavefunction (a vector) or a density matrix
+    Args:
+        a (np.ndarray): the first object
+        b (np.ndarray): the second object
+    Raises:
+        ValueError: if there is a mismatch in the dimensions of the objects
+        ValueError: if a tensor has more than 2 dimensions
+    Returns:
+        float: the fidelity between the two objects
+    """
+    # remove empty dimensions
+    squa = np.squeeze(a)
+    squb = np.squeeze(b)
+    # check for dimensions mismatch
+    if len(set((*squa.shape, *squb.shape))) > 1:
+        raise ValueError("Dimension mismatch: {} and {}".format(squa.shape, squb.shape))
+    # case for two vectors
+    if len(squa.shape) == 1 and len(squb.shape) == 1:
+        return np.sqrt(
+            np.abs(np.dot(np.conj(squa), squb) * np.dot(np.conj(squb), squa))
         )
+    else:
+        # case for one matrix and one vector, or two matrices
+        items = []
+        for item in (squa, squb):
+            if len(item.shape) == 1:
+                items.append(np.outer(item, item))
+            elif len(item.shape) == 2:
+                items.append(item)
+            else:
+                raise ValueError(
+                    "expected vector or matrix, got {}dimensions".format(item.shape)
+                )
+
+        items[0] = sqrtm(items[0])
+        rho_sigma_rho = chained_matrix_multiplication(
+            np.matmul, items[0], items[1], items[0]
+        )
+        final_mat = sqrtm(rho_sigma_rho)
+        return np.trace(final_mat) ** 2
+
+
+def state_fidelity_to_eigenstates(
+    state: np.ndarray, eigenstates: np.ndarray, expanded: bool = True
+):
+    # eigenstates have shape N * M where M is the number of eigenstates
+
+    fids = []
+
+    for jj in range(eigenstates.shape[1]):
+        if expanded:
+            fids.append(
+                cirq.fidelity(
+                    state, eigenstates[:, jj], qid_shape=(2,) * int(np.log2(len(state)))
+                )
+            )
+        else:
+            # in case we have fermionic vectors which aren't 2**n
+            # expanded refers to jw_ restricted spaces functions
+            fids.append(fidelity(state, eigenstates[:, jj]) ** 2)
     return fids
 
 
@@ -507,12 +559,15 @@ def get_extrapolated_superposition(
 
 
 def thermal_density_matrix_at_particle_number(
-    beta: float, sparse_operator: csc_matrix, particle_number: list
+    beta: float,
+    sparse_operator: csc_matrix,
+    particle_number: list,
+    expanded: bool = True,
 ):
     eig_energies, eig_states = jw_eigenspectrum_at_particle_number(
         sparse_operator=sparse_operator,
         particle_number=particle_number,
-        expanded=True,
+        expanded=expanded,
     )
     thermal_density = expm(
         -beta

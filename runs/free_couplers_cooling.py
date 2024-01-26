@@ -10,6 +10,7 @@ from coolerClass import Cooler
 from building_blocks import (
     get_cheat_sweep,
     get_cheat_coupler,
+    get_perturbed_sweep,
     get_Z_env,
     get_cheat_coupler_list,
 )
@@ -34,7 +35,7 @@ def __main__(args):
     # whether we want to skip all saving data
     dry_run = False
     edm = ExperimentDataManager(
-        experiment_name="cooling_free_couplers_depolnoise_1e2",
+        experiment_name="cooling_free_couplers_zipfree",
         notes="using the noninteracting couplers",
         dry_run=dry_run,
     )
@@ -118,15 +119,6 @@ def __main__(args):
         model=model.to_json_dict()["constructor_params"],
     )
 
-    plt.rcParams.update(
-        {
-            "text.usetex": True,  # use inline math for ticks
-            "font.family": r"Computer Modern Roman",  # use serif/main font for text elements
-            "font.size": 15,
-            "figure.figsize": (5, 4),
-        }
-    )
-
     couplers = get_cheat_coupler_list(
         sys_eig_states=free_sys_eig_states,
         env_eig_states=env_eig_states,
@@ -171,7 +163,7 @@ def __main__(args):
 
     stop_omega = 0.1 * min_gap
 
-    method = "bigbrain"
+    method = "zipcool"
 
     if method == "bigbrain":
         coupler_transitions = np.abs(
@@ -207,27 +199,39 @@ def __main__(args):
             fig,
         )
         plt.show()
-    elif method == "zip":
-        n_steps = len(couplers)
-        sweep_values = get_cheat_sweep(sys_eig_energies, n_steps)
-        alphas = sweep_values / 100
+    elif method == "zipcool":
+        initial_pops = state_fidelity_to_eigenstates(
+            state=sys_initial_state, eigenstates=sys_eig_states
+        )
+        n_rep = 30
+        sweep_values = get_perturbed_sweep(free_sys_eig_energies, 3)
+        # sweep_values = get_cheat_sweep(sys_eig_energies, n_steps=len(sys_eig_energies))
+        alphas = sweep_values / np.linspace(1, 10, len(sweep_values))
         evolution_times = 2.5 * np.pi / (alphas)
-        fidelities, energies, final_sys_density_matrix = cooler.zip_cool(
+        (
+            fidelities,
+            sys_energies,
+            env_energies,
+            final_sys_density_matrix,
+        ) = cooler.zip_cool(
             alphas=alphas,
             evolution_times=evolution_times,
             sweep_values=sweep_values,
-            n_rep=10,
+            n_rep=n_rep,
         )
 
         jobj = {
             "fidelities": fidelities,
-            "energies": energies,
+            "sys_energies": sys_energies,
+            "env_energies": env_energies,
         }
         edm.save_dict_to_experiment(filename="cooling_free_couplers", jobj=jobj)
 
         fig = cooler.plot_generic_cooling(
-            energies,
-            fidelities,
+            env_energies=env_energies,
+            fidelities=fidelities,
+            initial_pops=initial_pops,
+            n_rep=n_rep,
             suptitle="Cooling 2$\\times$2 Fermi-Hubbard",
         )
 
