@@ -21,7 +21,11 @@ from utils import (
     state_fidelity_to_eigenstates,
     get_min_gap,
 )
-from fauvqe.utilities import jw_eigenspectrum_at_particle_number, spin_dicke_state
+from fauvqe.utilities import (
+    jw_eigenspectrum_at_particle_number,
+    spin_dicke_state,
+    flatten,
+)
 import cirq
 from openfermion import get_sparse_operator, jw_hartree_fock_state
 import numpy as np
@@ -33,7 +37,7 @@ from data_manager import ExperimentDataManager
 
 def __main__(args):
     # whether we want to skip all saving data
-    dry_run = False
+    dry_run = True
     edm = ExperimentDataManager(
         experiment_name="cooling_free_couplers_zipfree",
         notes="using the noninteracting couplers",
@@ -203,10 +207,20 @@ def __main__(args):
         initial_pops = state_fidelity_to_eigenstates(
             state=sys_initial_state, eigenstates=sys_eig_states
         )
-        n_rep = 30
-        sweep_values = get_perturbed_sweep(free_sys_eig_energies, 3)
+        n_rep = 5
+        sweep_values = np.array(
+            list(
+                flatten(
+                    get_perturbed_sweep(free_sys_eig_energies, x)
+                    for x in np.linspace(2.5, 3.5, 30)
+                )
+            )
+        )
+
+        sweep_values = get_perturbed_sweep(free_sys_eig_energies, 3.33)
+
         # sweep_values = get_cheat_sweep(sys_eig_energies, n_steps=len(sys_eig_energies))
-        alphas = sweep_values / np.linspace(1, 10, len(sweep_values))
+        alphas = sweep_values / 5
         evolution_times = 2.5 * np.pi / (alphas)
         (
             fidelities,
@@ -227,13 +241,12 @@ def __main__(args):
         }
         edm.save_dict_to_experiment(filename="cooling_free_couplers", jobj=jobj)
 
-        fig = cooler.plot_generic_cooling(
-            env_energies=env_energies,
-            fidelities=fidelities,
-            initial_pops=initial_pops,
-            n_rep=n_rep,
-            suptitle="Cooling 2$\\times$2 Fermi-Hubbard",
-        )
+        fig, ax = plt.subplots()
+
+        ax.plot(sweep_values, fidelities[1:], "k--")
+        ax.set_xlabel("$\omega$")
+        ax.set_ylabel("Fidelity")
+        ax.invert_xaxis()
 
         edm.save_figure(
             fig,
