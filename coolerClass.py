@@ -599,11 +599,8 @@ class Cooler:
     def plot_controlled_cooling(
         self,
         fidelities: list,
-        sys_energies: list,
         env_energies: list,
         omegas: list,
-        weaken_coupling: float,
-        n_qubits: int,
         eigenspectrums: list[list],
         suptitle: str = None,
     ):
@@ -615,7 +612,7 @@ class Cooler:
         nrows = 2
         cmap = plt.get_cmap("turbo", len(env_energies))
 
-        fig, axes = plt.subplots(nrows=nrows, figsize=(5, 3))
+        fig, axes = plt.subplots(nrows=nrows, figsize=(5, 3), sharex=True)
 
         plot_temp = False
         ax_bottom = axes[1]
@@ -630,49 +627,36 @@ class Cooler:
                 len_prev += len(fidelities[rep - 1])
                 sum_omega += sum(omegas[rep - 1])
 
-            xticks = np.arange(len_prev, len_prev + len(fidelities[rep]))
-            xlabel_up = "Steps"
-
             axes[0].plot(
-                xticks,
+                omegas[rep],
                 fidelities[rep],
                 color=cmap(rep),
                 linewidth=2,
             )
 
-            diffs = np.diff(omegas[rep])
-            omega_halfs = np.array(omegas[rep][:-1]) + diffs / 2
-            y_values = diffs ** (-2)
             ax_bottom.plot(
-                omega_halfs,
-                y_values,
+                omegas[rep],
+                env_energies[rep],
                 color=cmap(rep),
                 linewidth=2,
                 label="Rep. {}".format(rep + 1),
             )
-            if plot_temp:
-                twin_ax_bottom.plot(
-                    omegas[rep], env_energies[rep], color="red", linewidth=2
-                )
         for ind, spectrum in enumerate(eigenspectrums):
             ax_bottom.vlines(
                 spectrum,
                 ymin=0,
-                ymax=np.nanmax(y_values[np.isfinite(y_values)]),
+                ymax=np.nanmax(env_energies[np.isfinite(env_energies)]),
                 linestyle="--",
                 color=spectrum_cmap(ind),
                 linewidth=1,
             )
-        axes[0].set_ylabel(
-            r"$|\langle \psi_{cool} | \psi_{target} \rangle|^2$", labelpad=0
-        )
-        axes[0].set_xlabel(xlabel_up)
+        axes[0].set_ylabel(r"Fidelity", labelpad=0)
 
-        ax_bottom.set_ylabel(r"$(T_{fridge})^{-2}$")
+        ax_bottom.set_ylabel(r"$E_{fridge}$")
         ax_bottom.tick_params(axis="y")  # , labelcolor="blue")
         ax_bottom.set_yscale("log")
         ax_bottom.invert_xaxis()
-        ax_bottom.set_xlabel("Fridge gap")
+        ax_bottom.set_xlabel("$\omega$")
         if plot_temp:
             twin_ax_bottom.set_ylabel(r"Env. energy")
             twin_ax_bottom.tick_params(axis="y", labelcolor="red")
@@ -689,6 +673,27 @@ class Cooler:
                 )
             else:
                 ax_bottom.legend(bbox_to_anchor=(0.2, 2))
+        return fig
+
+    def plot_default_cooling(
+        self,
+        omegas: np.ndarray,
+        fidelities: np.ndarray,
+        env_energies: np.ndarray,
+        suptitle: str,
+    ):
+        fig, axes = plt.subplots(nrows=2, sharex=True)
+        axes[0].plot(omegas, fidelities, linewidth=2)
+        axes[0].set_ylabel("Fidelity")
+
+        axes[1].plot(omegas, env_energies, linewidth=2)
+        axes[1].set_ylabel(r"$T_{fridge}$")
+        axes[1].set_xlabel(r"$\omega$")
+        axes[1].invert_xaxis()
+
+        if suptitle:
+            fig.suptitle(suptitle)
+
         return fig
 
     def plot_generic_cooling(

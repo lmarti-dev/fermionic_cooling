@@ -4,6 +4,7 @@ import sys
 # sys.path.append("/home/Refik/Data/My_files/Dropbox/PhD/repos/fauvqe/")
 
 from fauvqe.models.fermiHubbardModel import FermiHubbardModel
+from helpers.specificModel import SpecificModel
 
 from coolerClass import Cooler
 
@@ -27,12 +28,16 @@ from fauvqe.utilities import (
     flatten,
 )
 import cirq
-from openfermion import get_sparse_operator, jw_hartree_fock_state
-import numpy as np
+from openfermion import (
+    get_sparse_operator,
+    jw_hartree_fock_state,
+    get_quadratic_hamiltonian,
+)
 import matplotlib.pyplot as plt
 
 
-from data_manager import ExperimentDataManager
+from data_manager import ExperimentDataManager, set_color_cycler
+import numpy as np
 
 
 def __main__(args):
@@ -43,14 +48,29 @@ def __main__(args):
         notes="using the noninteracting couplers",
         dry_run=dry_run,
     )
+    set_color_cycler()
     # model stuff
-    model = FermiHubbardModel(x_dimension=2, y_dimension=2, tunneling=1, coulomb=2)
-    n_qubits = len(model.flattened_qubits)
-    n_electrons = [2, 2]
+
+    model_name = "v3/FAU_O2_singlet_6e_4o_CASSCF"
+    if model_name == "fh":
+        model = FermiHubbardModel(x_dimension=2, y_dimension=2, tunneling=1, coulomb=2)
+        n_qubits = len(model.flattened_qubits)
+        n_electrons = [2, 2]
+        non_interacting_model = model.non_interacting_model.fock_hamiltonian
+    else:
+        spm = SpecificModel(model_name=model_name)
+        model = spm.current_model
+        n_qubits = len(model.flattened_qubits)
+        n_electrons = spm.Nf
+        non_interacting_model = get_quadratic_hamiltonian(
+            fermion_operator=model.fock_hamiltonian,
+            n_qubits=n_qubits,
+            ignore_incompatible_terms=True,
+        )
 
     free_sys_eig_energies, free_sys_eig_states = jw_eigenspectrum_at_particle_number(
         sparse_operator=get_sparse_operator(
-            model.non_interacting_model.fock_hamiltonian,
+            non_interacting_model,
             n_qubits=len(model.flattened_qubits),
         ),
         particle_number=n_electrons,
@@ -160,14 +180,14 @@ def __main__(args):
 
     print(f"coupler dim: {cooler.sys_env_coupler_data_dims}")
 
-    ansatz_options = {"beta": 1, "mu": 1, "c": 2}
+    ansatz_options = {"beta": 1, "mu": 1, "c": 1}
     weaken_coupling = 100
 
     start_omega = 1.01 * spectrum_width
 
     stop_omega = 0.1 * min_gap
 
-    method = "zipcool"
+    method = "bigbrain"
 
     if method == "bigbrain":
         coupler_transitions = np.abs(
@@ -190,11 +210,8 @@ def __main__(args):
 
         fig = cooler.plot_controlled_cooling(
             fidelities=fidelities,
-            sys_energies=sys_ev_energies,
             env_energies=env_ev_energies,
             omegas=omegas,
-            weaken_coupling=weaken_coupling,
-            n_qubits=n_qubits,
             eigenspectrums=[
                 sys_eig_energies - sys_eig_energies[0],
             ],

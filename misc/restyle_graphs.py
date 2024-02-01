@@ -72,7 +72,7 @@ for fpath in fpaths:
 
     new_axes[0].set_ylabel("Fidelity")
     new_axes[1].set_xlabel("$\omega$")
-    new_axes[1].set_ylabel(r"$(E_{fridge})^{-2}$")
+    new_axes[1].set_ylabel(r"$f(E_{fridge})^{-2}$")
 
     figname = fpath.split("\\")[-2]
     edm.save_figure(fig=new_fig, filename=figname)
