@@ -135,7 +135,7 @@ def get_cheat_sweep(spectrum: np.ndarray, n_steps: int = None, n_rep: int = None
     res = []
     if n_steps is None:
         n_rep = n_rep
-    elif n_rep is None:
+    if n_rep is None:
         n_rep = 1
     else:
         n_rep = int(n_steps / (len(spectrum) - 1))

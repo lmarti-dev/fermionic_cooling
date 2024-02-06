@@ -1,32 +1,31 @@
+import matplotlib.pyplot as plt
+import numpy as np
 from adiabatic_sweep import (
-    run_sweep,
-    get_sweep_hamiltonian,
     fermion_to_dense,
     get_instantaneous_ground_states,
+    get_sweep_hamiltonian,
+    run_sweep,
 )
-from fauvqe.models.fermiHubbardModel import FermiHubbardModel
-
-from data_manager import ExperimentDataManager
-
-from fauvqe.utilities import (
-    jw_eigenspectrum_at_particle_number,
+from cirq import fidelity
+from helpers.specificModel import SpecificModel
+from openfermion import (
+    get_sparse_operator,
+    jw_hartree_fock_state,
+    get_quadratic_hamiltonian,
 )
 from utils import (
-    get_closest_noninteracting_degenerate_ground_state,
-    get_min_gap,
     extrapolate_ground_state_non_interacting_fermi_hubbard,
+    get_closest_noninteracting_degenerate_ground_state,
     get_extrapolated_superposition,
+    get_min_gap,
     state_fidelity_to_eigenstates,
 )
 
-from openfermion import get_sparse_operator, jw_hartree_fock_state
-import matplotlib.pyplot as plt
-
-from cirq import fidelity
-import numpy as np
-
-
 from data_manager import ExperimentDataManager
+from fauvqe.models.fermiHubbardModel import FermiHubbardModel
+from fauvqe.utilities import (
+    jw_eigenspectrum_at_particle_number,
+)
 
 
 def plot_fidelity(fidelities, instant_fidelities):
@@ -38,26 +37,55 @@ def plot_fidelity(fidelities, instant_fidelities):
     ax.set_ylabel("Fidelity")
     ax.legend()
 
-    plt.show()
+    # plt.show()
 
 
 def __main__():
-    # whether we want to skip all saving data
-    dry_run = True
+    model_names = (
+        "v3/FAU_O2_singlet_6e_4o_CASSCF",
+        "v3/FAU_O2_singlet_8e_6o_CASSCF",
+        "v3/Fe3_NTA_quartet_CASSCF",
+        "v3/FAU_O2_triplet_6e_4o_CASSCF",
+    )
+    dry_run = False
+
     edm = ExperimentDataManager(
-        experiment_name="adiabatic_sweep_only",
-        notes="trying out adiabatic sweep for fermi hubbard",
+        experiment_name="adiabatic_sweep_chems",
+        notes="adiabatic sweep for chemical models",
         dry_run=dry_run,
     )
+    for model_name in model_names:
+        run_comp(edm, model_name)
+        edm.new_run()
+
+
+def run_comp(edm, model_name):
+    # whether we want to skip all saving data
+
     # model stuff
-    model = FermiHubbardModel(x_dimension=2, y_dimension=2, tunneling=1, coulomb=2)
-    n_electrons = [2, 1]
+    if model_name == "fh":
+        model = FermiHubbardModel(x_dimension=2, y_dimension=2, tunneling=1, coulomb=2)
+        n_qubits = len(model.flattened_qubits)
+        n_electrons = [2, 2]
+        non_interacting_fock_hamiltonian = model.non_interacting_model.fock_hamiltonian
+    else:
+        spm = SpecificModel(model_name=model_name)
+        model = spm.current_model
+        n_qubits = len(model.flattened_qubits)
+        n_electrons = spm.Nf
+        non_interacting_fock_hamiltonian = get_quadratic_hamiltonian(
+            fermion_operator=model.fock_hamiltonian,
+            n_qubits=n_qubits,
+            ignore_incompatible_terms=True,
+        )
 
-    n_qubits = len(model.flattened_qubits)
+    # extrapolated_ground_state = extrapolate_ground_state_non_interacting_fermi_hubbard(
+    #     model=model, n_electrons=n_electrons, n_points=5, deg=1
+    # )
 
-    extrapolated_ground_state = extrapolate_ground_state_non_interacting_fermi_hubbard(
-        model=model, n_electrons=n_electrons, n_points=5, deg=1
-    )
+    # extrapolated_superposition = get_extrapolated_superposition(
+    #     model=model, n_electrons=n_electrons, coulomb=1e-6
+    # )
 
     eigenenergies, eigenstates = jw_eigenspectrum_at_particle_number(
         sparse_operator=get_sparse_operator(model.fock_hamiltonian),
@@ -66,14 +94,9 @@ def __main__():
     )
 
     slater_eigenenergies, slater_eigenstates = jw_eigenspectrum_at_particle_number(
-        sparse_operator=get_sparse_operator(
-            model.non_interacting_model.fock_hamiltonian
-        ),
+        sparse_operator=get_sparse_operator(non_interacting_fock_hamiltonian),
         particle_number=n_electrons,
         expanded=True,
-    )
-    extrapolated_superposition = get_extrapolated_superposition(
-        model=model, n_electrons=n_electrons, coulomb=1e-6
     )
 
     final_ground_state = eigenstates[:, 0]
@@ -82,17 +105,22 @@ def __main__():
         f"initial fidelity: {fidelity(initial_ground_state,final_ground_state,qid_shape=(2,)*n_qubits)}"
     )
 
-    ham_start = fermion_to_dense(model.non_interacting_model.fock_hamiltonian)
+    ham_start = fermion_to_dense(non_interacting_fock_hamiltonian)
     ham_stop = fermion_to_dense(model.fock_hamiltonian)
 
     # total steps
     n_steps = int(1e2)
     # total time
     spectrum_width = np.max(eigenenergies) - np.min(eigenenergies)
-    total_time = (
-        20 * spectrum_width / (get_min_gap(eigenenergies, threshold=1e-12) ** 2)
-    )
+    total_time = spectrum_width / (get_min_gap(eigenenergies, threshold=1e-6) ** 2)
 
+    edm.dump_some_variables(
+        model_name=model_name,
+        n_qubits=n_qubits,
+        n_electrons=n_electrons,
+        spectrum_width=spectrum_width,
+        total_time=total_time,
+    )
     instantaneous_ground_states = get_instantaneous_ground_states(
         ham_start=ham_start, ham_stop=ham_stop, n_steps=n_steps, n_electrons=n_electrons
     )
@@ -120,17 +148,10 @@ def __main__():
 
     print("=============")
 
-    for a, b in zip(fid_init, fid_final):
-        print(f"init: {a:.3f} final {b:.3f}")
-
-    plt.rcParams.update(
-        {
-            "font.family": r"serif",  # use serif/main font for text elements
-            "text.usetex": True,  # use inline math for ticks
-            "pgf.rcfonts": False,  # don't setup fonts from rc parameters
-            "figure.figsize": (5, 3),
-        }
-    )
+    for ind, (a, b) in enumerate(zip(fid_init, fid_final)):
+        print(
+            f"E_{ind} init pop: {a:.3f} dE: {slater_eigenenergies[ind]-slater_eigenenergies[0]:.3f} final pop {b:.3f} dE: {eigenenergies[ind]-eigenenergies[0]:.3f}"
+        )
 
     # pops
     fig, ax = plt.subplots()
@@ -142,14 +163,14 @@ def __main__():
         np.linspace(0, total_time, len(fidelities)),
         fidelities,
         "r",
-        linewidth=3,
+        linewidth=2,
         label="Fidelity to g.s.",
     )
     ax.plot(
         np.linspace(0, total_time, len(instant_fidelities)),
         instant_fidelities,
         "b",
-        linewidth=3,
+        linewidth=2,
         label="Fidelity to instant g.s.",
     )
     ax.set_xlabel("Time")
@@ -159,8 +180,6 @@ def __main__():
     # ax.set_ybound(1e-7, 1)
 
     edm.save_figure(fig=fig)
-
-    plt.show()
 
 
 if __name__ == "__main__":

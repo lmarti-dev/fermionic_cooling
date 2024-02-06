@@ -57,7 +57,9 @@ class Cooler:
         env_ground_state: np.ndarray,
         sys_env_coupler_data: Union[cirq.PauliSum, list],
         verbosity: int = 0,
+        time_evolve_method: str = "diag",
     ):
+        self.time_evolve_method = time_evolve_method
         self.verbosity = verbosity
         self.sys_hamiltonian = sys_hamiltonian
         self.n_electrons = n_electrons
@@ -97,6 +99,9 @@ class Cooler:
         if self.verbosity and self.msg != {}:
             print("\n".join(self.msg.values()))
             print("\033[F" * (1 + len(self.msg.keys())))
+
+    def msg_out(self):
+        print("\x1B[#B" * (2 + len(self.msg.keys())))
 
     def cooling_hamiltonian(self, env_coupling: float, alpha: float):
         if isinstance(self.sys_env_coupler, (cirq.PauliSum, cirq.PauliString)):
@@ -229,6 +234,8 @@ class Cooler:
             n_sys_qubits=len(self.sys_qubits),
             n_env_qubits=len(self.env_qubits),
         )
+
+        self.msg_out()
         return fidelities, sys_energies, env_energies, final_sys_density_matrix
 
     def cool(
@@ -289,6 +296,8 @@ class Cooler:
             n_sys_qubits=len(self.sys_qubits),
             n_env_qubits=len(self.env_qubits),
         )
+
+        self.msg_out()
         return fidelities, energies, final_sys_density_matrix
 
     def sys_env_coupler_easy_setter(self, coupler_index: int, rep: int):
@@ -476,6 +485,7 @@ class Cooler:
 
                 omega = omega - epsilon
 
+        self.msg_out()
         return fidelities, sys_energies, omegas, env_energies
 
     def trotter_cooling_step(
@@ -553,7 +563,7 @@ class Cooler:
             ham=cooling_hamiltonian,  # .matrix(qubits=self.total_qubits),
             rho=total_density_matrix,
             t=evolution_time,
-            method="expm",
+            method=self.time_evolve_method,
         )
 
         traced_density_matrix = trace_out_env(
@@ -641,11 +651,12 @@ class Cooler:
                 linewidth=2,
                 label="Rep. {}".format(rep + 1),
             )
+        all_env_energies = np.array(list(flatten(env_energies)))
         for ind, spectrum in enumerate(eigenspectrums):
             ax_bottom.vlines(
                 spectrum,
                 ymin=0,
-                ymax=np.nanmax(env_energies[np.isfinite(env_energies)]),
+                ymax=np.nanmax(all_env_energies[np.isfinite(all_env_energies)]),
                 linestyle="--",
                 color=spectrum_cmap(ind),
                 linewidth=1,

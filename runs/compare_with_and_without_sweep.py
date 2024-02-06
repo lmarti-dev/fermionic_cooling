@@ -7,7 +7,7 @@ from fauvqe.models.fermiHubbardModel import FermiHubbardModel
 from helpers.specificModel import SpecificModel
 
 from coolerClass import Cooler
-
+from adiabatic_sweep import run_sweep, fermion_to_dense
 from building_blocks import (
     get_cheat_sweep,
     get_cheat_coupler,
@@ -44,14 +44,13 @@ def __main__(args):
     # whether we want to skip all saving data
     dry_run = False
     edm = ExperimentDataManager(
-        experiment_name="cooling_free_couplers",
-        notes="using the noninteracting couplers",
+        experiment_name="cooling_with_initial_adiab_sweep",
+        notes="adding an initial sweep before the cooling run",
         dry_run=dry_run,
     )
     set_color_cycler()
     # model stuff
 
-    # model_name = "fh"
     model_name = "v3/FAU_O2_singlet_6e_4o_CASSCF"
     if model_name == "fh":
         model = FermiHubbardModel(x_dimension=2, y_dimension=2, tunneling=1, coulomb=2)
@@ -146,10 +145,10 @@ def __main__(args):
     )
 
     couplers = get_cheat_coupler_list(
-        sys_eig_states=free_sys_eig_states,
+        sys_eig_states=sys_eig_states,
         env_eig_states=env_eig_states,
         qubits=sys_qubits + env_qubits,
-        gs_indices=(0, 1, 2),
+        gs_indices=(0,),
         noise=0,
     )  # Interaction only on Qubit 0?
     print("coupler done")
@@ -164,39 +163,64 @@ def __main__(args):
 
     # evolution_time = 1e-3
 
-    # call cool
+    for which_initial_process in ("adiabatic", "none"):
+        print(f"Initial process: {which_initial_process}")
 
-    cooler = Cooler(
-        sys_hamiltonian=model.hamiltonian,
-        n_electrons=n_electrons,
-        sys_qubits=model.flattened_qubits,
-        sys_ground_state=sys_ground_state,
-        sys_initial_state=sys_initial_state,
-        env_hamiltonian=env_ham,
-        env_qubits=env_qubits,
-        env_ground_state=env_ground_state,
-        sys_env_coupler_data=couplers,
-        verbosity=5,
-    )
-    n_rep = 1
+        if which_initial_process == "adiabatic":
+            # call sweep
+            initial_ground_state = sys_slater_state
+            final_ground_state = sys_eig_states[:, 0]
+            ham_start = fermion_to_dense(model.non_interacting_model.fock_hamiltonian)
+            ham_stop = fermion_to_dense(model.fock_hamiltonian)
+            n_steps = 100
+            total_time = (
+                20
+                * spectrum_width
+                / (get_min_gap(sys_eig_energies, threshold=1e-12) ** 2)
+            )
 
-    print(f"coupler dim: {cooler.sys_env_coupler_data_dims}")
-
-    ansatz_options = {"beta": 1, "mu": 30, "c": 10}
-    weaken_coupling = 10
-
-    start_omega = 1.01 * spectrum_width
-    start_omega = 2.1
-
-    stop_omega = 0.1 * min_gap
-    stop_omega = 1.9
-
-    method = "bigbrain"
-
-    if method == "bigbrain":
-        coupler_transitions = np.abs(
-            np.array(free_sys_eig_energies[1:]) - free_sys_eig_energies[0]
+            (
+                fidelities,
+                instant_fidelities,
+                final_ground_state,
+                populations,
+                final_state,
+            ) = run_sweep(
+                initial_state=initial_ground_state,
+                ham_start=ham_start,
+                ham_stop=ham_stop,
+                final_ground_state=final_ground_state,
+                instantaneous_ground_states=None,
+                n_steps=n_steps,
+                total_time=total_time,
+                get_populations=True,
+            )
+            sys_initial_state = final_state
+        elif which_initial_process == "none":
+            sys_initial_state = sys_slater_state
+        cooler = Cooler(
+            sys_hamiltonian=model.hamiltonian,
+            n_electrons=n_electrons,
+            sys_qubits=model.flattened_qubits,
+            sys_ground_state=sys_ground_state,
+            sys_initial_state=sys_initial_state,
+            env_hamiltonian=env_ham,
+            env_qubits=env_qubits,
+            env_ground_state=env_ground_state,
+            sys_env_coupler_data=couplers,
+            verbosity=5,
         )
+        n_rep = 1
+
+        print(f"coupler dim: {cooler.sys_env_coupler_data_dims}")
+
+        ansatz_options = {"beta": 1, "mu": 10, "c": 30}
+        weaken_coupling = 30
+
+        start_omega = 2
+
+        stop_omega = 0.1
+
         fidelities, sys_ev_energies, omegas, env_ev_energies = cooler.big_brain_cool(
             start_omega=start_omega,
             stop_omega=stop_omega,
@@ -207,74 +231,14 @@ def __main__(args):
         )
 
         jobj = {
+            "omegas": omegas,
             "fidelities": fidelities,
             "sys_energies": sys_ev_energies,
+            "env_ev_energies": env_ev_energies,
         }
-        edm.save_dict_to_experiment(filename="cooling_free", jobj=jobj)
-
-        fig = cooler.plot_controlled_cooling(
-            fidelities=fidelities,
-            env_energies=env_ev_energies,
-            omegas=omegas,
-            eigenspectrums=[
-                sys_eig_energies - sys_eig_energies[0],
-            ],
+        edm.save_dict_to_experiment(
+            filename=f"cooling_free_{which_initial_process}", jobj=jobj
         )
-        edm.save_figure(
-            fig,
-        )
-        plt.show()
-    elif method == "zipcool":
-        initial_pops = state_fidelity_to_eigenstates(
-            state=sys_initial_state, eigenstates=sys_eig_states
-        )
-        n_rep = 1
-        sweep_values = np.array(
-            list(
-                flatten(
-                    get_perturbed_sweep(free_sys_eig_energies, x)
-                    for x in np.linspace(2.5, 3.5, 30)
-                )
-            )
-        )
-
-        sweep_values = get_cheat_sweep(spectrum=sys_eig_energies)
-
-        # sweep_values = get_cheat_sweep(sys_eig_energies, n_steps=len(sys_eig_energies))
-        alphas = sweep_values / 50
-        evolution_times = 2.5 * np.pi / (alphas)
-        (
-            fidelities,
-            sys_energies,
-            env_energies,
-            final_sys_density_matrix,
-        ) = cooler.zip_cool(
-            alphas=alphas,
-            evolution_times=evolution_times,
-            sweep_values=sweep_values,
-            n_rep=n_rep,
-            fidelity_threshold=2,
-        )
-
-        jobj = {
-            "fidelities": fidelities,
-            "sys_energies": sys_energies,
-            "env_energies": env_energies,
-        }
-        edm.save_dict_to_experiment(filename="cooling_free_couplers", jobj=jobj)
-
-        fig, ax = plt.subplots()
-
-        ax.plot(sweep_values, fidelities[1:], "k--")
-        ax.set_xlabel("$\omega$")
-        ax.set_ylabel("Fidelity")
-        ax.invert_xaxis()
-
-        edm.save_figure(
-            fig,
-        )
-
-        plt.show()
 
 
 if __name__ == "__main__":

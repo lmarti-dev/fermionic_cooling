@@ -106,8 +106,12 @@ def run_sweep(
         if len(state.shape) == 2:
             # if we deal with a density csc_matrix
             state = np.matmul(state, np.conjugate(unitary.T))
+            state /= np.trace(state)
         elif len(state.shape) > 2:
             raise ValueError(f"Expected state size 1 or 2, got {state.size}")
+        # statevector
+        else:
+            state /= np.linalg.norm(state)
         if get_populations:
             state_pops = []
             for ind_spec in range(end_spectrum.shape[1]):

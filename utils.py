@@ -5,6 +5,8 @@ from typing import Iterable, Iterator
 
 import cirq
 import numpy as np
+import cupy as cp
+from cupyx.scipy.linalg import expm as cupy_expm
 from openfermion import FermionOperator, get_sparse_operator, jw_hartree_fock_state
 from scipy.linalg import sqrtm
 from scipy.sparse import csc_matrix
@@ -138,7 +140,7 @@ def get_psum_qubits(psum: cirq.PauliSum) -> Iterable[cirq.Qid]:
 
 
 def dagger(U: np.ndarray) -> np.ndarray:
-    return np.transpose(np.conj(U))
+    return np.conj(U.T)
 
 
 def time_evolve_state(ham: np.ndarray, ket: np.ndarray, t: float):
@@ -149,11 +151,8 @@ def time_evolve_density_matrix(
     ham: np.ndarray,
     rho: np.ndarray,
     t: float,
-    method: str = "expm_multiply",
-    verbose: bool = False,
+    method: str = "expm",
 ):
-    # print("timing...")
-    start = time.time()
     if method == "expm_multiply":
         # can be extremely slow
         # Ur
@@ -162,10 +161,31 @@ def time_evolve_density_matrix(
         Ut_rho_Utd = dagger(expm_multiply(A=-1j * t * ham, B=dagger(Ut_rho)))
     elif method == "expm":
         Ut = expm(-1j * t * ham)
-        Ut_rho_Utd = Ut @ rho @ Ut.transpose().conjugate()
-    end = time.time()
-    if verbose:
-        print("time evolution took: {} sec".format(end - start))
+        Ut_rho_Utd = Ut @ rho @ Ut.T.conjugate()
+    elif method == "cupy":
+        raise NotImplementedError
+        # borken
+        ham = cp.array(ham, dtype=complex)
+        rho = cp.array(rho, dtype=complex)
+        Ut = cupy_expm(-1j * t * ham)
+        Ut_rho_Utd = cp.matmul(cp.matmul(Ut, rho), Ut.T.conjugate())
+    elif method == "sparse":
+        # definitely do NOT use this
+        # it's very slow
+        ham = csc_matrix(ham)
+        rho = csc_matrix(rho)
+        Ut_rho = expm_multiply(A=-1j * t * ham, B=rho)
+        Ut_rho_Utd = dagger(expm_multiply(A=-1j * t * ham, B=dagger(Ut_rho)))
+        Ut_rho_Utd = Ut_rho_Utd.toarray()
+    elif method == "diag":
+        # here we use the diag method because cupy's expm doesn't
+        # work for complex matrices.. only real ones (will know)
+        _D, _V = cp.linalg.eigh(cp.asarray(ham, dtype=complex))
+        _dV = _V.T.conjugate()
+        Ut = cp.matmul(cp.matmul(_V, cp.diag(cp.exp(-1j * t * _D))), _dV)
+        Utd = Ut.T.conjugate()
+        Ut_rho_Utd = cp.matmul(cp.matmul(Ut, cp.asarray(rho, dtype=complex)), Utd).get()
+
     if not cirq.is_hermitian(Ut_rho_Utd):
         raise ValueError("time-evolved density matrix is not hermitian")
     return Ut_rho_Utd
@@ -220,6 +240,11 @@ def trace_out_env(
     n_sys_qubits: int,
     n_env_qubits: int,
 ):
+    return cirq.partial_trace(
+        rho.reshape(*[2 for _ in range(2 * n_sys_qubits + 2 * n_env_qubits)]),
+        range(n_sys_qubits),
+    ).reshape(2**n_sys_qubits, 2**n_sys_qubits)
+    # cirq is faster
     return two_tensors_partial_trace(rho=rho, n1=n_sys_qubits, n2=n_env_qubits)
 
 
@@ -396,14 +421,6 @@ def coupler_fidelity_to_ground_state_projectors(
         measures.append(
             np.trace(np.conjugate(np.transpose(exp_coupler)) @ exp_projector)
         )
-
-        # measures.append(
-        #     cirq.fidelity(
-        #         expm(-1j * coupler),
-        #         expm(-1j * projector),
-        #         qid_shape=(2,) * int(np.log2(len(coupler))),
-        #     )
-        # )
     return measures
 
 
