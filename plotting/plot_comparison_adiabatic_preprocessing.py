@@ -78,7 +78,7 @@ def plot_results(edm, with_adiab: str, wout_adiab: str, sys_eig_energies: np.nda
 
 if __name__ == "__main__":
 
-    edm = ExperimentDataManager(experiment_date="plot_initial_sweep_comparison")
+    edm = ExperimentDataManager(experiment_name="plot_initial_sweep_comparison")
     var_dump = load_json(
         "/home/eckstein/Desktop/projects/data/2024_02_07/cooling_with_initial_adiab_sweep_13h33/run_00000/logging/var_dump_2024_02_07_13_33_16.json"
     )
