@@ -183,14 +183,11 @@ def __main__(args):
     print(f"coupler dim: {cooler.sys_env_coupler_data_dims}")
 
     ansatz_options = {"beta": 1, "mu": 30, "c": 10}
-    weaken_coupling = 10
+    weaken_coupling = 20
 
     start_omega = 1.01 * spectrum_width
-    start_omega = 2.1
 
     stop_omega = 0.1 * min_gap
-    stop_omega = 1.9
-
     method = "bigbrain"
 
     if method == "bigbrain":

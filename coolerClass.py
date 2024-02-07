@@ -29,6 +29,7 @@ from utils import (
     ketbra,
     time_evolve_density_matrix,
     trace_out_env,
+    trace_out_sys,
     depth_indexing,
     get_list_depth,
 )
@@ -143,7 +144,7 @@ class Cooler:
         return expectation_wrapper(
             self.env_hamiltonian,
             env_state,
-            self.total_qubits,
+            self.env_qubits,
         )
 
     def get_coupler_from_data(self, indices: tuple = None):
@@ -171,7 +172,7 @@ class Cooler:
 
         sys_fidelity = self.sys_fidelity(self.sys_initial_state)
         sys_energy = self.sys_energy(self.sys_initial_state)
-        env_energy = self.env_energy(self.total_initial_state)
+        env_energy = self.env_energy(self.env_ground_state)
 
         self.update_message(
             "fidgs",
@@ -251,10 +252,12 @@ class Cooler:
         total_density_matrix = initial_density_matrix
 
         fidelities = []
-        energies = []
+        sys_energies = []
+        env_energies = []
 
         sys_fidelity = self.sys_fidelity(self.sys_initial_state)
         sys_energy = self.sys_energy(self.sys_initial_state)
+        env_energy = self.env_energy(self.env_ground_state)
 
         self.update_message(
             "fidgs",
@@ -265,7 +268,8 @@ class Cooler:
         )
 
         fidelities.append(sys_fidelity)
-        energies.append(sys_energy)
+        sys_energies.append(sys_energy)
+        env_energies.append(env_energy)
 
         for step, env_coupling in enumerate(sweep_values):
             # trotterize cooling to go slow
@@ -275,14 +279,15 @@ class Cooler:
             else:
                 step_fn = self.cooling_step
                 evolution_time = evolution_times[step]
-            sys_fidelity, sys_energy, _, total_density_matrix = step_fn(
+            sys_fidelity, sys_energy, env_energy, total_density_matrix = step_fn(
                 total_density_matrix=total_density_matrix,
                 env_coupling=env_coupling,
                 alpha=alphas[step],
                 evolution_time=evolution_time,
             )
             fidelities.append(sys_fidelity)
-            energies.append(sys_energy)
+            sys_energies.append(sys_energy)
+            env_energies.append(env_energy)
             self.update_message(
                 "fidgs",
                 "fidelity to gs: {:.4f}, energy diff of traced out rho: {:.4f}".format(
@@ -298,7 +303,7 @@ class Cooler:
         )
 
         self.msg_out()
-        return fidelities, energies, final_sys_density_matrix
+        return fidelities, sys_energies, env_energies, final_sys_density_matrix
 
     def sys_env_coupler_easy_setter(self, coupler_index: int, rep: int):
         coupler_indexing = self.sys_env_coupler_data_dims > 0
@@ -357,7 +362,7 @@ class Cooler:
 
         sys_fidelity = self.sys_fidelity(self.sys_initial_state)
         sys_energy = self.sys_energy(self.sys_initial_state)
-        env_energy = self.env_energy(self.total_initial_state)
+        env_energy = self.env_energy(self.env_ground_state)
         n_qubits = len(self.sys_hamiltonian.qubits)
 
         self.update_message(
@@ -516,10 +521,17 @@ class Cooler:
                 n_sys_qubits=len(self.sys_qubits),
                 n_env_qubits=len(self.env_qubits),
             )
+            traced_env = trace_out_sys(
+                rho=total_density_matrix,
+                n_sys_qubits=len(self.sys_qubits),
+                n_env_qubits=len(self.env_qubits),
+            )
 
             # renormalizing to avoid errors
             traced_density_matrix /= np.trace(traced_density_matrix)
             total_density_matrix /= np.trace(total_density_matrix)
+            traced_env /= np.trace(traced_env)
+
             sys_energy = self.sys_energy(traced_density_matrix)
             sys_energy_after = sys_energy
 
@@ -530,7 +542,7 @@ class Cooler:
             )
             self.print_msg()
         sys_fidelity = self.sys_fidelity(traced_density_matrix)
-        env_energy = self.env_energy(total_density_matrix)
+        env_energy = self.env_energy(traced_env)
         # putting the env back in the ground state
         total_density_matrix = np.kron(
             traced_density_matrix, self.env_ground_density_matrix
@@ -571,6 +583,11 @@ class Cooler:
             n_sys_qubits=len(self.sys_qubits),
             n_env_qubits=len(self.env_qubits),
         )
+        traced_env = trace_out_sys(
+            rho=total_density_matrix,
+            n_sys_qubits=len(self.sys_qubits),
+            n_env_qubits=len(self.env_qubits),
+        )
 
         if depol_noise is not None:
             # add depol noise
@@ -589,11 +606,12 @@ class Cooler:
         # renormalizing to avoid errors
         traced_density_matrix /= np.trace(traced_density_matrix)
         total_density_matrix /= np.trace(total_density_matrix)
+        traced_env /= np.trace(traced_env)
 
         # computing useful values
         sys_fidelity = self.sys_fidelity(traced_density_matrix)
         sys_energy = self.sys_energy(traced_density_matrix)
-        env_energy = self.env_energy(total_density_matrix)
+        env_energy = self.env_energy(traced_env)
 
         self.print_msg()
 
