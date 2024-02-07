@@ -19,12 +19,21 @@ from utils import (
     get_min_gap,
 )
 
-from data_manager import ExperimentDataManager
+from data_manager import ExperimentDataManager, set_color_cycler
 from fauvqe.models.fermiHubbardModel import FermiHubbardModel
 from fauvqe.utilities import jw_eigenspectrum_at_particle_number, spin_dicke_state
 
 
+def get_all_gaps(sys_eig_energies):
+    sweep_values = np.array(list(np.abs(np.diff(sys_eig_energies))))
+    sweep_values = np.repeat(sweep_values[sweep_values > 1e-8], 10)
+    idx = np.argsort(-sweep_values)
+    sweep_values = sweep_values[idx]
+    return sweep_values
+
+
 def __main__(args):
+    set_color_cycler()
     # whether we want to skip all saving data
     dry_run = True
     edm = ExperimentDataManager(
@@ -79,22 +88,21 @@ def __main__(args):
         sparse_operator=get_sparse_operator(model.fock_hamiltonian),
         particle_number=n_electrons,
     )
-    couplers = get_cheat_thermalizers(
-        sys_eig_states=sys_eig_states, env_eig_states=env_eig_states, reverse=True
+    couplers = get_cheat_coupler_list(
+        sys_eig_states=sys_eig_states, env_eig_states=env_eig_states
     )
 
-    ones_matrix = np.ones((sys_eig_states.shape[0], sys_eig_states.shape[0]))
-    ones_matrix /= np.trace(ones_matrix)
-    couplers = [get_matrix_coupler(ones_matrix, env_eig_states)]
+    # ones_matrix = np.ones((sys_eig_states.shape[0], sys_eig_states.shape[0]))
+    # ones_matrix /= np.trace(ones_matrix)
+    # couplers = [get_matrix_coupler(ones_matrix, env_eig_states)]
 
     print("coupler done")
 
     print(f"number of couplers: {len(couplers)}")
 
     # SWeep values are here dummy
-    sweep_values = np.array(list(np.abs(np.diff(sys_eig_energies))))
-    sweep_values = np.repeat(sweep_values[sweep_values > 1e-8], 10)
 
+    sweep_values = get_cheat_sweep(sys_eig_energies)
     alphas = sweep_values / 100
     evolution_times = np.pi / np.abs(alphas)
     # evolution_time = 1e-3
@@ -115,6 +123,7 @@ def __main__(args):
         env_ground_state=env_ground_state,
         sys_env_coupler_data=couplers,
         verbosity=5,
+        time_evolve_method="expm",
     )
 
     # probe_times(edm, cooler, alphas, sweep_values)
@@ -125,7 +134,7 @@ def __main__(args):
             sys_energies,
             env_energies,
             final_sys_density_matrix,
-        ) = thermalizer.zip_cool(
+        ) = thermalizer.cool(
             alphas=alphas,
             evolution_times=evolution_times,
             sweep_values=sweep_values,
@@ -166,10 +175,10 @@ def __main__(args):
             f"initial_sys_ene: {sys_energies[0]} final sys ene: {sys_energies[-1]}, thermal energy: {thermal_energy}"
         )
 
-        fig = thermalizer.plot_generic_cooling(
-            fidelities,
-            initial_pops=fids_initl,
-            env_energies=env_energies,
+        fig = thermalizer.plot_default_cooling(
+            omegas=sweep_values,
+            fidelities=fidelities[1:],
+            env_energies=env_energies[1:],
             suptitle="Thermalizing 2$\\times$2 Fermi-Hubbard",
         )
         edm.save_figure(
@@ -178,7 +187,7 @@ def __main__(args):
         plt.show()
 
     elif method == "bigbrain":
-        ansatz_options = {"beta": 1, "mu": 1, "c": 10}
+        ansatz_options = {"beta": 1, "mu": 10, "c": 10}
         weaken_coupling = 100
 
         spectrum_width = np.abs(np.max(sys_eig_energies) - np.min(sys_eig_energies))

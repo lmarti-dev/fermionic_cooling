@@ -184,7 +184,7 @@ def __main__(args):
     print(f"coupler dim: {cooler.sys_env_coupler_data_dims}")
 
     ansatz_options = {"beta": 1, "mu": 10, "c": 20}
-    weaken_coupling = 10
+    weaken_coupling = 20
 
     start_omega = 1.01 * spectrum_width
 

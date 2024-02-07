@@ -263,6 +263,19 @@ def trace_out_sys(
 ):
     return cirq.partial_trace(
         rho.reshape(*[2 for _ in range(2 * n_sys_qubits + 2 * n_env_qubits)]),
+        range(n_sys_qubits, n_env_qubits),
+    ).reshape(2**n_env_qubits, 2**n_env_qubits)
+    # cirq is faster
+    return two_tensors_partial_trace(rho=rho, n1=n_sys_qubits, n2=n_env_qubits)
+
+
+def trace_out_sys(
+    rho: np.ndarray,
+    n_sys_qubits: int,
+    n_env_qubits: int,
+):
+    return cirq.partial_trace(
+        rho.reshape(*[2 for _ in range(2 * n_sys_qubits + 2 * n_env_qubits)]),
         range(n_sys_qubits, n_sys_qubits + n_env_qubits),
     ).reshape(2**n_env_qubits, 2**n_env_qubits)
 
