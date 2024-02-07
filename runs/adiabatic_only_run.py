@@ -40,7 +40,7 @@ def plot_fidelity(fidelities, instant_fidelities):
     # plt.show()
 
 
-def __main__():
+def chemicals():
     model_names = (
         "v3/FAU_O2_singlet_6e_4o_CASSCF",
         "v3/FAU_O2_singlet_8e_6o_CASSCF",
@@ -50,8 +50,8 @@ def __main__():
     dry_run = False
 
     edm = ExperimentDataManager(
-        experiment_name="adiabatic_sweep_chems",
-        notes="adiabatic sweep for chemical models",
+        experiment_name="adiabatic_sweep_molecules",
+        notes="adiabatic sweep for various chemicals",
         dry_run=dry_run,
     )
     for model_name in model_names:
@@ -59,21 +59,41 @@ def __main__():
         edm.new_run()
 
 
+def coulomb_start():
+
+    dry_run = False
+    model_name = "fh_coulomb"
+
+    edm = ExperimentDataManager(
+        experiment_name="adiabatic_coulomb_model",
+        notes="adiabatic sweep for from the t=0 model",
+        dry_run=dry_run,
+    )
+    run_comp(edm, model_name)
+
+
+def __main__():
+    coulomb_start()
+
+
 def run_comp(edm, model_name):
     # whether we want to skip all saving data
 
     # model stuff
-    if model_name == "fh":
+    if "fh_" in model_name:
         model = FermiHubbardModel(x_dimension=2, y_dimension=2, tunneling=1, coulomb=2)
         n_qubits = len(model.flattened_qubits)
         n_electrons = [2, 2]
-        non_interacting_fock_hamiltonian = model.non_interacting_model.fock_hamiltonian
+        if "coulomb" in model_name:
+            start_fock_hamiltonian = model.coulomb_model.fock_hamiltonian
+        elif "nonint" in model_name:
+            start_fock_hamiltonian = model.non_interacting_model.fock_hamiltonian
     else:
         spm = SpecificModel(model_name=model_name)
         model = spm.current_model
         n_qubits = len(model.flattened_qubits)
         n_electrons = spm.Nf
-        non_interacting_fock_hamiltonian = get_quadratic_hamiltonian(
+        start_fock_hamiltonian = get_quadratic_hamiltonian(
             fermion_operator=model.fock_hamiltonian,
             n_qubits=n_qubits,
             ignore_incompatible_terms=True,
@@ -93,19 +113,19 @@ def run_comp(edm, model_name):
         expanded=True,
     )
 
-    slater_eigenenergies, slater_eigenstates = jw_eigenspectrum_at_particle_number(
-        sparse_operator=get_sparse_operator(non_interacting_fock_hamiltonian),
+    start_eigenenergies, start_eigenstates = jw_eigenspectrum_at_particle_number(
+        sparse_operator=get_sparse_operator(start_fock_hamiltonian),
         particle_number=n_electrons,
         expanded=True,
     )
 
     final_ground_state = eigenstates[:, 0]
-    initial_ground_state = slater_eigenstates[:, 0]
+    initial_ground_state = start_eigenstates[:, 0]
     print(
         f"initial fidelity: {fidelity(initial_ground_state,final_ground_state,qid_shape=(2,)*n_qubits)}"
     )
 
-    ham_start = fermion_to_dense(non_interacting_fock_hamiltonian)
+    ham_start = fermion_to_dense(start_fock_hamiltonian)
     ham_stop = fermion_to_dense(model.fock_hamiltonian)
 
     # total steps
@@ -150,7 +170,7 @@ def run_comp(edm, model_name):
 
     for ind, (a, b) in enumerate(zip(fid_init, fid_final)):
         print(
-            f"E_{ind} init pop: {a:.3f} dE: {slater_eigenenergies[ind]-slater_eigenenergies[0]:.3f} final pop {b:.3f} dE: {eigenenergies[ind]-eigenenergies[0]:.3f}"
+            f"E_{ind} init pop: {a:.3f} dE: {start_eigenenergies[ind]-start_eigenenergies[0]:.3f} final pop {b:.3f} dE: {eigenenergies[ind]-eigenenergies[0]:.3f}"
         )
 
     # pops

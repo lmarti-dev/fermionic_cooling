@@ -5,7 +5,7 @@ import sys
 
 from fauvqe.models.fermiHubbardModel import FermiHubbardModel
 from helpers.specificModel import SpecificModel
-from fermionic_cooling.plotting.plot_comparison_adiabatic_preprocessing import (
+from plotting.plot_comparison_adiabatic_preprocessing import (
     plot_results,
 )
 
@@ -54,18 +54,23 @@ def __main__(args):
     set_color_cycler()
     # model stuff
 
-    model_name = "fh"
-    if model_name == "fh":
+    model_name = "fh_coulomb"
+    if "fh_" in model_name:
         model = FermiHubbardModel(x_dimension=2, y_dimension=2, tunneling=1, coulomb=2)
         n_qubits = len(model.flattened_qubits)
         n_electrons = [2, 2]
-        non_interacting_model = model.non_interacting_model.fock_hamiltonian
+        if "coulomb" in model_name:
+            start_fock_hamiltonian = model.coulomb_model.fock_hamiltonian
+            couplers_fock_hamiltonian = model.non_interacting_model.fock_hamiltonian
+        elif "nonint" in model_name:
+            start_fock_hamiltonian = model.non_interacting_model.fock_hamiltonian
+            couplers_fock_hamiltonian = start_fock_hamiltonian
     else:
         spm = SpecificModel(model_name=model_name)
         model = spm.current_model
         n_qubits = len(model.flattened_qubits)
         n_electrons = spm.Nf
-        non_interacting_model = get_quadratic_hamiltonian(
+        start_fock_hamiltonian = get_quadratic_hamiltonian(
             fermion_operator=model.fock_hamiltonian,
             n_qubits=n_qubits,
             ignore_incompatible_terms=True,
@@ -73,7 +78,7 @@ def __main__(args):
 
     free_sys_eig_energies, free_sys_eig_states = jw_eigenspectrum_at_particle_number(
         sparse_operator=get_sparse_operator(
-            non_interacting_model,
+            couplers_fock_hamiltonian,
             n_qubits=len(model.flattened_qubits),
         ),
         particle_number=n_electrons,
@@ -90,8 +95,16 @@ def __main__(args):
         n_qubits=n_sys_qubits, Nf=n_electrons, right_to_left=False
     )
     sys_mixed_state = np.ones(2**n_sys_qubits) / (2 ** (n_sys_qubits / 2))
-    sys_slater_state = free_sys_eig_states[:, 2]
+    start_eig_energies, start_eig_states = jw_eigenspectrum_at_particle_number(
+        sparse_operator=get_sparse_operator(
+            start_fock_hamiltonian,
+            n_qubits=len(model.flattened_qubits),
+        ),
+        particle_number=n_electrons,
+        expanded=True,
+    )
 
+    sys_slater_state = start_eig_states[:, 0]
     sys_eig_energies, sys_eig_states = jw_eigenspectrum_at_particle_number(
         sparse_operator=get_sparse_operator(
             model.fock_hamiltonian,
@@ -173,11 +186,11 @@ def __main__(args):
             # call sweep
             initial_ground_state = sys_slater_state
             final_ground_state = sys_eig_states[:, 0]
-            ham_start = fermion_to_dense(non_interacting_model)
+            ham_start = fermion_to_dense(start_fock_hamiltonian)
             ham_stop = fermion_to_dense(model.fock_hamiltonian)
             n_steps = 100
             total_time = (
-                0.01
+                0.001
                 * spectrum_width
                 / (get_min_gap(sys_eig_energies, threshold=1e-12) ** 2)
             )
@@ -217,10 +230,10 @@ def __main__(args):
 
         print(f"coupler dim: {cooler.sys_env_coupler_data_dims}")
 
-        ansatz_options = {"beta": 1, "mu": 10, "c": 10}
+        ansatz_options = {"beta": 1, "mu": 20, "c": 10}
         weaken_coupling = 30
 
-        start_omega = 2
+        start_omega = 3
 
         stop_omega = 0.1
 
