@@ -5,8 +5,16 @@ from typing import Iterable, Iterator
 
 import cirq
 import numpy as np
-import cupy as cp
-from cupyx.scipy.linalg import expm as cupy_expm
+
+
+# TODO: replace functions with numpy equivalents
+try:
+    import cupy as cp
+    from cupyx.scipy.linalg import expm as cupy_expm
+
+    NO_CUPY = False
+except ImportError:
+    NO_CUPY = True
 from openfermion import FermionOperator, get_sparse_operator, jw_hartree_fock_state
 from scipy.linalg import sqrtm
 from scipy.sparse import csc_matrix
