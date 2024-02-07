@@ -5,6 +5,9 @@ import sys
 
 from fauvqe.models.fermiHubbardModel import FermiHubbardModel
 from helpers.specificModel import SpecificModel
+from fermionic_cooling.plotting.plot_comparison_adiabatic_preprocessing import (
+    plot_results,
+)
 
 from coolerClass import Cooler
 from adiabatic_sweep import run_sweep, fermion_to_dense
@@ -51,7 +54,7 @@ def __main__(args):
     set_color_cycler()
     # model stuff
 
-    model_name = "v3/FAU_O2_singlet_6e_4o_CASSCF"
+    model_name = "fh"
     if model_name == "fh":
         model = FermiHubbardModel(x_dimension=2, y_dimension=2, tunneling=1, coulomb=2)
         n_qubits = len(model.flattened_qubits)
@@ -119,7 +122,6 @@ def __main__(args):
     sys_ground_energy_exp = expectation_wrapper(
         model.hamiltonian, sys_ground_state, model.flattened_qubits
     )
-
     fidelity = cirq.fidelity(
         sys_initial_state,
         sys_ground_state,
@@ -145,7 +147,7 @@ def __main__(args):
     )
 
     couplers = get_cheat_coupler_list(
-        sys_eig_states=sys_eig_states,
+        sys_eig_states=free_sys_eig_states,
         env_eig_states=env_eig_states,
         qubits=sys_qubits + env_qubits,
         gs_indices=(0,),
@@ -163,6 +165,7 @@ def __main__(args):
 
     # evolution_time = 1e-3
 
+    fpaths = []
     for which_initial_process in ("adiabatic", "none"):
         print(f"Initial process: {which_initial_process}")
 
@@ -170,11 +173,11 @@ def __main__(args):
             # call sweep
             initial_ground_state = sys_slater_state
             final_ground_state = sys_eig_states[:, 0]
-            ham_start = fermion_to_dense(model.non_interacting_model.fock_hamiltonian)
+            ham_start = fermion_to_dense(non_interacting_model)
             ham_stop = fermion_to_dense(model.fock_hamiltonian)
             n_steps = 100
             total_time = (
-                20
+                0.01
                 * spectrum_width
                 / (get_min_gap(sys_eig_energies, threshold=1e-12) ** 2)
             )
@@ -214,7 +217,7 @@ def __main__(args):
 
         print(f"coupler dim: {cooler.sys_env_coupler_data_dims}")
 
-        ansatz_options = {"beta": 1, "mu": 10, "c": 30}
+        ansatz_options = {"beta": 1, "mu": 10, "c": 10}
         weaken_coupling = 30
 
         start_omega = 2
@@ -236,9 +239,15 @@ def __main__(args):
             "sys_energies": sys_ev_energies,
             "env_ev_energies": env_ev_energies,
         }
-        edm.save_dict_to_experiment(
-            filename=f"cooling_free_{which_initial_process}", jobj=jobj
+        fpaths.append(
+            edm.save_dict_to_experiment(
+                filename=f"cooling_free_{which_initial_process}",
+                jobj=jobj,
+                return_fpath=True,
+            )
         )
+
+    plot_results(edm, fpaths[0], fpaths[1], sys_eig_energies)
 
 
 if __name__ == "__main__":

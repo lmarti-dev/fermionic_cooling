@@ -31,6 +31,7 @@ from utils import (
     trace_out_env,
     depth_indexing,
     get_list_depth,
+    NO_CUPY,
 )
 from building_blocks import control_function
 
@@ -59,6 +60,8 @@ class Cooler:
         verbosity: int = 0,
         time_evolve_method: str = "diag",
     ):
+        if NO_CUPY:
+            time_evolve_method = "expm"
         self.time_evolve_method = time_evolve_method
         self.verbosity = verbosity
         self.sys_hamiltonian = sys_hamiltonian

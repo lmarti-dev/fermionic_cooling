@@ -177,19 +177,18 @@ def __main__(args):
         env_ground_state=env_ground_state,
         sys_env_coupler_data=couplers,
         verbosity=5,
+        time_evolve_method="expm",
     )
     n_rep = 1
 
     print(f"coupler dim: {cooler.sys_env_coupler_data_dims}")
 
-    ansatz_options = {"beta": 1, "mu": 30, "c": 10}
+    ansatz_options = {"beta": 1, "mu": 10, "c": 20}
     weaken_coupling = 10
 
     start_omega = 1.01 * spectrum_width
-    start_omega = 2.1
 
     stop_omega = 0.1 * min_gap
-    stop_omega = 1.9
 
     method = "bigbrain"
 
