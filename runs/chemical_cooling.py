@@ -11,7 +11,7 @@ from utils import ketbra
 
 from data_manager import ExperimentDataManager, set_color_cycler
 from fauvqe.utilities import jw_eigenspectrum_at_particle_number
-from fauvqe_running_code.helpers.specificModel import SpecificModel
+from fauvqe_running_code.chemical_models.specificModel import SpecificModel
 
 dry_run = True
 edm = ExperimentDataManager("chemical_cooling", dry_run=dry_run)

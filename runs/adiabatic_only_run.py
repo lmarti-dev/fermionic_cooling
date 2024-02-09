@@ -7,7 +7,7 @@ from adiabatic_sweep import (
     run_sweep,
 )
 from cirq import fidelity
-from helpers.specificModel import SpecificModel
+from chemical_models.specificModel import SpecificModel
 from openfermion import (
     get_sparse_operator,
     jw_hartree_fock_state,

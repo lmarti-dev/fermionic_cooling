@@ -4,7 +4,7 @@ import sys
 # sys.path.append("/home/Refik/Data/My_files/Dropbox/PhD/repos/fauvqe/")
 
 from fauvqe.models.fermiHubbardModel import FermiHubbardModel
-from helpers.specificModel import SpecificModel
+from chemical_models.specificModel import SpecificModel
 from plotting.plot_comparison_adiabatic_preprocessing import (
     plot_results,
 )
@@ -230,7 +230,7 @@ def __main__(args):
 
         print(f"coupler dim: {cooler.sys_env_coupler_data_dims}")
 
-        ansatz_options = {"beta": 1, "mu": 20, "c": 10}
+        ansatz_options = {"beta": 1, "mu": 10, "c": 10}
         weaken_coupling = 30
 
         start_omega = 3

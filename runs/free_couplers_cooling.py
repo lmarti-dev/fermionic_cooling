@@ -4,7 +4,7 @@ import sys
 # sys.path.append("/home/Refik/Data/My_files/Dropbox/PhD/repos/fauvqe/")
 
 from fauvqe.models.fermiHubbardModel import FermiHubbardModel
-from helpers.specificModel import SpecificModel
+from chemical_models.specificModel import SpecificModel
 
 from coolerClass import Cooler
 
