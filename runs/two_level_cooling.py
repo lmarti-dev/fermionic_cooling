@@ -85,7 +85,7 @@ cooler = Cooler(
     sys_env_coupler=coupler,
 )
 
-fidelities, energies = cooler.cool(
+fidelities, energies = cooler.loop_cool(
     alphas=alphas,
     evolution_times=evolution_times,
     sweep_values=sweep_values,

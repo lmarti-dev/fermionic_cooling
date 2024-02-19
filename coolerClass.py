@@ -19,31 +19,29 @@
 from typing import Iterable, Union
 
 import cirq
+import cupy as cp
 import matplotlib.cm as cm
 import matplotlib.colors as colors
 import matplotlib.pyplot as plt
 import numpy as np
+from building_blocks import control_function
 from utils import (
+    NO_CUPY,
+    depth_indexing,
     expectation_wrapper,
+    get_list_depth,
     is_density_matrix,
     ketbra,
     time_evolve_density_matrix,
     trace_out_env,
     trace_out_sys,
-    depth_indexing,
-    get_list_depth,
-    NO_CUPY,
 )
-from building_blocks import control_function
 
 from fauvqe.utilities import (
-    ket_in_subspace,
     flatten,
-    jw_eigenspectrum_at_particle_number,
+    ket_in_subspace,
     spin_dicke_mixed_state,
 )
-
-from openfermion import get_sparse_operator
 
 
 class Cooler:
@@ -62,6 +60,7 @@ class Cooler:
         time_evolve_method: str = "diag",
     ):
         if NO_CUPY:
+            print("Cupy not installed, using CPU")
             time_evolve_method = "expm"
         self.time_evolve_method = time_evolve_method
         self.verbosity = verbosity
@@ -242,11 +241,12 @@ class Cooler:
         self.msg_out()
         return fidelities, sys_energies, env_energies, final_sys_density_matrix
 
-    def cool(
+    def loop_cool(
         self,
         evolution_times: np.ndarray,
         alphas: np.ndarray,
         sweep_values: Iterable[float],
+        pooling_method: str = "max",
         use_trotter: bool = False,
     ):
         initial_density_matrix = self.total_initial_state
@@ -275,30 +275,62 @@ class Cooler:
         env_energies.append(env_energy)
 
         for step, env_coupling in enumerate(sweep_values):
-            # trotterize cooling to go slow
-            if use_trotter:
-                step_fn = self.trotter_cooling_step
-                evolution_time = 1e-2
+            temp_fidelities = []
+            temp_sys_energies = []
+            temp_env_energies = []
+            for coupler_idx in range(self.get_coupler_number(rep=None)):
+                self.update_message(
+                    "coupn",
+                    f"coupler number {coupler_idx}",
+                    message_level=5,
+                )
+                self.sys_env_coupler_easy_setter(coupler_index=coupler_idx, rep=None)
+                # trotterize cooling to go slow
+                if use_trotter:
+                    step_fn = self.trotter_cooling_step
+                    evolution_time = 1e-2
+                else:
+                    step_fn = self.cooling_step
+                    evolution_time = evolution_times[step]
+                sys_fidelity, sys_energy, env_energy, total_density_matrix = step_fn(
+                    total_density_matrix=total_density_matrix,
+                    env_coupling=env_coupling,
+                    alpha=alphas[step],
+                    evolution_time=evolution_time,
+                )
+
+                temp_fidelities.append(sys_fidelity)
+                temp_sys_energies.append(sys_energy)
+                temp_env_energies.append(env_energy)
+
+                self.update_message(
+                    "fidgs",
+                    "fid. to tgt.: {:.4f}, ΔE of ϱ_sys: {:.4f}".format(
+                        sys_fidelity, sys_energy - self.sys_ground_energy
+                    ),
+                    message_level=5,
+                )
+                self.update_message(
+                    "step", f"step: {step} coupling: {env_coupling:.4f}"
+                )
+
+            # since we loop over all couplers, decide how we append the results
+            # one per step or all etc.
+            if pooling_method == "all":
+                fidelities.extend(temp_fidelities)
+                sys_energies.extend(temp_sys_energies)
+                env_energies.extend(temp_env_energies)
             else:
-                step_fn = self.cooling_step
-                evolution_time = evolution_times[step]
-            sys_fidelity, sys_energy, env_energy, total_density_matrix = step_fn(
-                total_density_matrix=total_density_matrix,
-                env_coupling=env_coupling,
-                alpha=alphas[step],
-                evolution_time=evolution_time,
-            )
-            fidelities.append(sys_fidelity)
-            sys_energies.append(sys_energy)
-            env_energies.append(env_energy)
-            self.update_message(
-                "fidgs",
-                "fidelity to gs: {:.4f}, energy diff of traced out rho: {:.4f}".format(
-                    sys_fidelity, sys_energy - self.sys_ground_energy
-                ),
-                message_level=5,
-            )
-            self.update_message("step", f"step: {step} coupling: {env_coupling:.4f}")
+                if pooling_method == "mean":
+                    pool_fn = np.mean
+                elif pooling_method == "max":
+                    pool_fn = np.max
+                elif pooling_method == "min":
+                    pool_fn = np.min
+                fidelities.append(pool_fn(temp_fidelities))
+                sys_energies.append(pool_fn(temp_sys_energies))
+                env_energies.append(pool_fn(temp_env_energies))
+
         final_sys_density_matrix = trace_out_env(
             rho=total_density_matrix,
             n_sys_qubits=len(self.sys_qubits),
@@ -454,7 +486,7 @@ class Cooler:
                     # print stats on evolution
                     self.update_message(
                         "fidgs",
-                        "fidelity to gs: {:.4f}, energy diff of traced out rho: {:.4f}".format(
+                        "fid. to tgt.: {:.4f}, ΔE of ϱ_sys: {:.4f}".format(
                             sys_fidelity, sys_energy - self.sys_ground_energy
                         ),
                         message_level=5,
@@ -493,8 +525,13 @@ class Cooler:
 
                 omega = omega - epsilon
 
+        final_sys_density_matrix = trace_out_env(
+            rho=total_density_matrix,
+            n_sys_qubits=len(self.sys_qubits),
+            n_env_qubits=len(self.env_qubits),
+        )
         self.msg_out()
-        return fidelities, sys_energies, omegas, env_energies
+        return fidelities, sys_energies, omegas, env_energies, final_sys_density_matrix
 
     def trotter_cooling_step(
         self,
@@ -713,12 +750,34 @@ class Cooler:
         fidelities: np.ndarray,
         env_energies: np.ndarray,
         suptitle: str,
+        n_rep: int = None,
     ):
         fig, axes = plt.subplots(nrows=2, sharex=True)
-        axes[0].plot(omegas, fidelities, linewidth=2)
-        axes[0].set_ylabel("Fidelity")
 
-        axes[1].plot(omegas, env_energies, linewidth=2)
+        if n_rep is not None and len(omegas) % n_rep == 0 and n_rep > 1:
+            slice_size = int(len(omegas) / n_rep)
+            for rep in range(n_rep):
+                idx = slice(rep * slice_size, (rep + 1) * slice_size)
+                axes[0].plot(omegas[idx], fidelities[idx], linewidth=2)
+                axes[1].plot(omegas[idx], env_energies[idx], linewidth=2)
+
+                if rep < n_rep - 1:
+                    axes[0].plot(
+                        [
+                            omegas[(rep + 1) * slice_size - 1],
+                            omegas[(rep + 1) * slice_size],
+                        ],
+                        [
+                            fidelities[(rep + 1) * slice_size - 1],
+                            fidelities[(rep + 1) * slice_size],
+                        ],
+                        "k:",
+                        linewidth=0.5,
+                    )
+        else:
+            axes[0].plot(omegas, fidelities, linewidth=2)
+            axes[1].plot(omegas, env_energies, linewidth=2)
+        axes[0].set_ylabel("Fidelity")
         axes[1].set_ylabel(r"$T_{fridge}$")
         axes[1].set_xlabel(r"$\omega$")
         axes[1].invert_xaxis()
@@ -835,7 +894,7 @@ class Cooler:
                 )
                 self.update_message(
                     "fidgs",
-                    "fidelity to gs: {:.4f}, energy diff of traced out rho: {:.4f}".format(
+                    "fid. to tgt.: {:.4f}, ΔE of ϱ_sys: {:.4f}".format(
                         sys_fidelity, sys_energy - self.sys_ground_energy
                     ),
                     message_level=5,

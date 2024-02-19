@@ -1,10 +1,64 @@
 from utils import time_evolve_density_matrix, spin_dicke_state, ketbra
-from building_blocks import get_Z_env, get_cheat_coupler
+from building_blocks import get_Z_env, get_cheat_coupler, get_cheat_coupler_list
 import time
 import numpy as np
 from fauvqe.models.fermiHubbardModel import FermiHubbardModel
+from fauvqe.utilities import (
+    jw_eigenspectrum_at_particle_number,
+    jw_get_true_ground_state_at_particle_number,
+)
 from cirq import X, Y
 import cupy as cp
+from coolerClass import Cooler
+from openfermion import get_sparse_operator, jw_hartree_fock_state
+
+
+def setup_cooler(x, y, n_env_qubits, method):
+    model = FermiHubbardModel(x_dimension=x, y_dimension=y, tunneling=1, coulomb=2)
+    n_electrons = [2, 2]
+    sys_qubits = model.flattened_qubits
+    n_sys_qubits = len(sys_qubits)
+
+    env_qubits, env_ground_state, env_ham, env_eig_energies, env_eig_states = get_Z_env(
+        n_qubits=n_env_qubits
+    )
+    sparse_op = get_sparse_operator(
+        model.non_interacting_model.fock_hamiltonian,
+        n_qubits=len(model.flattened_qubits),
+    )
+    free_sys_eig_energies, free_sys_eig_states = jw_eigenspectrum_at_particle_number(
+        sparse_operator=sparse_op,
+        particle_number=n_electrons,
+        expanded=True,
+    )
+    sys_ground_energy, sys_ground_state = jw_get_true_ground_state_at_particle_number(
+        sparse_operator=sparse_op, particle_number=n_electrons
+    )
+    sys_initial_state = ketbra(
+        jw_hartree_fock_state(n_orbitals=n_sys_qubits, n_electrons=sum(n_electrons))
+    )
+    couplers = get_cheat_coupler_list(
+        sys_eig_states=free_sys_eig_states,
+        env_eig_states=env_eig_states,
+        qubits=sys_qubits + env_qubits,
+        gs_indices=(0, 1, 2),
+        noise=0,
+    )  # Interaction only on Qubit 0?
+
+    cooler = Cooler(
+        sys_hamiltonian=model.hamiltonian,
+        n_electrons=n_electrons,
+        sys_qubits=model.flattened_qubits,
+        sys_ground_state=sys_ground_state,
+        sys_initial_state=sys_initial_state,
+        env_hamiltonian=env_ham,
+        env_qubits=env_qubits,
+        env_ground_state=env_ground_state,
+        sys_env_coupler_data=couplers,
+        verbosity=5,
+        time_evolve_method=method,
+    )
+    return cooler
 
 
 def prod(*args):
@@ -49,33 +103,47 @@ def get_ham_rho(x, y, n, which=np):
     return ham, rho
 
 
+def time_evolve_step(x, y, n, which):
+    ham, rho = get_ham_rho(x, y, n, which=which)
+    t = 1000 * np.random.rand()
+    Ut_rho_Utd = time_evolve_density_matrix(ham=ham, rho=rho, t=t, method=method)
+    return Ut_rho_Utd
+
+
+def full_cooling_step(cooler: Cooler, which=np):
+    alpha = which.random.rand() + 0.1
+    env_coupling = which.random.rand() * 10
+    evolution_time = 2.5 * np.pi / alpha
+    sys_fidelity, sys_energy, env_energy, total_density_matrix = cooler.cooling_step(
+        cooler.total_initial_state, alpha, env_coupling, evolution_time
+    )
+    return total_density_matrix
+
+
 methods = ("diag", "expm")
-n_steps = 100
+n_steps = 30
 
 times = {m: {} for m in methods}
 
 results = {k: None for k in methods}
 shapes = ((2, 2, 1), (2, 2, 2), (2, 2, 3))
-shapes = ((2, 2, 1),)
+shapes = ((2, 2, 1), (2, 2, 2), (2, 2, 3))
 
 for ind, (x, y, n) in enumerate(shapes):
+    elapsed = []
     for method in methods:
-        if method == "diag":
-            which = cp
-        else:
-            which = np
-        start = time.time()
+        cooler = setup_cooler(x, y, n_env_qubits=n, method=method)
         for _ in range(n_steps):
+            start = time.time()
             # inside to mimick changing ham
-            ham, rho = get_ham_rho(x, y, n, which=which)
-            t = 1000 * np.random.rand()
-            Ut_rho_Utd = time_evolve_density_matrix(
-                ham=ham, rho=rho, t=t, method=method
-            )
-        end = time.time()
-        elapsed = end - start
+            Ut_rho_Utd = full_cooling_step(cooler=cooler)
+            end = time.time()
+            elapsed.append(end - start)
 
         times[method][str((x, y, n))] = elapsed
         results[method] = Ut_rho_Utd
-        print(method, (x, y, n), elapsed)
-    print(f"{method}: {np.all(np.isclose(results[method],results['expm']))}")
+        print(
+            f"{method} {(x, y, n)} mean: {np.mean(elapsed):.3f} var: {np.var(elapsed):.3f}"
+        )
+
+# print(f"{method}: {np.all(np.isclose(results[method],results['expm']))}")

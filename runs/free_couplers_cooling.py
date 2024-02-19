@@ -54,9 +54,9 @@ def __main__(args):
     # model_name = "fh"
     model_name = "v3/FAU_O2_singlet_6e_4o_CASSCF"
     if model_name == "fh":
-        model = FermiHubbardModel(x_dimension=2, y_dimension=2, tunneling=1, coulomb=2)
+        model = FermiHubbardModel(x_dimension=1, y_dimension=2, tunneling=1, coulomb=2)
         n_qubits = len(model.flattened_qubits)
-        n_electrons = [2, 2]
+        n_electrons = [1, 2]
         non_interacting_model = model.non_interacting_model.fock_hamiltonian
     else:
         spm = SpecificModel(model_name=model_name)
@@ -196,7 +196,13 @@ def __main__(args):
         coupler_transitions = np.abs(
             np.array(free_sys_eig_energies[1:]) - free_sys_eig_energies[0]
         )
-        fidelities, sys_ev_energies, omegas, env_ev_energies = cooler.big_brain_cool(
+        (
+            fidelities,
+            sys_ev_energies,
+            omegas,
+            env_ev_energies,
+            final_sys_density_matrix,
+        ) = cooler.big_brain_cool(
             start_omega=start_omega,
             stop_omega=stop_omega,
             ansatz_options=ansatz_options,

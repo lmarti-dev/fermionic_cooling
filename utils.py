@@ -263,19 +263,6 @@ def trace_out_sys(
 ):
     return cirq.partial_trace(
         rho.reshape(*[2 for _ in range(2 * n_sys_qubits + 2 * n_env_qubits)]),
-        range(n_sys_qubits, n_env_qubits),
-    ).reshape(2**n_env_qubits, 2**n_env_qubits)
-    # cirq is faster
-    return two_tensors_partial_trace(rho=rho, n1=n_sys_qubits, n2=n_env_qubits)
-
-
-def trace_out_sys(
-    rho: np.ndarray,
-    n_sys_qubits: int,
-    n_env_qubits: int,
-):
-    return cirq.partial_trace(
-        rho.reshape(*[2 for _ in range(2 * n_sys_qubits + 2 * n_env_qubits)]),
         range(n_sys_qubits, n_sys_qubits + n_env_qubits),
     ).reshape(2**n_env_qubits, 2**n_env_qubits)
 
@@ -607,22 +594,27 @@ def thermal_density_matrix_at_particle_number(
         particle_number=particle_number,
         expanded=expanded,
     )
-    thermal_density = expm(
-        -beta
-        * (
-            np.sum(
-                (
-                    eig_energies[ind] * ketbra(eig_states[:, ind])
-                    for ind in range(eig_states.shape[1])
-                )
-            )
-        )
+
+    thermal_density = np.sum(
+        [
+            np.exp(-beta * eig_energies[i]) * ketbra(eig_states[:, i])
+            for i in range(len(eig_energies))
+        ],
+        axis=0,
     )
     thermal_density /= np.trace(thermal_density)
     return thermal_density
 
 
 def thermal_density_matrix(beta: float, ham: cirq.PauliSum, qubits: list[cirq.Qid]):
-    thermal_density = expm(-beta * ham.matrix(qubits=qubits))
+    eig_energies, eig_states = np.linalg.eigh(ham.matrix(qubits=qubits))
+
+    thermal_density = np.sum(
+        [
+            np.exp(-beta * eig_energies[i]) * ketbra(eig_states[:, i])
+            for i in range(len(eig_energies))
+        ],
+        axis=0,
+    )
     thermal_density /= np.trace(thermal_density)
     return thermal_density

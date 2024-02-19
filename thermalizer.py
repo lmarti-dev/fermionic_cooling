@@ -14,6 +14,7 @@ class Thermalizer(Cooler):
         *args,
         **kwargs
     ):
+
         self.beta = beta
 
         super().__init__(*args, **kwargs)
@@ -21,6 +22,15 @@ class Thermalizer(Cooler):
         # set thermal states
         self.thermal_env_density = thermal_env_density
         self.thermal_sys_density = thermal_sys_density
+
+        self.sys_ground_energy = np.real(
+            self.sys_hamiltonian.expectation_from_density_matrix(
+                self.thermal_sys_density,
+                qubit_map={
+                    k: v for k, v in zip(self.sys_qubits, range(len(self.sys_qubits)))
+                },
+            )
+        )
 
     def sys_fidelity(self, state: np.ndarray):
         return fidelity(
@@ -71,6 +81,8 @@ class Thermalizer(Cooler):
         sys_energy = self.sys_energy(traced_density_matrix)
         env_energy = self.env_energy(total_density_matrix)
 
+        self.print_msg()
+
         if depol_noise is not None:
             # add depol noise
             spin_conserving = False
@@ -90,5 +102,5 @@ class Thermalizer(Cooler):
 
         # putting the env back in the thermal state
         total_density_matrix = np.kron(traced_density_matrix, self.thermal_env_density)
-        self.print_msg()
+
         return sys_fidelity, sys_energy, env_energy, total_density_matrix

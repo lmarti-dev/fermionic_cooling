@@ -26,14 +26,19 @@ def get_cheat_thermalizers(
     sys_eig_states,
     env_eig_states,
     reverse: bool = True,
+    add_non_cross_terms: bool = False,
 ):
     couplers = []
     env_up = np.outer(env_eig_states[:, 1], np.conjugate(env_eig_states[:, 0]))
-    # in case there are multiple ground states we can cool to (if I may say so)
     for j in range(0, sys_eig_states.shape[1] - 1):
-        # |sys_0Xsys_k| O |env_1Xenv_0|
+        # |sys_j X sys_j+1| otimes |env_1 X env_0|, j<j+1
+        sys_coupler = np.outer(
+            sys_eig_states[:, j], np.conjugate(sys_eig_states[:, j + 1])
+        )
+        if add_non_cross_terms:
+            sys_coupler += np.conjugate(np.transpose(sys_coupler))
         coupler = np.kron(
-            np.outer(sys_eig_states[:, j], np.conjugate(sys_eig_states[:, j + 1])),
+            sys_coupler,
             env_up,
         )
         coupler = coupler + np.conjugate(np.transpose(coupler))
@@ -131,11 +136,26 @@ def get_perturbed_sweep(spectrum: np.ndarray, lam: float, decimals: int = 5):
     return np.array(sweep_values[::-1])
 
 
-def get_cheat_sweep(spectrum: np.ndarray, n_steps: int = None, n_rep: int = None):
+def get_cheat_sweep(
+    spectrum: np.ndarray, n_steps: int = None, n_rep: int = None
+) -> np.ndarray:
+    """Return all the gaps in the spectrum (if they are bigger than 0) in reverse order, repeated n_rep times or
+    eventually closest to n_steps.
+
+    Args:
+        spectrum (np.ndarray): the energy spectrum
+        n_steps (int, optional): the number of steps. Defaults to None.
+        n_rep (int, optional): the number of reps. Defaults to None.
+
+    Returns:
+        np.ndarray: the energy gaps
+    """
     res = []
     if n_steps is None:
+        if n_rep is None:
+            n_rep = 1
         n_rep = n_rep
-    if n_rep is None:
+    elif n_rep is None:
         n_rep = 1
     else:
         n_rep = int(n_steps / (len(spectrum) - 1))
@@ -243,6 +263,7 @@ def control_function(
     beta: float = 1,
     mu: float = 10,
     c: float = 100,
+    minus: float = 0,
     use_accelerate: bool = False,
     clamp: bool = True,
 ):
@@ -268,9 +289,10 @@ def control_function(
     # disallow values which might be due to bugs
     if clamp is True:
         t_fridge = np.clip(t_fridge, 0, 0.1)
-
-    # return 1e-3 * (-np.log10(t_fridge))
-    return abs(beta / (np.exp(mu / (1 - np.log10(t_fridge / omega))) + c)) * accelerate
+    return (
+        abs(beta / (np.exp(mu / (1 - np.log10(np.abs(t_fridge - minus) / omega))) + c))
+        * accelerate
+    )
 
     # return abs(beta * f(omega) * np.exp(-((t_fridge * c) ** mu)))
 
