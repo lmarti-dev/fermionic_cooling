@@ -66,7 +66,7 @@ def plot_results(edm, with_adiab: str, wout_adiab: str, sys_eig_energies: np.nda
 
     axes[0].set_ylabel("Fidelity")
     axes[1].set_xlabel("$\omega$")
-    axes[1].set_ylabel(r"$E_{fridge}$")
+    axes[1].set_ylabel(r"$T_F$")
     axes[0].legend()
 
     # figname = fpath.split("\\")[-2]
