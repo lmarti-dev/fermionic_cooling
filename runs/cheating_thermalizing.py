@@ -98,7 +98,7 @@ def main_run(edm: ExperimentDataManager, initial_beta, target_beta):
     # whether we want to skip all saving data
 
     # model stuff
-    model = FermiHubbardModel(x_dimension=2, y_dimension=2, tunneling=1, coulomb=2)
+    model = FermiHubbardModel(x_dimension=1, y_dimension=2, tunneling=1, coulomb=2)
     sys_qubits = model.flattened_qubits
 
     # define inverse temp
@@ -109,7 +109,7 @@ def main_run(edm: ExperimentDataManager, initial_beta, target_beta):
     n_env_qubits = 1
     n_total_qubits = n_sys_qubits + n_env_qubits
 
-    n_electrons = [2, 2]
+    n_electrons = [1, 1]
     sys_hartree_fock = jw_hartree_fock_state(
         n_orbitals=n_sys_qubits, n_electrons=sum(n_electrons)
     )
@@ -171,7 +171,7 @@ def main_run(edm: ExperimentDataManager, initial_beta, target_beta):
     min_gap = get_min_gap(sys_eig_energies, threshold=1e-8)
     sweep_values = np.tile(np.linspace(min_gap, spectrum_width, 40), n_rep)[::-1]
     # sweep_values = get_cheat_sweep(spectrum=sys_eig_energies)
-    alphas = sweep_values
+    alphas = sweep_values / 100
     evolution_times = np.pi / np.abs(alphas)
 
     thermalizer = Thermalizer(
@@ -203,7 +203,7 @@ def main_run(edm: ExperimentDataManager, initial_beta, target_beta):
     )
 
     # probe_times(edm, cooler, alphas, sweep_values)
-    method = "bigbrain"
+    method = "zipcool"
     if method == "zipcool":
         (
             fidelities,
@@ -306,7 +306,7 @@ def main_run(edm: ExperimentDataManager, initial_beta, target_beta):
 def loop_over_betas():
     dry_run = False
 
-    for initial_beta in (0, 1, 100):
+    for initial_beta in (10,):
         edm = ExperimentDataManager(
             experiment_name=f"compare_thermalizers_initb_{initial_beta}",
             dry_run=dry_run,
