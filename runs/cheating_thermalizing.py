@@ -253,7 +253,7 @@ def main_run(edm: ExperimentDataManager, initial_beta, target_beta):
         ansatz_options = {
             "beta": 1,
             "mu": 10,
-            "c": 10,
+            "c": 20,
             "minus": env_ham.expectation_from_density_matrix(
                 thermal_env_density, qubit_map={k: v for v, k in enumerate(env_qubits)}
             ),
@@ -322,8 +322,8 @@ def loop_over_betas():
 
 def normal_run():
     dry_run = False
-    initial_beta = 50
-    target_beta = 10
+    initial_beta = 60
+    target_beta = 1
 
     edm = ExperimentDataManager(
         experiment_name=f"fh22_{initial_beta}_target_beta",
@@ -334,4 +334,4 @@ def normal_run():
 
 
 if __name__ == "__main__":
-    loop_over_betas()
+    normal_run()

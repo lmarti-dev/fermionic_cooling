@@ -1,6 +1,6 @@
 import cirq
 import numpy as np
-from utils import ndarray_to_psum, get_transition_rates
+from fermionic_cooling.utils import ndarray_to_psum, get_transition_rates
 from math import prod
 from fauvqe.models.fermiHubbardModel import FermiHubbardModel
 from fauvqe.utilities import jw_eigenspectrum_at_particle_number
@@ -287,12 +287,13 @@ def control_function(
         accelerate = 1
 
     # disallow values which might be due to bugs
-    if clamp is True:
-        t_fridge = np.clip(t_fridge, 0, 0.1)
-    return (
+    ctrl = (
         abs(beta / (np.exp(mu / (1 - np.log10(np.abs(t_fridge - minus) / omega))) + c))
         * accelerate
     )
+    if clamp is True:
+        return np.clip(ctrl, 1e-4, 1)
+    return ctrl
 
     # return abs(beta * f(omega) * np.exp(-((t_fridge * c) ** mu)))
 

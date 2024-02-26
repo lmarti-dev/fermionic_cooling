@@ -19,13 +19,12 @@
 from typing import Iterable, Union
 
 import cirq
-import cupy as cp
 import matplotlib.cm as cm
 import matplotlib.colors as colors
 import matplotlib.pyplot as plt
 import numpy as np
 from building_blocks import control_function
-from utils import (
+from fermionic_cooling.utils import (
     NO_CUPY,
     depth_indexing,
     expectation_wrapper,
@@ -678,7 +677,10 @@ class Cooler:
             }
         )
         nrows = 2
-        cmap = plt.get_cmap("turbo", len(env_energies))
+        if len(env_energies) > 1:
+            cmap = plt.get_cmap("turbo", len(env_energies))
+        else:
+            cmap = plt.get_cmap("faucmap", len(env_energies[0]))
 
         fig, axes = plt.subplots(nrows=nrows, figsize=(5, 3), sharex=True)
 
@@ -721,8 +723,8 @@ class Cooler:
             )
         axes[0].set_ylabel(r"Fidelity", labelpad=0)
 
-        ax_bottom.set_ylabel(r"$E_{fridge}$")
-        ax_bottom.tick_params(axis="y")  # , labelcolor="blue")
+        ax_bottom.set_ylabel(r"$T_F$")
+        ax_bottom.tick_params(axis="y")
         ax_bottom.set_yscale("log")
         ax_bottom.invert_xaxis()
         ax_bottom.set_xlabel("$\omega$")
@@ -778,7 +780,7 @@ class Cooler:
             axes[0].plot(omegas, fidelities, linewidth=2)
             axes[1].plot(omegas, env_energies, linewidth=2)
         axes[0].set_ylabel("Fidelity")
-        axes[1].set_ylabel(r"$T_{fridge}$")
+        axes[1].set_ylabel(r"$T_F$")
         axes[1].set_xlabel(r"$\omega$")
         axes[1].invert_xaxis()
 

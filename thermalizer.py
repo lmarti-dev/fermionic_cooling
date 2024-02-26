@@ -1,6 +1,6 @@
 from coolerClass import Cooler
 import numpy as np
-from utils import time_evolve_density_matrix, trace_out_env
+from fermionic_cooling.utils import time_evolve_density_matrix, trace_out_env
 from fauvqe.utilities import spin_dicke_mixed_state
 from cirq import fidelity
 

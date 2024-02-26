@@ -3,7 +3,7 @@ import numpy as np
 from adiabatic_sweep import get_sweep_hamiltonian, run_sweep
 from scipy.linalg import expm
 from coolerClass import Cooler
-from utils import trace_out_env, time_evolve_density_matrix
+from fermionic_cooling.utils import trace_out_env, time_evolve_density_matrix
 
 
 def get_trotterized_sweep_cooling_unitaries(

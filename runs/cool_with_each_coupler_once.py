@@ -45,30 +45,18 @@ def __main__(args):
     # whether we want to skip all saving data
     dry_run = False
     edm = ExperimentDataManager(
-        experiment_name="singlet_o2_freecouplers",
-        notes="cooling this home cooked chemical ham with free couplers",
+        experiment_name="fh22_oneatatime",
+        notes="cooling bigbrain run with one coupler each time",
         dry_run=dry_run,
     )
     use_style()
     # model stuff
 
-    model_name = "cooked/SingletO2_6e_8q"
     model_name = "fh"
-    if model_name == "fh":
-        model = FermiHubbardModel(x_dimension=2, y_dimension=2, tunneling=1, coulomb=2)
-        n_qubits = len(model.flattened_qubits)
-        n_electrons = [2, 2]
-        non_interacting_model = model.non_interacting_model.fock_hamiltonian
-    else:
-        spm = SpecificModel(model_name=model_name)
-        model = spm.current_model
-        n_qubits = len(model.flattened_qubits)
-        n_electrons = spm.Nf
-        non_interacting_model = get_quadratic_hamiltonian(
-            fermion_operator=model.fock_hamiltonian,
-            n_qubits=n_qubits,
-            ignore_incompatible_terms=True,
-        )
+    model = FermiHubbardModel(x_dimension=2, y_dimension=2, tunneling=1, coulomb=2)
+    n_qubits = len(model.flattened_qubits)
+    n_electrons = [2, 2]
+    non_interacting_model = model.non_interacting_model.fock_hamiltonian
 
     free_sys_eig_energies, free_sys_eig_states = jw_eigenspectrum_at_particle_number(
         sparse_operator=get_sparse_operator(
@@ -167,122 +155,75 @@ def __main__(args):
 
     # call cool
 
-    cooler = Cooler(
-        sys_hamiltonian=model.hamiltonian,
-        n_electrons=n_electrons,
-        sys_qubits=model.flattened_qubits,
-        sys_ground_state=sys_ground_state,
-        sys_initial_state=sys_initial_state,
-        env_hamiltonian=env_ham,
-        env_qubits=env_qubits,
-        env_ground_state=env_ground_state,
-        sys_env_coupler_data=couplers,
-        verbosity=5,
-        time_evolve_method="expm",
-    )
-    n_rep = 1
+    for ind, coupler in enumerate(couplers):
+        if ind > 0:
+            edm.new_run(notes=f"coupler n={ind}")
 
-    print(f"coupler dim: {cooler.sys_env_coupler_data_dims}")
-
-    ansatz_options = {"beta": 1, "mu": 20, "c": 40}
-    weaken_coupling = 20
-
-    start_omega = 1.01 * spectrum_width
-
-    stop_omega = 0.1 * min_gap
-
-    method = "bigbrain"
-
-    if method == "bigbrain":
-        coupler_transitions = np.abs(
-            np.array(free_sys_eig_energies[1:]) - free_sys_eig_energies[0]
-        )
-        (
-            fidelities,
-            sys_ev_energies,
-            omegas,
-            env_ev_energies,
-            final_sys_density_matrix,
-        ) = cooler.big_brain_cool(
-            start_omega=start_omega,
-            stop_omega=stop_omega,
-            ansatz_options=ansatz_options,
-            n_rep=n_rep,
-            weaken_coupling=weaken_coupling,
-            coupler_transitions=None,
-        )
-
-        jobj = {
-            "omegas": omegas,
-            "fidelities": fidelities,
-            "sys_energies": sys_ev_energies,
-            "env_energies": env_ev_energies,
-        }
-        edm.save_dict_to_experiment(filename="cooling_free", jobj=jobj)
-
-        fig = cooler.plot_controlled_cooling(
-            fidelities=fidelities,
-            env_energies=env_ev_energies,
-            omegas=omegas,
-            eigenspectrums=[
-                sys_eig_energies - sys_eig_energies[0],
-            ],
-        )
-        edm.save_figure(
-            fig,
-        )
-        plt.show()
-    elif method == "zipcool":
-        initial_pops = state_fidelity_to_eigenstates(
-            state=sys_initial_state, eigenstates=sys_eig_states
+        cooler = Cooler(
+            sys_hamiltonian=model.hamiltonian,
+            n_electrons=n_electrons,
+            sys_qubits=model.flattened_qubits,
+            sys_ground_state=sys_ground_state,
+            sys_initial_state=sys_initial_state,
+            env_hamiltonian=env_ham,
+            env_qubits=env_qubits,
+            env_ground_state=env_ground_state,
+            sys_env_coupler_data=[coupler],
+            verbosity=5,
+            time_evolve_method="expm",
         )
         n_rep = 1
-        sweep_values = np.array(
-            list(
-                flatten(
-                    get_perturbed_sweep(free_sys_eig_energies, x)
-                    for x in np.linspace(2.5, 3.5, 30)
-                )
+
+        print(f"coupler dim: {cooler.sys_env_coupler_data_dims}")
+
+        ansatz_options = {"beta": 1, "mu": 20, "c": 40}
+        weaken_coupling = 20
+
+        start_omega = 1.01 * spectrum_width
+
+        stop_omega = 0.1 * min_gap
+
+        method = "bigbrain"
+
+        if method == "bigbrain":
+            coupler_transitions = np.abs(
+                np.array(free_sys_eig_energies[1:]) - free_sys_eig_energies[0]
             )
-        )
+            (
+                fidelities,
+                sys_ev_energies,
+                omegas,
+                env_ev_energies,
+                final_sys_density_matrix,
+            ) = cooler.big_brain_cool(
+                start_omega=start_omega,
+                stop_omega=stop_omega,
+                ansatz_options=ansatz_options,
+                n_rep=n_rep,
+                weaken_coupling=weaken_coupling,
+                coupler_transitions=None,
+            )
 
-        sweep_values = get_cheat_sweep(spectrum=sys_eig_energies)
+            jobj = {
+                "omegas": omegas,
+                "fidelities": fidelities,
+                "sys_energies": sys_ev_energies,
+                "env_energies": env_ev_energies,
+            }
+            edm.save_dict_to_experiment(filename="cooling_free", jobj=jobj)
 
-        # sweep_values = get_cheat_sweep(sys_eig_energies, n_steps=len(sys_eig_energies))
-        alphas = sweep_values / 50
-        evolution_times = 2.5 * np.pi / (alphas)
-        (
-            fidelities,
-            sys_energies,
-            env_energies,
-            final_sys_density_matrix,
-        ) = cooler.zip_cool(
-            alphas=alphas,
-            evolution_times=evolution_times,
-            sweep_values=sweep_values,
-            n_rep=n_rep,
-            fidelity_threshold=2,
-        )
-
-        jobj = {
-            "fidelities": fidelities,
-            "sys_energies": sys_energies,
-            "env_energies": env_energies,
-        }
-        edm.save_dict_to_experiment(filename="cooling_free_couplers", jobj=jobj)
-
-        fig, ax = plt.subplots()
-
-        ax.plot(sweep_values, fidelities[1:], "k--")
-        ax.set_xlabel("$\omega$")
-        ax.set_ylabel("Fidelity")
-        ax.invert_xaxis()
-
-        edm.save_figure(
-            fig,
-        )
-
-        plt.show()
+            fig = cooler.plot_controlled_cooling(
+                fidelities=fidelities,
+                env_energies=env_ev_energies,
+                omegas=omegas,
+                eigenspectrums=[
+                    sys_eig_energies - sys_eig_energies[0],
+                ],
+            )
+            edm.save_figure(
+                fig,
+            )
+            # plt.show()
 
 
 if __name__ == "__main__":
