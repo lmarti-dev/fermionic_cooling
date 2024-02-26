@@ -20,7 +20,6 @@ def get_values(ax: plt.Axes):
 
 
 def restyle_fig(fpath: str, normalized: bool = False):
-    use_style()
     if fpath.endswith("pickle"):
         fig = pickle.load(io.open(fpath, "rb"))
     elif fpath.endswith("json"):
@@ -40,7 +39,7 @@ def restyle_fig(fpath: str, normalized: bool = False):
 
     new_axes[0].plot(
         xvb,
-        yvt,
+        yvt[:-1],
     )
 
     new_axes[1].clear()
@@ -61,11 +60,12 @@ def restyle_fig(fpath: str, normalized: bool = False):
 
     new_axes[0].set_ylabel("Fidelity")
     new_axes[1].set_xlabel("$\omega$")
-    new_axes[1].set_ylabel(r"$T_F$")
+    new_axes[1].set_ylabel(r"$f(T_F)^{-2}$")
     new_axes[1].yaxis.set_minor_formatter(ticker.StrMethodFormatter("{x:.3f}"))
     # plt.show()
 
     figname = os.path.splitext(os.path.basename(fpath))[0]
+    print(figname)
     edm.save_figure(fig=new_fig, filename=figname)
 
 
@@ -90,4 +90,7 @@ pickle_fpaths = [
     r"/home/eckstein/Desktop/projects/data/2024_02_20/fh22_60_target_beta_11h03/run_00000/figures/hazelnuts_data_2024_02_21_08_38_11.pickle"
 ]
 
-restyle_fig(pickle_fpaths[0])
+use_style()
+# restyle_fig(pickle_fpaths[0])
+for fpath in fpaths:
+    restyle_fig(fpath, normalized=True)

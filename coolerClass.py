@@ -677,10 +677,10 @@ class Cooler:
             }
         )
         nrows = 2
-        if len(env_energies) > 1:
+        try:
+            cmap = plt.get_cmap("faucmap", len(env_energies))
+        except Exception:
             cmap = plt.get_cmap("turbo", len(env_energies))
-        else:
-            cmap = plt.get_cmap("faucmap", len(env_energies[0]))
 
         fig, axes = plt.subplots(nrows=nrows, figsize=(5, 3), sharex=True)
 
