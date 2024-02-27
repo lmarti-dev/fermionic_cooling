@@ -383,6 +383,8 @@ class Cooler:
         ansatz_options: dict = {},
         weaken_coupling: float = 100,
         coupler_transitions: list = None,
+        depol_noise: float = None,
+        is_noise_spin_conserving: bool = False,
     ):
         initial_density_matrix = self.total_initial_state
         if not cirq.is_hermitian(initial_density_matrix):
@@ -479,7 +481,9 @@ class Cooler:
                         env_coupling=omega,
                         alpha=alpha,
                         evolution_time=evolution_time,
-                        reset=reset,
+                        do_reset_fridge=reset,
+                        depol_noise=depol_noise,
+                        is_noise_spin_conserving=is_noise_spin_conserving,
                     )
 
                     # print stats on evolution
@@ -596,7 +600,8 @@ class Cooler:
         env_coupling: float,
         evolution_time: float,
         depol_noise: float = None,
-        reset: bool = True,
+        do_reset_fridge: bool = True,
+        is_noise_spin_conserving: bool = False,
     ):
         cooling_hamiltonian = self.cooling_hamiltonian(env_coupling, alpha)
 
@@ -630,8 +635,8 @@ class Cooler:
 
         if depol_noise is not None:
             # add depol noise
-            spin_conserving = False
-            if spin_conserving is True:
+
+            if is_noise_spin_conserving is True:
                 rho_err = spin_dicke_mixed_state(
                     n_qubits=len(self.sys_qubits), Nf=self.n_electrons
                 )
@@ -654,7 +659,7 @@ class Cooler:
 
         self.print_msg()
 
-        if not reset:
+        if not do_reset_fridge:
             return sys_fidelity, sys_energy, env_energy, total_density_matrix
 
         # putting the env back in the ground state
@@ -671,16 +676,16 @@ class Cooler:
         eigenspectrums: list[list],
         suptitle: str = None,
     ):
-        plt.rcParams.update(
-            {
-                "figure.figsize": (5, 3),
-            }
-        )
+        more_than_one_rep = len(env_energies) > 1
         nrows = 2
-        try:
-            cmap = plt.get_cmap("faucmap", len(env_energies))
-        except Exception:
-            cmap = plt.get_cmap("turbo", len(env_energies))
+        if more_than_one_rep:
+            try:
+                cmap_name = "faucmap"
+                cmap = plt.get_cmap(cmap_name, len(env_energies))
+            except Exception:
+                cmap_name = "turbo"
+                cmap = plt.get_cmap(cmap_name, len(env_energies))
+                print(f"using {cmap_name}")
 
         fig, axes = plt.subplots(nrows=nrows, figsize=(5, 3), sharex=True)
 
@@ -696,20 +701,16 @@ class Cooler:
             else:
                 len_prev += len(fidelities[rep - 1])
                 sum_omega += sum(omegas[rep - 1])
-
-            axes[0].plot(
-                omegas[rep],
-                fidelities[rep],
-                color=cmap(rep),
-                linewidth=2,
-            )
+            if more_than_one_rep:
+                kwargs = {"color": cmap(rep)}
+            else:
+                kwargs = {}
+            axes[0].plot(omegas[rep], fidelities[rep], linewidth=2, **kwargs)
 
             ax_bottom.plot(
                 omegas[rep],
                 env_energies[rep],
-                color=cmap(rep),
-                linewidth=2,
-                label="Rep. {}".format(rep + 1),
+                **kwargs,
             )
         all_env_energies = np.array(list(flatten(env_energies)))
         for ind, spectrum in enumerate(eigenspectrums):
@@ -737,7 +738,7 @@ class Cooler:
             fig.suptitle(suptitle)
 
         use_cbar = True
-        if len(env_energies) > 1:
+        if more_than_one_rep:
             if use_cbar:
                 fig.colorbar(
                     cm.ScalarMappable(norm=colors.NoNorm(), cmap=cmap), ax=axes

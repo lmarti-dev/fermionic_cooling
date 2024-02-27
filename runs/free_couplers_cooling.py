@@ -45,7 +45,7 @@ def __main__(args):
     # whether we want to skip all saving data
     dry_run = False
     edm = ExperimentDataManager(
-        experiment_name="singlet_o2_freecouplers",
+        experiment_name="fh_new_freecouplers",
         notes="cooling this home cooked chemical ham with free couplers",
         dry_run=dry_run,
     )
@@ -101,7 +101,7 @@ def __main__(args):
     )
 
     # initial state setting
-    sys_initial_state = ketbra(sys_slater_state)
+    sys_initial_state = ketbra(sys_hartree_fock)
 
     sys_ground_state = sys_eig_states[:, np.argmin(sys_eig_energies)]
     sys_ground_energy = np.min(sys_eig_energies)
@@ -185,7 +185,7 @@ def __main__(args):
     print(f"coupler dim: {cooler.sys_env_coupler_data_dims}")
 
     ansatz_options = {"beta": 1, "mu": 20, "c": 40}
-    weaken_coupling = 20
+    weaken_coupling = 100
 
     start_omega = 1.01 * spectrum_width
 
@@ -197,6 +197,7 @@ def __main__(args):
         coupler_transitions = np.abs(
             np.array(free_sys_eig_energies[1:]) - free_sys_eig_energies[0]
         )
+        depol_noise = 1e-5
         (
             fidelities,
             sys_ev_energies,
@@ -210,6 +211,8 @@ def __main__(args):
             n_rep=n_rep,
             weaken_coupling=weaken_coupling,
             coupler_transitions=None,
+            depol_noise=depol_noise,
+            is_noise_spin_conserving=False,
         )
 
         jobj = {
@@ -217,6 +220,7 @@ def __main__(args):
             "fidelities": fidelities,
             "sys_energies": sys_ev_energies,
             "env_energies": env_ev_energies,
+            "depol_noise": depol_noise,
         }
         edm.save_dict_to_experiment(filename="cooling_free", jobj=jobj)
 

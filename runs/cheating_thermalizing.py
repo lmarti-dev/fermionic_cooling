@@ -94,11 +94,10 @@ def maximally_mixed_state(n_qubits):
 
 
 def main_run(edm: ExperimentDataManager, initial_beta, target_beta):
-    set_color_cycler()
     # whether we want to skip all saving data
 
     # model stuff
-    model = FermiHubbardModel(x_dimension=1, y_dimension=2, tunneling=1, coulomb=2)
+    model = FermiHubbardModel(x_dimension=2, y_dimension=2, tunneling=1, coulomb=2)
     sys_qubits = model.flattened_qubits
 
     # define inverse temp
@@ -109,7 +108,7 @@ def main_run(edm: ExperimentDataManager, initial_beta, target_beta):
     n_env_qubits = 1
     n_total_qubits = n_sys_qubits + n_env_qubits
 
-    n_electrons = [1, 1]
+    n_electrons = [2, 2]
     sys_hartree_fock = jw_hartree_fock_state(
         n_orbitals=n_sys_qubits, n_electrons=sum(n_electrons)
     )
@@ -125,6 +124,10 @@ def main_run(edm: ExperimentDataManager, initial_beta, target_beta):
         particle_number=n_electrons,
         expanded=True,
     )
+
+    # renormalize target beta with ground state
+    target_beta = target_beta / np.abs(sys_eig_energies[0])
+
     free_sys_eig_energies, free_sys_eig_states = jw_eigenspectrum_at_particle_number(
         sparse_operator=get_sparse_operator(
             model.non_interacting_model.fock_hamiltonian,
@@ -203,7 +206,7 @@ def main_run(edm: ExperimentDataManager, initial_beta, target_beta):
     )
 
     # probe_times(edm, cooler, alphas, sweep_values)
-    method = "zipcool"
+    method = "bigbrain"
     if method == "zipcool":
         (
             fidelities,
@@ -252,8 +255,8 @@ def main_run(edm: ExperimentDataManager, initial_beta, target_beta):
     elif method == "bigbrain":
         ansatz_options = {
             "beta": 1,
-            "mu": 10,
-            "c": 20,
+            "mu": 20,
+            "c": 40,
             "minus": env_ham.expectation_from_density_matrix(
                 thermal_env_density, qubit_map={k: v for v, k in enumerate(env_qubits)}
             ),
@@ -283,8 +286,10 @@ def main_run(edm: ExperimentDataManager, initial_beta, target_beta):
         )
 
         jobj = {
+            "omegas": omegas,
             "fidelities": fidelities,
             "sys_energies": sys_ev_energies,
+            "env_energies": env_ev_energies,
         }
         edm.save_dict_to_experiment(filename="cooling_free", jobj=jobj)
 
@@ -322,7 +327,7 @@ def loop_over_betas():
 
 def normal_run():
     dry_run = False
-    initial_beta = 60
+    initial_beta = 0
     target_beta = 1
 
     edm = ExperimentDataManager(
