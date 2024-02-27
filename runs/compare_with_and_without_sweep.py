@@ -1,49 +1,45 @@
 import sys
 
-# tsk tsk
-# sys.path.append("/home/Refik/Data/My_files/Dropbox/PhD/repos/fauvqe/")
-
-from fauvqe.models.fermiHubbardModel import FermiHubbardModel
-from chemical_models.specificModel import SpecificModel
+import cirq
+import matplotlib.pyplot as plt
+import numpy as np
+from adiabatic_sweep import fermion_to_dense, run_sweep
+from building_blocks import (
+    get_cheat_coupler,
+    get_cheat_coupler_list,
+    get_cheat_sweep,
+    get_perturbed_sweep,
+    get_Z_env,
+)
+from coolerClass import Cooler
+from openfermion import (
+    get_quadratic_hamiltonian,
+    get_sparse_operator,
+    jw_hartree_fock_state,
+)
 from plotting.plot_comparison_adiabatic_preprocessing import (
     plot_results,
 )
-
-from coolerClass import Cooler
-from adiabatic_sweep import run_sweep, fermion_to_dense
-from building_blocks import (
-    get_cheat_sweep,
-    get_cheat_coupler,
-    get_perturbed_sweep,
-    get_Z_env,
-    get_cheat_coupler_list,
-)
-
-from utils import (
+from fermionic_cooling.utils import (
     expectation_wrapper,
+    get_min_gap,
     ketbra,
     state_fidelity_to_eigenstates,
-    get_min_gap,
 )
+
+from chemical_models.specificModel import SpecificModel
+from data_manager import ExperimentDataManager
+from fauplotstyle.styler import use_style
+from fauvqe.models.fermiHubbardModel import FermiHubbardModel
 from fauvqe.utilities import (
+    flatten,
     jw_eigenspectrum_at_particle_number,
     spin_dicke_state,
-    flatten,
 )
-import cirq
-from openfermion import (
-    get_sparse_operator,
-    jw_hartree_fock_state,
-    get_quadratic_hamiltonian,
-)
-import matplotlib.pyplot as plt
-
-
-from data_manager import ExperimentDataManager, set_color_cycler
-import numpy as np
 
 
 def __main__(args):
+    use_style()
     # whether we want to skip all saving data
     dry_run = False
     edm = ExperimentDataManager(
@@ -51,10 +47,9 @@ def __main__(args):
         notes="adding an initial sweep before the cooling run",
         dry_run=dry_run,
     )
-    set_color_cycler()
     # model stuff
 
-    model_name = "fh_coulomb"
+    model_name = "fh_nonint"
     if "fh_" in model_name:
         model = FermiHubbardModel(x_dimension=2, y_dimension=2, tunneling=1, coulomb=2)
         n_qubits = len(model.flattened_qubits)
@@ -104,7 +99,7 @@ def __main__(args):
         expanded=True,
     )
 
-    sys_slater_state = start_eig_states[:, 0]
+    sys_slater_state = start_eig_states[:, 2]
     sys_eig_energies, sys_eig_states = jw_eigenspectrum_at_particle_number(
         sparse_operator=get_sparse_operator(
             model.fock_hamiltonian,
@@ -113,7 +108,10 @@ def __main__(args):
         particle_number=n_electrons,
         expanded=True,
     )
+    spectrum_width = max(sys_eig_energies) - min(sys_eig_energies)
 
+    start_omega = spectrum_width / 2
+    stop_omega = 0.1
     # initial state setting
     sys_initial_state = ketbra(sys_slater_state)
 
@@ -159,26 +157,29 @@ def __main__(args):
         model=model.to_json_dict()["constructor_params"],
     )
 
+    max_k = len(
+        np.where((free_sys_eig_energies - free_sys_eig_energies[0]) < start_omega)[0]
+    )
     couplers = get_cheat_coupler_list(
         sys_eig_states=free_sys_eig_states,
         env_eig_states=env_eig_states,
         qubits=sys_qubits + env_qubits,
         gs_indices=(0,),
         noise=0,
+        max_k=None,
     )  # Interaction only on Qubit 0?
-    print("coupler done")
-
+    print(f"coupler done, max_k: {max_k}")
     print(f"number of couplers: {len(couplers)}")
     # coupler = get_cheat_coupler(sys_eigenstates, env_eigenstates)
 
     # get environment ham sweep values
-    spectrum_width = max(sys_eig_energies) - min(sys_eig_energies)
 
     min_gap = get_min_gap(free_sys_eig_energies, threshold=1e-6)
 
     # evolution_time = 1e-3
 
     fpaths = []
+    sweep_time_mult = 0.01
     for which_initial_process in ("adiabatic", "none"):
         print(f"Initial process: {which_initial_process}")
 
@@ -190,7 +191,7 @@ def __main__(args):
             ham_stop = fermion_to_dense(model.fock_hamiltonian)
             n_steps = 100
             total_time = (
-                0.001
+                sweep_time_mult
                 * spectrum_width
                 / (get_min_gap(sys_eig_energies, threshold=1e-12) ** 2)
             )
@@ -230,14 +231,16 @@ def __main__(args):
 
         print(f"coupler dim: {cooler.sys_env_coupler_data_dims}")
 
-        ansatz_options = {"beta": 1, "mu": 10, "c": 10}
+        ansatz_options = {"beta": 1, "mu": 20, "c": 40}
         weaken_coupling = 30
 
-        start_omega = 3
-
-        stop_omega = 0.1
-
-        fidelities, sys_ev_energies, omegas, env_ev_energies = cooler.big_brain_cool(
+        (
+            fidelities,
+            sys_ev_energies,
+            omegas,
+            env_ev_energies,
+            _,
+        ) = cooler.big_brain_cool(
             start_omega=start_omega,
             stop_omega=stop_omega,
             ansatz_options=ansatz_options,
@@ -251,6 +254,9 @@ def __main__(args):
             "fidelities": fidelities,
             "sys_energies": sys_ev_energies,
             "env_ev_energies": env_ev_energies,
+            "start_omega": start_omega,
+            "stop_omega": stop_omega,
+            "sweep_time_mult": sweep_time_mult,
         }
         fpaths.append(
             edm.save_dict_to_experiment(

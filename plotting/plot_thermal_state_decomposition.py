@@ -1,11 +1,10 @@
 import numpy as np
 from openfermion import get_sparse_operator
-from utils import (
+from fermionic_cooling.utils import (
     state_fidelity_to_eigenstates,
     thermal_density_matrix_at_particle_number,
+    fidelity,
 )
-from utils import fidelity
-
 from fauvqe.models.fermiHubbardModel import FermiHubbardModel
 from fauvqe.utilities import jw_eigenspectrum_at_particle_number, spin_dicke_mixed_state
 import matplotlib.pyplot as plt
@@ -13,9 +12,9 @@ from data_manager import ExperimentDataManager
 from fauplotstyle.styler import use_style
 
 
-def plot_amplitudes_vs_beta(edm: ExperimentDataManager):
-    model = FermiHubbardModel(x_dimension=1, y_dimension=2, tunneling=1, coulomb=2)
-    n_electrons = [1, 1]
+def plot_amplitudes_vs_beta(edm: ExperimentDataManager, zoom: bool = False):
+    model = FermiHubbardModel(x_dimension=2, y_dimension=2, tunneling=1, coulomb=2)
+    n_electrons = [2, 2]
     n_qubits = len(model.flattened_qubits)
 
     eigenenergies, eigenstates = jw_eigenspectrum_at_particle_number(
@@ -49,12 +48,12 @@ def plot_amplitudes_vs_beta(edm: ExperimentDataManager):
 
     fig, ax = plt.subplots()
     cmap = plt.get_cmap("turbo", len(total_fids))
-
-    axins = ax.inset_axes(
-        [0.1, 0.1, 0.3, 0.4],
-        xlim=(1e-2, 1e-1),
-        ylim=(0.02, 0.1),
-    )
+    if zoom:
+        axins = ax.inset_axes(
+            [0.1, 0.1, 0.3, 0.4],
+            xlim=(2e-2, 1e-1),
+            ylim=(0.0004, 0.001),
+        )
 
     for ind, fids in enumerate(total_fids):
         ax.plot(
@@ -63,21 +62,22 @@ def plot_amplitudes_vs_beta(edm: ExperimentDataManager):
             label=rf"$|E_{{{ind}}}\rangle$",
             color=cmap(ind),
         )
-        axins.plot(
-            betas * np.abs(eigenenergies[0]),
-            np.abs(fids),
-            label=rf"$|E_{{{ind}}}\rangle$",
-            color=cmap(ind),
-        )
+        if zoom:
+            axins.plot(
+                betas * np.abs(eigenenergies[0]),
+                np.abs(fids),
+                label=rf"$|E_{{{ind}}}\rangle$",
+                color=cmap(ind),
+            )
 
     ax.set_ylabel("Amplitude")
     ax.set_xlabel(r"$\beta E_0$")
     ax.set_yscale("log")
     ax.set_xscale("log")
     ax.set_ylim(1e-10, 2)
-    axins.yaxis.tick_right()
-
-    ax.indicate_inset_zoom(axins, edgecolor="black")
+    if zoom:
+        axins.yaxis.tick_right()
+        ax.indicate_inset_zoom(axins, edgecolor="black")
 
     edm.save_figure(fig)
     plt.show()
@@ -128,6 +128,8 @@ def plot_mms_fidelity_vs_beta(edm):
 use_style()
 
 dry_run = False
-edm = ExperimentDataManager(experiment_name="plot_components_vs_beta", dry_run=dry_run)
+edm = ExperimentDataManager(
+    experiment_name="plot_components_vs_beta_fh22", dry_run=dry_run
+)
 plot_amplitudes_vs_beta(edm)
 # plot_mms_fidelity_vs_beta(edm)
