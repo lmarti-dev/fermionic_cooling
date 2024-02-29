@@ -20,12 +20,16 @@ def load_json(fpath: os.PathLike):
     return jobj
 
 
-def plot_results(edm, with_adiab: str, wout_adiab: str, sys_eig_energies: np.ndarray):
+def plot_results(
+    edm,
+    with_adiab: str,
+    wout_adiab: str,
+    sys_eig_energies: np.ndarray,
+    is_tf_log: bool = False,
+):
 
     jobj_with = load_json(with_adiab)
     jobj_wout = load_json(wout_adiab)
-
-    plt.rcParams["font.size"] = 16
 
     fig, axes = plt.subplots(nrows=2, sharex=True)
 
@@ -41,12 +45,26 @@ def plot_results(edm, with_adiab: str, wout_adiab: str, sys_eig_energies: np.nda
             label=labels[ind],
         )
 
-        axes[1].plot(
-            jobj["omegas"][0],
-            jobj["env_ev_energies"][0],
-            color=colors[ind],
-            linewidth=1.5,
-        )
+        # only for thermalization
+        if is_tf_log:
+            axes[1].plot(
+                jobj["omegas"][0],
+                np.abs(
+                    np.array(jobj["env_ev_energies"][0]) - jobj["env_ev_energies"][0][0]
+                ),
+                color=colors[ind],
+                linewidth=1.5,
+            )
+            axes[1].set_yscale("log")
+            axes[1].set_ylabel(r"$|\Delta T_F|$")
+        else:
+            axes[1].plot(
+                jobj["omegas"][0],
+                jobj["env_ev_energies"][0],
+                color=colors[ind],
+                linewidth=1.5,
+            )
+        axes[1].set_ylabel(r"$T_F$")
 
     all_energies = np.array(list(flatten(jobj["env_ev_energies"])))
 
@@ -66,7 +84,6 @@ def plot_results(edm, with_adiab: str, wout_adiab: str, sys_eig_energies: np.nda
 
     axes[0].set_ylabel("Fidelity")
     axes[1].set_xlabel("$\omega$")
-    axes[1].set_ylabel(r"$T_F$")
     axes[0].legend()
 
     # figname = fpath.split("\\")[-2]

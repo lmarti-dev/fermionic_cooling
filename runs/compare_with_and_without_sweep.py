@@ -99,7 +99,8 @@ def __main__(args):
         expanded=True,
     )
 
-    sys_slater_state = start_eig_states[:, 2]
+    slater_index = 2
+    sys_slater_state = start_eig_states[:, slater_index]
     sys_eig_energies, sys_eig_states = jw_eigenspectrum_at_particle_number(
         sparse_operator=get_sparse_operator(
             model.fock_hamiltonian,
@@ -110,7 +111,7 @@ def __main__(args):
     )
     spectrum_width = max(sys_eig_energies) - min(sys_eig_energies)
 
-    start_omega = spectrum_width / 2
+    start_omega = spectrum_width / 4
     stop_omega = 0.1
     # initial state setting
     sys_initial_state = ketbra(sys_slater_state)
@@ -164,9 +165,9 @@ def __main__(args):
         sys_eig_states=free_sys_eig_states,
         env_eig_states=env_eig_states,
         qubits=sys_qubits + env_qubits,
-        gs_indices=(0,),
+        gs_indices=(slater_index,),
         noise=0,
-        max_k=None,
+        max_k=max_k,
     )  # Interaction only on Qubit 0?
     print(f"coupler done, max_k: {max_k}")
     print(f"number of couplers: {len(couplers)}")
@@ -231,8 +232,8 @@ def __main__(args):
 
         print(f"coupler dim: {cooler.sys_env_coupler_data_dims}")
 
-        ansatz_options = {"beta": 1, "mu": 20, "c": 40}
-        weaken_coupling = 30
+        ansatz_options = {"beta": 1, "mu": 20, "c": 10}
+        weaken_coupling = 100
 
         (
             fidelities,
