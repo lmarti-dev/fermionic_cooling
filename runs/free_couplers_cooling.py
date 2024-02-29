@@ -212,7 +212,7 @@ def __main__(args):
             weaken_coupling=weaken_coupling,
             coupler_transitions=None,
             depol_noise=depol_noise,
-            is_noise_spin_conserving=False,
+            is_noise_spin_conserving=True,
         )
 
         jobj = {

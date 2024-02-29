@@ -638,7 +638,7 @@ class Cooler:
 
             if is_noise_spin_conserving is True:
                 rho_err = spin_dicke_mixed_state(
-                    n_qubits=len(self.sys_qubits), Nf=self.n_electrons
+                    n_qubits=len(self.sys_qubits), Nf=self.n_electrons, expanded=True
                 )
             else:
                 rho_err = np.eye(len(traced_density_matrix))
@@ -799,11 +799,6 @@ class Cooler:
         supplementary_data: dict = {},
         suptitle: str = None,
     ):
-        plt.rcParams.update(
-            {
-                "figure.figsize": (5, 3),
-            }
-        )
         nrows = 2 + len(supplementary_data)
         fig, axes = plt.subplots(nrows=nrows, figsize=(5, 3))
 
