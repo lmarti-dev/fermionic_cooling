@@ -11,7 +11,7 @@ from building_blocks import (
 )
 from thermalizer import Thermalizer
 from openfermion import get_sparse_operator, jw_hartree_fock_state
-from utils import (
+from fermionic_cooling.utils import (
     ketbra,
     state_fidelity_to_eigenstates,
     thermal_density_matrix_at_particle_number,
@@ -19,9 +19,10 @@ from utils import (
     get_min_gap,
 )
 
-from data_manager import ExperimentDataManager, set_color_cycler
+from data_manager import ExperimentDataManager
 from fauvqe.models.fermiHubbardModel import FermiHubbardModel
 from fauvqe.utilities import jw_eigenspectrum_at_particle_number, spin_dicke_state, qmap
+from fauplotstyle.styler import use_style
 
 
 def print_thermalizing_stats(
@@ -255,7 +256,7 @@ def main_run(edm: ExperimentDataManager, initial_beta, target_beta):
     elif method == "bigbrain":
         ansatz_options = {
             "beta": 1,
-            "mu": 20,
+            "mu": 10,
             "c": 40,
             "minus": env_ham.expectation_from_density_matrix(
                 thermal_env_density, qubit_map={k: v for v, k in enumerate(env_qubits)}
@@ -339,4 +340,5 @@ def normal_run():
 
 
 if __name__ == "__main__":
+    use_style()
     normal_run()

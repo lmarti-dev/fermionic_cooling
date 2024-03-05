@@ -46,7 +46,8 @@ class Thermalizer(Cooler):
         env_coupling: float,
         evolution_time: float,
         depol_noise: float = None,
-        reset: bool = True,
+        do_reset_fridge: bool = True,
+        is_noise_spin_conserving: bool = False,
     ):
         cooling_hamiltonian = self.cooling_hamiltonian(env_coupling, alpha)
 
@@ -85,10 +86,10 @@ class Thermalizer(Cooler):
 
         if depol_noise is not None:
             # add depol noise
-            spin_conserving = False
-            if spin_conserving is True:
+
+            if is_noise_spin_conserving is True:
                 rho_err = spin_dicke_mixed_state(
-                    n_qubits=len(self.sys_qubits), Nf=self.n_electrons
+                    n_qubits=len(self.sys_qubits), Nf=self.n_electrons, expanded=True
                 )
             else:
                 rho_err = np.eye(len(traced_density_matrix))
@@ -97,7 +98,7 @@ class Thermalizer(Cooler):
                 1 - depol_noise
             ) * traced_density_matrix + depol_noise * rho_err
 
-        if not reset:
+        if not do_reset_fridge:
             return sys_fidelity, sys_energy, env_energy, total_density_matrix
 
         # putting the env back in the thermal state
