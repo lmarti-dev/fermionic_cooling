@@ -29,40 +29,47 @@ def get_data(data_dir: str):
     return jobj
 
 
-use_style()
-dry_run = False
-edm = ExperimentDataManager(
-    experiment_name="plot_couplers_oneatatime",
-    notes="plotting the couplers individual resonances",
-    dry_run=dry_run,
-)
+def plot_each_coupler_perf(dirname):
+    runs = list(sorted(os.listdir(dirname)))
+    cmap = plt.get_cmap("faucmap", len(runs))
 
-dirname = "/home/eckstein/Desktop/projects/data/2024_02_23/fh22_oneatatime_09h25/"
+    fig, axes = plt.subplots(nrows=2, sharex=True)
 
-runs = list(sorted(os.listdir(dirname)))
-cmap = plt.get_cmap("faucmap", len(runs))
+    for ind, run in enumerate(runs):
+        data_dir = os.path.join(dirname, run, "data/")
+        data = get_data(data_dir)
+        omegas = data["omegas"]
+        fidelities = data["fidelities"]
+        env_energies = data["env_energies"]
+        axes[0].plot(omegas[0], fidelities[0], color=cmap(ind), label=f"Coupler {ind}")
+        axes[1].plot(
+            omegas[0],
+            env_energies[0],
+            color=cmap(ind),
+        )
+    axes[1].invert_xaxis()
+    cbar = fig.colorbar(cm.ScalarMappable(norm=colors.NoNorm(), cmap=cmap), ax=axes)
+    cbar.set_label("Coupler index")
 
-fig, axes = plt.subplots(nrows=2, sharex=True)
+    axes[0].set_ylabel("Fidelity")
+    axes[1].set_ylabel("$T_F$")
+    axes[1].set_xlabel("$\omega$")
+    return fig
 
-for ind, run in enumerate(runs):
-    data_dir = os.path.join(dirname, run, "data/")
-    data = get_data(data_dir)
-    omegas = data["omegas"]
-    fidelities = data["fidelities"]
-    env_energies = data["env_energies"]
-    axes[0].plot(omegas[0], fidelities[0], color=cmap(ind), label=f"Coupler {ind}")
-    axes[1].plot(
-        omegas[0],
-        env_energies[0],
-        color=cmap(ind),
+
+if __name__ == "__main__":
+    use_style()
+    dry_run = False
+    edm = ExperimentDataManager(
+        experiment_name="plot_couplers_oneatatime",
+        notes="plotting the couplers individual resonances",
+        dry_run=dry_run,
     )
-axes[1].invert_xaxis()
-cbar = fig.colorbar(cm.ScalarMappable(norm=colors.NoNorm(), cmap=cmap), ax=axes)
-cbar.set_label("Coupler index")
 
-axes[0].set_ylabel("Fidelity")
-axes[1].set_ylabel("$T_F$")
-axes[1].set_xlabel("$\omega$")
+    dirname = "/home/eckstein/Desktop/projects/data/2024_02_23/fh22_oneatatime_09h25/"
+    fig = plot_each_coupler_perf(dirname)
 
-edm.save_figure(fig=fig, filename="plot_each_coupler_resonance", add_timestamp=False)
-plt.show()
+    edm.save_figure(
+        fig=fig, filename="plot_each_coupler_resonance", add_timestamp=False
+    )
+    plt.show()

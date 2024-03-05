@@ -65,7 +65,7 @@ if __name__ == "__main__":
         n_qubits=n_env_qubits
     )
 
-    fix, axes = plt.subplots(figsize=(5, 3), nrows=2)
+    fix, axes = plt.subplots(nrows=2)
 
     coupler_list_fsim = get_moving_fsim_coupler_list(sys_qubits, env_qubits)
     coupler_list_ZY = get_moving_ZY_coupler_list(sys_qubits, env_qubits)

@@ -18,7 +18,7 @@ from openfermion import (
     jw_hartree_fock_state,
 )
 from plotting.plot_comparison_adiabatic_preprocessing import (
-    plot_results,
+    plot_comparison_fast_sweep,
 )
 from fermionic_cooling.utils import (
     expectation_wrapper,

@@ -116,7 +116,6 @@ def probe_reps_with_noise(
             noise_range,
             end_fidelities[n_rep, :],
             "x--",
-            linewidth=2,
             label=f"{actual_rep} rep.",
         )
     ax.set_xlabel("Noise coefficient [-]")
@@ -221,7 +220,6 @@ def probe_alpha_with_noise(
             noise_range,
             end_fidelities[wc_ind, :],
             "x-",
-            linewidth=1,
             label=rf"$\alpha/{weaken_coupling:.3f}$",
         )
     ax.set_xlabel("Noise coefficient [-]")
@@ -322,7 +320,6 @@ def probe_noise(
         noise_range,
         end_fidelities,
         "x-",
-        linewidth=2,
         markersize=5,
     )
     ax.set_xlabel("Noise coefficient [-]")
@@ -398,15 +395,6 @@ def __main__(args):
         sys_eigenspectrum=sys_eig_energies,
         env_eigenergies=env_eig_energies,
         model=model.to_json_dict()["constructor_params"],
-    )
-
-    plt.rcParams.update(
-        {
-            "text.usetex": True,  # use inline math for ticks
-            "font.family": r"Computer Modern Roman",  # use serif/main font for text elements
-            "font.size": 15,
-            "figure.figsize": (5, 4),
-        }
     )
     probe_noise(
         edm,

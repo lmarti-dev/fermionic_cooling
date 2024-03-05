@@ -14,7 +14,7 @@ def load_json(fpath):
     )
 
 
-def plot_combined(dirname):
+def plot_fast_sweep_vs_m(dirname):
     files = os.listdir(dirname)
     final_fids = np.zeros((len(files) // 2, 2))
     init_fids = np.zeros((len(files) // 2, 2))
@@ -41,6 +41,9 @@ def plot_combined(dirname):
         label="Without fast sweep",
     )
 
+    ax.set_ylabel("Final fidelity")
+    ax.set_xlabel(r"$M$")
+
     ax.legend()
     return fig
 
@@ -49,6 +52,6 @@ if __name__ == "__main__":
     use_style()
     edm = ExperimentDataManager(experiment_name="plot_fastsweep_vs_m")
     dirname = "/home/eckstein/Desktop/projects/data/2024_02_29/cooling_with_initial_adiab_sweep_10h10/run_00000/data"
-    fig = plot_combined(dirname)
+    fig = plot_fast_sweep_vs_m(dirname)
     edm.save_figure(fig)
     plt.show()

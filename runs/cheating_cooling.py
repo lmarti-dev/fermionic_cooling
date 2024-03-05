@@ -46,7 +46,7 @@ def probe_times(
         sweep_values=sweep_values,
         N_slices=50,
     )
-    fig, ax = plt.subplots(figsize=(5, 3))
+    fig, ax = plt.subplots()
     for ind, tup in enumerate(env_energy_dynamics):
         time = np.array(tup[0]) * (alphas[ind] / np.pi)
         env_energy = np.array(tup[1]) / sweep_values[ind]

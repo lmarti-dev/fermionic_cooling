@@ -178,19 +178,17 @@ def run_comp(edm, model_name):
     plot_populations = False
     if plot_populations:
         for pop in populations:
-            ax.plot(range(len(pop)), pop, linewidth=0.5)
+            ax.plot(range(len(pop)), pop)
     ax.plot(
         np.linspace(0, total_time, len(fidelities)),
         fidelities,
         "r",
-        linewidth=2,
         label="Fidelity to g.s.",
     )
     ax.plot(
         np.linspace(0, total_time, len(instant_fidelities)),
         instant_fidelities,
         "b",
-        linewidth=2,
         label="Fidelity to instant g.s.",
     )
     ax.set_xlabel("Time")

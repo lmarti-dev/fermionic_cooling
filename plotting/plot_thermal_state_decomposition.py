@@ -12,22 +12,19 @@ from data_manager import ExperimentDataManager
 from fauplotstyle.styler import use_style
 
 
-def plot_amplitudes_vs_beta(edm: ExperimentDataManager, zoom: bool = False):
-    model = FermiHubbardModel(x_dimension=2, y_dimension=2, tunneling=1, coulomb=2)
-    n_electrons = [2, 2]
+def plot_amplitudes_vs_beta(
+    x, y, tunneling, coulomb, n_electrons, zoom: bool = False, n_steps: int = 200
+):
+    model = FermiHubbardModel(
+        x_dimension=x, y_dimension=y, tunneling=tunneling, coulomb=coulomb
+    )
     n_qubits = len(model.flattened_qubits)
 
     eigenenergies, eigenstates = jw_eigenspectrum_at_particle_number(
         sparse_operator=get_sparse_operator(model.fock_hamiltonian),
         particle_number=n_electrons,
     )
-
-    n_steps = 200
     n_dims = len(eigenstates[:, 0])
-
-    edm.dump_some_variables(
-        model=model.to_json_dict()["constructor_params"], n_electrons=n_electrons
-    )
     betas = np.zeros((n_steps,))
 
     total_fids = np.zeros((n_dims, n_steps))
@@ -79,8 +76,7 @@ def plot_amplitudes_vs_beta(edm: ExperimentDataManager, zoom: bool = False):
         axins.yaxis.tick_right()
         ax.indicate_inset_zoom(axins, edgecolor="black")
 
-    edm.save_figure(fig)
-    plt.show()
+    return fig
 
 
 def plot_mms_fidelity_vs_beta(edm):
@@ -125,11 +121,12 @@ def plot_mms_fidelity_vs_beta(edm):
     plt.show()
 
 
-use_style()
+if __name__ == "__main__":
+    use_style()
 
-dry_run = False
-edm = ExperimentDataManager(
-    experiment_name="plot_components_vs_beta_fh22", dry_run=dry_run
-)
-plot_amplitudes_vs_beta(edm)
-# plot_mms_fidelity_vs_beta(edm)
+    dry_run = False
+    edm = ExperimentDataManager(
+        experiment_name="plot_components_vs_beta_fh22", dry_run=dry_run
+    )
+    fig = plot_amplitudes_vs_beta(2, 2, 1, 2)
+    # plot_mms_fidelity_vs_beta(edm)

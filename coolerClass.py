@@ -89,7 +89,7 @@ class Cooler:
 
         # message for verbose printing
         self.msg = {}
-        self.total_cooling_time=None
+        self.total_cooling_time = None
 
     def update_message(self, k: str, s: str, message_level: int = 1):
         if int(self.verbosity) >= message_level:
@@ -669,8 +669,9 @@ class Cooler:
         )
         return sys_fidelity, sys_energy, env_energy, total_density_matrix
 
+    @classmethod
     def plot_controlled_cooling(
-        self,
+        cls,
         fidelities: list,
         env_energies: list,
         omegas: list,
@@ -688,7 +689,7 @@ class Cooler:
                 cmap = plt.get_cmap(cmap_name, len(env_energies))
                 print(f"using {cmap_name}")
 
-        fig, axes = plt.subplots(nrows=nrows, figsize=(5, 3), sharex=True)
+        fig, axes = plt.subplots(nrows=nrows, sharex=True)
 
         plot_temp = False
         ax_bottom = axes[1]
@@ -706,7 +707,7 @@ class Cooler:
                 kwargs = {"color": cmap(rep)}
             else:
                 kwargs = {}
-            axes[0].plot(omegas[rep], fidelities[rep], linewidth=2, **kwargs)
+            axes[0].plot(omegas[rep], fidelities[rep], **kwargs)
 
             ax_bottom.plot(
                 omegas[rep],
@@ -721,7 +722,6 @@ class Cooler:
                 ymax=np.nanmax(all_env_energies[np.isfinite(all_env_energies)]),
                 linestyle="--",
                 color=spectrum_cmap(ind),
-                linewidth=1,
             )
         axes[0].set_ylabel(r"Fidelity", labelpad=0)
 
@@ -748,8 +748,9 @@ class Cooler:
                 ax_bottom.legend(bbox_to_anchor=(0.2, 2))
         return fig
 
+    @classmethod
     def plot_default_cooling(
-        self,
+        cls,
         omegas: np.ndarray,
         fidelities: np.ndarray,
         env_energies: np.ndarray,
@@ -762,8 +763,14 @@ class Cooler:
             slice_size = int(len(omegas) / n_rep)
             for rep in range(n_rep):
                 idx = slice(rep * slice_size, (rep + 1) * slice_size)
-                axes[0].plot(omegas[idx], fidelities[idx], linewidth=2)
-                axes[1].plot(omegas[idx], env_energies[idx], linewidth=2)
+                axes[0].plot(
+                    omegas[idx],
+                    fidelities[idx],
+                )
+                axes[1].plot(
+                    omegas[idx],
+                    env_energies[idx],
+                )
 
                 if rep < n_rep - 1:
                     axes[0].plot(
@@ -776,11 +783,16 @@ class Cooler:
                             fidelities[(rep + 1) * slice_size],
                         ],
                         "k:",
-                        linewidth=0.5,
                     )
         else:
-            axes[0].plot(omegas, fidelities, linewidth=2)
-            axes[1].plot(omegas, env_energies, linewidth=2)
+            axes[0].plot(
+                omegas,
+                fidelities,
+            )
+            axes[1].plot(
+                omegas,
+                env_energies,
+            )
         axes[0].set_ylabel("Fidelity")
         axes[1].set_ylabel(r"$T_F$")
         axes[1].set_xlabel(r"$\omega$")
@@ -791,8 +803,9 @@ class Cooler:
 
         return fig
 
+    @classmethod
     def plot_generic_cooling(
-        self,
+        cls,
         fidelities: list,
         initial_pops: list,
         env_energies: list,
@@ -801,9 +814,13 @@ class Cooler:
         suptitle: str = None,
     ):
         nrows = 2 + len(supplementary_data)
-        fig, axes = plt.subplots(nrows=nrows, figsize=(5, 3))
+        fig, axes = plt.subplots(nrows=nrows)
 
-        axes[0].plot(range(len(fidelities)), fidelities, "kx--", linewidth=2)
+        axes[0].plot(
+            range(len(fidelities)),
+            fidelities,
+            "kx--",
+        )
         axes[0].set_ylabel(r"$|\langle \psi_{cool} | \psi_{gs} \rangle|^2$")
         axes[0].set_xlabel(r"$Steps$")
         cmap = plt.get_cmap("turbo", n_rep)
@@ -824,7 +841,6 @@ class Cooler:
             list(reversed(initial_pops)),
             color="k",
             linestyle=":",
-            linewidth=2,
             label="initial pop.",
         )
         axes[1].legend()
@@ -834,7 +850,6 @@ class Cooler:
                     range(len(supplementary_data[k])),
                     supplementary_data[k],
                     color="k",
-                    linewidth=1.66,
                 )
                 axes[ind + 1].set_ylabel(k)
 

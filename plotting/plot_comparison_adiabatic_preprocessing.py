@@ -20,8 +20,7 @@ def load_json(fpath: os.PathLike):
     return jobj
 
 
-def plot_results(
-    edm,
+def plot_comparison_fast_sweep(
     with_adiab: str,
     wout_adiab: str,
     sys_eig_energies: np.ndarray,
@@ -41,7 +40,6 @@ def plot_results(
             jobj["omegas"][0],
             jobj["fidelities"][0],
             color=colors[ind],
-            linewidth=1.5,
             label=labels[ind],
         )
 
@@ -53,7 +51,6 @@ def plot_results(
                     np.array(jobj["env_ev_energies"][0]) - jobj["env_ev_energies"][0][0]
                 ),
                 color=colors[ind],
-                linewidth=1.5,
             )
             axes[1].set_yscale("log")
             axes[1].set_ylabel(r"$|\Delta T_F|$")
@@ -62,7 +59,6 @@ def plot_results(
                 jobj["omegas"][0],
                 jobj["env_ev_energies"][0],
                 color=colors[ind],
-                linewidth=1.5,
             )
         axes[1].set_ylabel(r"$T_F$")
 
@@ -74,7 +70,6 @@ def plot_results(
         ymax=np.nanmax(all_energies[np.isfinite(all_energies)]),
         linestyle="--",
         color="r",
-        linewidth=1,
     )
 
     plt.xlim(min(jobj["omegas"][0]) * 0.9, max(jobj["omegas"][0]) * 1.1)
@@ -89,8 +84,7 @@ def plot_results(
     # figname = fpath.split("\\")[-2]
     # edm.save_figure(fig=fig, filename=figname)
 
-    edm.save_figure(fig)
-    plt.show()
+    return fig
 
 
 if __name__ == "__main__":
@@ -103,9 +97,11 @@ if __name__ == "__main__":
     dirname = "/home/eckstein/Desktop/projects/data/2024_02_07/cooling_with_initial_adiab_sweep_13h33/run_00000/data/"
     with_adiab = "cooling_free_adiabatic_2024_02_07_14_04_53.json"
     wout_adiab = "cooling_free_none_2024_02_07_14_37_28.json"
-    plot_results(
+    fig = plot_comparison_fast_sweep(
         edm,
         os.path.join(dirname, with_adiab),
         os.path.join(dirname, wout_adiab),
         sys_eig_energies,
     )
+    edm.save_figure(fig)
+    plt.show()

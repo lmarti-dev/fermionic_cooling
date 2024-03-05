@@ -70,7 +70,7 @@ def plot_separate(edm: ExperimentDataManager, dirname):
     edm.save_figure(fig)
 
 
-def plot_single(edm: ExperimentDataManager, dirnames):
+def plot_single(dirnames):
 
     model = FermiHubbardModel(x_dimension=1, y_dimension=2, tunneling=1, coulomb=2)
     n_electrons = [1, 1]
@@ -114,9 +114,7 @@ def plot_single(edm: ExperimentDataManager, dirnames):
     #     rf"1 $\times$ 2 Fermi-Hubbard from $\beta$ to ${target_betas[0]/initial_betas[0]:.1f}\cdot \beta$ "
     # )
     # fig.suptitle(rf"1 $\times$ 2 Fermi-Hubbard from ${initial_betas[0]}$ to $\beta$ ")
-    edm.save_figure(fig, filename="consolidated_thermal_fig")
-
-    plt.show()
+    return fig
 
 
 def old_plot():
@@ -202,4 +200,4 @@ if __name__ == "__main__":
     edm = ExperimentDataManager(
         experiment_name="plot_comparison_thermalizing", dry_run=dry_run
     )
-    plot_single(edm, dirnames)
+    fig = plot_single(dirnames)

@@ -49,7 +49,6 @@ def restyle_fig(fpath: str, normalized: bool = False):
         ymax=np.nanmax(yvb[np.isfinite(yvb)]),
         linestyle="--",
         color="r",
-        linewidth=1,
     )
     new_axes[1].plot(
         xvb,
