@@ -89,6 +89,7 @@ class Cooler:
 
         # message for verbose printing
         self.msg = {}
+        self.total_cooling_time=None
 
     def update_message(self, k: str, s: str, message_level: int = 1):
         if int(self.verbosity) >= message_level:
@@ -409,7 +410,7 @@ class Cooler:
             message_level=8,
         )
 
-        total_cooling_time = 0
+        self.total_cooling_time = 0
         for rep in range(n_rep):
             self.update_message("rep", s="rep n. {}".format(rep), message_level=5)
             omega = start_omega
@@ -432,7 +433,7 @@ class Cooler:
             while omega > stop_omega:
                 self.update_message(
                     "ovstep",
-                    f"overall steps: {overall_steps}, total cool. time: {total_cooling_time:.2f}",
+                    f"overall steps: {overall_steps}, total cool. time: {self.total_cooling_time:.2f}",
                 )
 
                 # set alpha and t
@@ -440,7 +441,7 @@ class Cooler:
 
                 # there's not factor of two here, it's all correct
                 evolution_time = np.pi / alpha
-                total_cooling_time += evolution_time
+                self.total_cooling_time += evolution_time
 
                 if coupler_transitions is not None:
                     assert len(coupler_transitions) == coupler_number
