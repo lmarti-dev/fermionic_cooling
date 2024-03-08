@@ -725,7 +725,7 @@ class Cooler:
             )
         axes[0].set_ylabel(r"Fidelity", labelpad=0)
 
-        ax_bottom.set_ylabel(r"$T_F$")
+        ax_bottom.set_ylabel(r"$E_F$")
         ax_bottom.tick_params(axis="y")
         ax_bottom.set_yscale("log")
         ax_bottom.invert_xaxis()
@@ -794,7 +794,7 @@ class Cooler:
                 env_energies,
             )
         axes[0].set_ylabel("Fidelity")
-        axes[1].set_ylabel(r"$T_F$")
+        axes[1].set_ylabel(r"$E_F$")
         axes[1].set_xlabel(r"$\omega$")
         axes[1].invert_xaxis()
 

@@ -23,6 +23,7 @@ from fermionic_cooling.plotting.plot_thermalizing_vs_beta_init import (
     afternoon_plot,
     plot_single,
 )
+import numpy as np
 
 
 def show_if_dry(dry_run: bool):
@@ -57,8 +58,13 @@ def load_controlled_cooling_data(fpath):
     return omegas, fidelities, env_energies
 
 
-def controlled_cooling_load_plot(edm, fpath, fig_filename, sys_eig_energies):
+def controlled_cooling_load_plot(
+    edm, fpath, fig_filename, sys_eig_energies, tf_minus_val: int = None
+):
     omegas, fidelities, env_energies = load_controlled_cooling_data(fpath)
+    if tf_minus_val is not None:
+        new_env_energies = np.array(env_energies[0]) - tf_minus_val
+        env_energies[0] = new_env_energies.astype(list)
     fig = Cooler.plot_controlled_cooling(
         fidelities=fidelities,
         env_energies=env_energies,
@@ -106,14 +112,16 @@ show_if_dry(dry_run)
 
 fpath = r"c:\Users\Moi4\Desktop\current\FAU\phd\projects\cooling_fermions\graph_data\fh22_0_target_beta_11h04\run_00000\data\cooling_free_2024_02_29_08_51_07.json"
 fig_filename = "bigbbrain_thermal"
-controlled_cooling_load_plot(edm, fpath, fig_filename, sys_eig_energies)
+controlled_cooling_load_plot(
+    edm, fpath, fig_filename, sys_eig_energies, tf_minus_val=0.5
+)
 show_if_dry(dry_run)
 
 # fast sweep v m
 dirname = r"c:\Users\Moi4\Desktop\current\FAU\phd\projects\cooling_fermions\graph_data\cooling_with_initial_adiab_sweep_10h10\run_00000\data"
 fig = plot_fast_sweep_vs_m(dirname)
 show_if_dry(dry_run)
-edm.save_figure(fig, "fast_sweep_vs_m", add_timestamp=False)
+edm.save_figure(fig, "fast_sweep_vs_m", add_timestamp=False, fig_shape="half-y")
 
 
 # each coupler

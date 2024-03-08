@@ -52,7 +52,7 @@ def plot_each_coupler_perf(dirname):
     cbar.set_label("Coupler index")
 
     axes[0].set_ylabel("Fidelity")
-    axes[1].set_ylabel("$T_F$")
+    axes[1].set_ylabel("$E_F$")
     axes[1].set_xlabel("$\omega$")
     return fig
 

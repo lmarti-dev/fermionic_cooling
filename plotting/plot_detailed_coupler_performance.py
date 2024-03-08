@@ -61,7 +61,7 @@ cbar = fig.colorbar(cm.ScalarMappable(norm=colors.NoNorm(), cmap=cmap), ax=axes)
 cbar.set_label("Coupler index")
 
 axes[0].set_ylabel("Fidelity")
-axes[1].set_ylabel("$T_F$")
+axes[1].set_ylabel("$E_F$")
 axes[1].set_xlabel("$\omega$")
 
 edm.save_figure(fig=fig, filename="plot_each_coupler_resonance", add_timestamp=False)

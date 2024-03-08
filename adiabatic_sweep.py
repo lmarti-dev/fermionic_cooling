@@ -7,6 +7,8 @@ from scipy.sparse.linalg import expm_multiply
 
 from fauvqe.utilities import flatten, jw_get_true_ground_state_at_particle_number
 
+import multiprocessing as mp
+
 
 def fermion_to_dense(ham: FermionOperator):
     return get_sparse_operator(ham).todense()
@@ -60,6 +62,30 @@ def get_trotterized_sweep_unitaries(
         yield unitary
 
 
+def get_trotterized_sweep_unitary(
+    sweep_hamiltonian: callable, n_steps: int, total_time: float
+):
+
+    pool = mp.Pool(mp.cpu_count())
+
+    def get_chunk(steps):
+        for step in steps:
+            unitary = expm(
+                -1j * (total_time / n_steps) * sweep_hamiltonian(step / (n_steps - 1))
+            )
+            yield unitary
+
+    def matmul_iter(iterable):
+        return np.matmul(*iterable)
+
+    result = (get_chunk([step, step - 1]) for step in range(n_steps - 1, 1, -1))
+    for _ in range(int(np.log2(n_steps))):
+        result = ((result[i], result[i + 1]) for i in len(result) - 1)
+        print("len result", len(result))
+        result = pool.map(matmul_iter, result)
+    return result
+
+
 def run_sweep(
     initial_state: np.ndarray,
     ham_start: np.ndarray,
@@ -69,6 +95,7 @@ def run_sweep(
     n_steps: int,
     total_time: float,
     get_populations: bool = True,
+    single_unitary: bool = True,
 ):
     # set state to initial value
     state = initial_state
@@ -79,10 +106,28 @@ def run_sweep(
 
     sweep_hamiltonian = get_sweep_hamiltonian(ham_start=ham_start, ham_stop=ham_stop)
 
-    print(f"Preparing {n_steps} unitaries")
-    unitaries = get_trotterized_sweep_unitaries(
-        sweep_hamiltonian=sweep_hamiltonian, n_steps=n_steps, total_time=total_time
-    )
+    if single_unitary:
+        unitary = get_trotterized_sweep_unitary(
+            sweep_hamiltonian=sweep_hamiltonian, n_steps=n_steps, total_time=total_time
+        )
+        initial_fid = fidelity(state, final_ground_state, qid_shape=qid_shape)
+        initial_instant_fid = fidelity(state, initial_state, qid_shape=qid_shape)
+
+        state = unitary @ state
+
+        final_fid = fidelity(state, final_ground_state, qid_shape=qid_shape)
+
+        return (
+            [initial_fid, final_fid],
+            [initial_instant_fid, final_fid],
+            final_ground_state,
+            state,
+        )
+    else:
+        print(f"Preparing {n_steps} unitaries")
+        unitaries = get_trotterized_sweep_unitaries(
+            sweep_hamiltonian=sweep_hamiltonian, n_steps=n_steps, total_time=total_time
+        )
 
     print(f"Preparing {n_steps} instantaneous ground states")
 

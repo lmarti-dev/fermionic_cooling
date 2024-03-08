@@ -60,7 +60,7 @@ def plot_comparison_fast_sweep(
                 jobj["env_ev_energies"][0],
                 color=colors[ind],
             )
-        axes[1].set_ylabel(r"$T_F$")
+        axes[1].set_ylabel(r"$E_F$")
 
     all_energies = np.array(list(flatten(jobj["env_ev_energies"])))
 
@@ -88,17 +88,24 @@ def plot_comparison_fast_sweep(
 
 
 if __name__ == "__main__":
-
-    edm = ExperimentDataManager(experiment_name="plot_initial_sweep_comparison")
-    var_dump = load_json(
-        "/home/eckstein/Desktop/projects/data/2024_02_07/cooling_with_initial_adiab_sweep_13h33/run_00000/logging/var_dump_2024_02_07_13_33_16.json"
+    dry_run = True
+    edm = ExperimentDataManager(
+        experiment_name="plot_init_sweep_comparison_specific_gap", dry_run=dry_run
     )
+    platform = "win"
+    if platform == "linux":
+        var_dump_fpath = "var_dump_2024_02_07_13_33_16.json"
+        dirname = "/home/eckstein/Desktop/projects/data/2024_02_07/cooling_with_initial_adiab_sweep_13h33/run_00000/data/"
+        with_adiab = "cooling_free_adiabatic_2024_02_07_14_04_53.json"
+        wout_adiab = "cooling_free_none_2024_02_07_14_37_28.json"
+    elif platform == "win":
+        var_dump_fpath = "var_dump_2024_03_03_12_10_15.json"
+        dirname = r"C:\Users\Moi4\Desktop\current\FAU\phd\projects\cooling_fermions\graph_data\cooling_with_initial_adiab_sweep_10h10\run_00000\data"
+        with_adiab = "cooling_free_adiabatic_n_gaps_35_2024_03_03_14_20_36.json"
+        wout_adiab = "cooling_free_none_n_gaps_35_2024_03_03_17_04_31.json"
+    var_dump = load_json(os.path.join(dirname, "../logging", var_dump_fpath))
     sys_eig_energies = var_dump["sys_eig_energies"]
-    dirname = "/home/eckstein/Desktop/projects/data/2024_02_07/cooling_with_initial_adiab_sweep_13h33/run_00000/data/"
-    with_adiab = "cooling_free_adiabatic_2024_02_07_14_04_53.json"
-    wout_adiab = "cooling_free_none_2024_02_07_14_37_28.json"
     fig = plot_comparison_fast_sweep(
-        edm,
         os.path.join(dirname, with_adiab),
         os.path.join(dirname, wout_adiab),
         sys_eig_energies,
