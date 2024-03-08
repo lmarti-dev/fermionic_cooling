@@ -8,6 +8,7 @@ from adiabatic_sweep import (
     fermion_to_dense,
     get_instantaneous_ground_states,
     run_sweep,
+    get_sweep_norms,
 )
 from cirq import fidelity
 from json_extender import ExtendedJSONDecoder
@@ -16,7 +17,7 @@ from openfermion import (
     get_sparse_operator,
 )
 
-
+from fermionic_cooling.utils import get_min_gap
 from chemical_models.specificModel import SpecificModel
 from data_manager import ExperimentDataManager
 from fauvqe.models.fermiHubbardModel import FermiHubbardModel
@@ -147,8 +148,14 @@ def run_comp(edm: ExperimentDataManager, model_name: str):
     spectrum_width = np.max(sys_eig_energies) - np.min(sys_eig_energies)
 
     epsilon = 1e-2
-    total_time = 1e3
-    n_steps = int(total_time**2 / epsilon)
+    min_gap = get_min_gap(sys_eig_energies, 1e-2)
+
+    maxh, maxhd = get_sweep_norms(ham_start=ham_start, ham_stop=ham_stop)
+
+    print(f"min gap {min_gap} maxh: {maxh} maxhd: {maxhd}")
+
+    total_time = maxhd**2 * spectrum_width / (min_gap**3 * epsilon)
+    n_steps = int(total_time**3 * min_gap**2 * 3 * maxh**2 / (maxhd**2))
     # cap at a 1e5 depth
     # n_steps = int(np.min((n_steps, 1e5)))
     use_inst_gs = False
@@ -167,7 +174,6 @@ def run_comp(edm: ExperimentDataManager, model_name: str):
         fidelities,
         instant_fidelities,
         final_ground_state,
-        populations,
         final_state,
     ) = run_sweep(
         initial_state=initial_ground_state,
@@ -177,7 +183,7 @@ def run_comp(edm: ExperimentDataManager, model_name: str):
         instantaneous_ground_states=instantaneous_ground_states,
         n_steps=n_steps,
         total_time=total_time,
-        get_populations=True,
+        get_populations=False,
     )
 
     edm.dump_some_variables(

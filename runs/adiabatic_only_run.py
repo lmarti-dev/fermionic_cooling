@@ -4,6 +4,7 @@ from adiabatic_sweep import (
     fermion_to_dense,
     get_instantaneous_ground_states,
     get_sweep_hamiltonian,
+    get_sweep_norms,
     run_sweep,
 )
 from cirq import fidelity
@@ -13,7 +14,7 @@ from openfermion import (
     jw_hartree_fock_state,
     get_quadratic_hamiltonian,
 )
-from utils import (
+from fermionic_cooling.utils import (
     extrapolate_ground_state_non_interacting_fermi_hubbard,
     get_closest_noninteracting_degenerate_ground_state,
     get_extrapolated_superposition,
@@ -59,34 +60,17 @@ def chemicals():
         edm.new_run()
 
 
-def coulomb_start():
-
-    dry_run = False
-    model_name = "fh_coulomb"
-
-    edm = ExperimentDataManager(
-        experiment_name="adiabatic_coulomb_model",
-        notes="adiabatic sweep for from the t=0 model",
-        dry_run=dry_run,
-    )
-    run_comp(edm, model_name)
-
-
-def __main__():
-    coulomb_start()
-
-
 def run_comp(edm, model_name):
     # whether we want to skip all saving data
 
     # model stuff
     if "fh_" in model_name:
-        model = FermiHubbardModel(x_dimension=2, y_dimension=2, tunneling=1, coulomb=2)
+        model = FermiHubbardModel(x_dimension=3, y_dimension=2, tunneling=1, coulomb=2)
         n_qubits = len(model.flattened_qubits)
-        n_electrons = [2, 2]
+        n_electrons = [1, 1]
         if "coulomb" in model_name:
             start_fock_hamiltonian = model.coulomb_model.fock_hamiltonian
-        elif "nonint" in model_name:
+        elif "slater" in model_name:
             start_fock_hamiltonian = model.non_interacting_model.fock_hamiltonian
     else:
         spm = SpecificModel(model_name=model_name)
@@ -99,28 +83,20 @@ def run_comp(edm, model_name):
             ignore_incompatible_terms=True,
         )
 
-    # extrapolated_ground_state = extrapolate_ground_state_non_interacting_fermi_hubbard(
-    #     model=model, n_electrons=n_electrons, n_points=5, deg=1
-    # )
-
-    # extrapolated_superposition = get_extrapolated_superposition(
-    #     model=model, n_electrons=n_electrons, coulomb=1e-6
-    # )
-
-    eigenenergies, eigenstates = jw_eigenspectrum_at_particle_number(
+    sys_eig_energies, sys_eig_states = jw_eigenspectrum_at_particle_number(
         sparse_operator=get_sparse_operator(model.fock_hamiltonian),
         particle_number=n_electrons,
         expanded=True,
     )
 
-    start_eigenenergies, start_eigenstates = jw_eigenspectrum_at_particle_number(
+    start_sys_eig_energies, start_sys_eig_states = jw_eigenspectrum_at_particle_number(
         sparse_operator=get_sparse_operator(start_fock_hamiltonian),
         particle_number=n_electrons,
         expanded=True,
     )
 
-    final_ground_state = eigenstates[:, 0]
-    initial_ground_state = start_eigenstates[:, 0]
+    final_ground_state = sys_eig_states[:, 0]
+    initial_ground_state = start_sys_eig_states[:, 0]
     print(
         f"initial fidelity: {fidelity(initial_ground_state,final_ground_state,qid_shape=(2,)*n_qubits)}"
     )
@@ -128,11 +104,20 @@ def run_comp(edm, model_name):
     ham_start = fermion_to_dense(start_fock_hamiltonian)
     ham_stop = fermion_to_dense(model.fock_hamiltonian)
 
-    # total steps
-    n_steps = int(1e2)
-    # total time
-    spectrum_width = np.max(eigenenergies) - np.min(eigenenergies)
-    total_time = spectrum_width / (get_min_gap(eigenenergies, threshold=1e-6) ** 2)
+    epsilon = 1e-2
+    min_gap = get_min_gap(sys_eig_energies, 1e-2)
+
+    maxh, maxhd = get_sweep_norms(ham_start=ham_start, ham_stop=ham_stop)
+
+    print(f"min gap {min_gap} maxh: {maxh} maxhd: {maxhd}")
+
+    spectrum_width = np.abs(sys_eig_energies[-1] - sys_eig_energies[0])
+
+    total_time = maxhd**2 * spectrum_width / (min_gap**3 * epsilon)
+    n_steps = int(total_time**3 * min_gap**2 * 3 * maxh**2 / (maxhd**2))
+
+    total_time = 100
+    n_steps = 100
 
     edm.dump_some_variables(
         model_name=model_name,
@@ -163,14 +148,14 @@ def run_comp(edm, model_name):
         get_populations=True,
     )
 
-    fid_init = state_fidelity_to_eigenstates(initial_ground_state, eigenstates)
-    fid_final = state_fidelity_to_eigenstates(final_state, eigenstates)
+    fid_init = state_fidelity_to_eigenstates(initial_ground_state, sys_eig_states)
+    fid_final = state_fidelity_to_eigenstates(final_state, sys_eig_states)
 
     print("=============")
 
     for ind, (a, b) in enumerate(zip(fid_init, fid_final)):
         print(
-            f"E_{ind} init pop: {a:.3f} dE: {start_eigenenergies[ind]-start_eigenenergies[0]:.3f} final pop {b:.3f} dE: {eigenenergies[ind]-eigenenergies[0]:.3f}"
+            f"E_{ind} init pop: {a:.3f} dE: {start_sys_eig_energies[ind]-start_sys_eig_energies[0]:.3f} final pop {b:.3f} dE: {sys_eig_energies[ind]-sys_eig_energies[0]:.3f}"
         )
 
     # pops
@@ -198,6 +183,18 @@ def run_comp(edm, model_name):
     # ax.set_ybound(1e-7, 1)
 
     edm.save_figure(fig=fig)
+
+
+def __main__():
+    dry_run = False
+    model_name = "fh_slater"
+
+    edm = ExperimentDataManager(
+        experiment_name="adiabatic_slater_model",
+        notes="adiabatic sweep for from the t=0 model",
+        dry_run=dry_run,
+    )
+    run_comp(edm, model_name)
 
 
 if __name__ == "__main__":

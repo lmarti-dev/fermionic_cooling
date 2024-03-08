@@ -5,7 +5,11 @@ from scipy.linalg import expm
 from scipy.sparse import csc_matrix
 from scipy.sparse.linalg import expm_multiply
 
-from fauvqe.utilities import flatten, jw_get_true_ground_state_at_particle_number
+from fauvqe.utilities import (
+    flatten,
+    jw_get_true_ground_state_at_particle_number,
+    jw_eigenspectrum_at_particle_number,
+)
 
 import multiprocessing as mp
 
@@ -95,7 +99,7 @@ def run_sweep(
     n_steps: int,
     total_time: float,
     get_populations: bool = True,
-    single_unitary: bool = True,
+    single_unitary: bool = False,
 ):
     # set state to initial value
     state = initial_state
@@ -188,6 +192,20 @@ def run_sweep(
     if get_populations:
         return fidelities, instant_fidelities, final_ground_state, populations, state
     return fidelities, instant_fidelities, final_ground_state, state
+
+
+def get_sweep_norms(ham_start: np.array, ham_stop: np.array):
+
+    start_eig_vals, _ = np.linalg.eigh(ham_start)
+    stop_eig_vals, _ = np.linalg.eigh(ham_stop)
+
+    maxh = np.max((np.max(start_eig_vals), np.max(stop_eig_vals)))
+
+    d_eig_vals, _ = np.linalg.eigh(ham_stop - ham_start)
+
+    maxhd = np.max(d_eig_vals)
+
+    return maxh, maxhd
 
 
 def run_sparse_sweep():
