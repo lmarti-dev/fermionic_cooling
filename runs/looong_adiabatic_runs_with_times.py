@@ -156,8 +156,10 @@ def run_comp(edm: ExperimentDataManager, model_name: str):
 
     total_time = maxhd**2 * spectrum_width / (min_gap**3 * epsilon)
     n_steps = int(total_time**3 * min_gap**2 * 3 * maxh**2 / (maxhd**2))
-    # cap at a 1e5 depth
-    # n_steps = int(np.min((n_steps, 1e5)))
+
+    total_time = 1000
+    n_steps = 10000
+
     use_inst_gs = False
     if use_inst_gs:
         instantaneous_ground_states = get_instantaneous_ground_states(
