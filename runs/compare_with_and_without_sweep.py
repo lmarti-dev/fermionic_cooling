@@ -48,7 +48,7 @@ def __main__(args):
     )
     # model stuff
 
-    model_name = "fh_nonint"
+    model_name = "fh_coulomb"
     if "fh_" in model_name:
         model = FermiHubbardModel(x_dimension=2, y_dimension=2, tunneling=1, coulomb=2)
         n_qubits = len(model.flattened_qubits)
@@ -98,7 +98,7 @@ def __main__(args):
         expanded=True,
     )
 
-    slater_index = 2
+    slater_index = 0
     sys_slater_state = start_eig_states[:, slater_index]
     sys_eig_energies, sys_eig_states = jw_eigenspectrum_at_particle_number(
         sparse_operator=get_sparse_operator(
@@ -110,8 +110,8 @@ def __main__(args):
     )
     spectrum_width = max(sys_eig_energies) - min(sys_eig_energies)
     for n_gaps in range(1, len(sys_eig_energies)):
-        start_omega = 1.05 * (sys_eig_energies[n_gaps] - sys_eig_energies[0])
-        stop_omega = 0.1
+        start_omega = 1.1 * (sys_eig_energies[n_gaps] - sys_eig_energies[0])
+        stop_omega = 0.8
         # initial state setting
         sys_initial_state = ketbra(sys_slater_state)
 
@@ -162,6 +162,7 @@ def __main__(args):
                 0
             ]
         )
+        max_k = n_gaps + 1
         couplers = get_cheat_coupler_list(
             sys_eig_states=free_sys_eig_states,
             env_eig_states=env_eig_states,
@@ -169,6 +170,7 @@ def __main__(args):
             gs_indices=(slater_index,),
             noise=0,
             max_k=max_k,
+            use_pauli_x=False,
         )  # Interaction only on Qubit 0?
         print(f"coupler done, max_k: {max_k}")
         print(f"number of couplers: {len(couplers)}")
@@ -233,8 +235,8 @@ def __main__(args):
 
             print(f"coupler dim: {cooler.sys_env_coupler_data_dims}")
 
-            ansatz_options = {"beta": 1, "mu": 30, "c": 10}
-            weaken_coupling = 100
+            ansatz_options = {"beta": 1, "mu": 30, "c": 20}
+            weaken_coupling = 20
 
             (
                 fidelities,

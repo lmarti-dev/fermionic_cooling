@@ -59,20 +59,26 @@ def get_cheat_coupler_list(
     gs_indices: int = (0,),
     noise: float = 0,
     max_k: int = None,
+    use_pauli_x: bool = False,
 ):
     couplers = []
     env_up = np.outer(env_eig_states[:, 1], np.conjugate(env_eig_states[:, 0]))
+    env_down = np.outer(env_eig_states[:, 0], np.conjugate(env_eig_states[:, 1]))
     # in case there are multiple ground states we can cool to (if I may say so)
     if max_k is None:
         max_k = sys_eig_states.shape[1]
     for gs_index in gs_indices:
         for k in range(1, max_k):
             # |sys_0Xsys_k| O |env_1Xenv_0|
+            if use_pauli_x:
+                env_part = env_up + env_down
+            else:
+                env_part = env_up
             coupler = np.kron(
                 np.outer(
                     sys_eig_states[:, gs_index], np.conjugate(sys_eig_states[:, k])
                 ),
-                env_up,
+                env_part,
             )
             if abs(noise) > 0:
                 noisy_coupler = np.random.rand(*coupler.shape)
