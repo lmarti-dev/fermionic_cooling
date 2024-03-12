@@ -65,9 +65,9 @@ def run_comp(edm, model_name):
 
     # model stuff
     if "fh_" in model_name:
-        model = FermiHubbardModel(x_dimension=3, y_dimension=2, tunneling=1, coulomb=2)
+        model = FermiHubbardModel(x_dimension=2, y_dimension=2, tunneling=1, coulomb=2)
         n_qubits = len(model.flattened_qubits)
-        n_electrons = [1, 1]
+        n_electrons = [2, 2]
         if "coulomb" in model_name:
             start_fock_hamiltonian = model.coulomb_model.fock_hamiltonian
         elif "slater" in model_name:
@@ -95,8 +95,9 @@ def run_comp(edm, model_name):
         expanded=True,
     )
 
+    gs_index = 2
     final_ground_state = sys_eig_states[:, 0]
-    initial_ground_state = start_sys_eig_states[:, 0]
+    initial_ground_state = start_sys_eig_states[:, gs_index]
     print(
         f"initial fidelity: {fidelity(initial_ground_state,final_ground_state,qid_shape=(2,)*n_qubits)}"
     )
@@ -116,8 +117,8 @@ def run_comp(edm, model_name):
     total_time = maxhd**2 * spectrum_width / (min_gap**3 * epsilon)
     n_steps = int(total_time**3 * min_gap**2 * 3 * maxh**2 / (maxhd**2))
 
-    total_time = 100
-    n_steps = 100
+    total_time = 1000
+    n_steps = 30000
 
     edm.dump_some_variables(
         model_name=model_name,
@@ -125,6 +126,9 @@ def run_comp(edm, model_name):
         n_electrons=n_electrons,
         spectrum_width=spectrum_width,
         total_time=total_time,
+        n_steps=n_steps,
+        min_gap=min_gap,
+        model=model.to_json_dict()["constructor_params"],
     )
     instantaneous_ground_states = get_instantaneous_ground_states(
         ham_start=ham_start, ham_stop=ham_stop, n_steps=n_steps, n_electrons=n_electrons
@@ -158,6 +162,20 @@ def run_comp(edm, model_name):
             f"E_{ind} init pop: {a:.3f} dE: {start_sys_eig_energies[ind]-start_sys_eig_energies[0]:.3f} final pop {b:.3f} dE: {sys_eig_energies[ind]-sys_eig_energies[0]:.3f}"
         )
 
+    edm.save_dict_to_experiment(
+        {
+            "times": np.linspace(0, total_time, len(fidelities)),
+            "n_steps": n_steps,
+            "total_time": total_time,
+            "fidelities": fidelities,
+            "model_name": model_name,
+            "gs_index": gs_index,
+        }
+    )
+
+
+def plot_adiabatic_sweep(edm, populations, total_time, fidelities, instant_fidelities):
+
     # pops
     fig, ax = plt.subplots()
     plot_populations = False
@@ -190,8 +208,8 @@ def __main__():
     model_name = "fh_slater"
 
     edm = ExperimentDataManager(
-        experiment_name="adiabatic_slater_model",
-        notes="adiabatic sweep for from the t=0 model",
+        experiment_name=f"adiabatic_{model_name}_model",
+        notes=f"adiabatic sweep for from the {model_name} model",
         dry_run=dry_run,
     )
     run_comp(edm, model_name)

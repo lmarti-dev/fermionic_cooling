@@ -99,10 +99,10 @@ if __name__ == "__main__":
         with_adiab = "cooling_free_adiabatic_2024_02_07_14_04_53.json"
         wout_adiab = "cooling_free_none_2024_02_07_14_37_28.json"
     elif platform == "win":
-        var_dump_fpath = "var_dump_2024_03_03_12_10_15.json"
-        dirname = r"C:\Users\Moi4\Desktop\current\FAU\phd\projects\cooling_fermions\graph_data\cooling_with_initial_adiab_sweep_10h10\run_00000\data"
-        with_adiab = "cooling_free_adiabatic_n_gaps_35_2024_03_03_14_20_36.json"
-        wout_adiab = "cooling_free_none_n_gaps_35_2024_03_03_17_04_31.json"
+        var_dump_fpath = "var_dump_2024_03_07_17_20_06.json"
+        dirname = r"c:\Users\Moi4\Desktop\current\FAU\phd\projects\cooling_fermions\graph_data\cooling_with_initial_adiab_sweep_17h20\run_00000\data"
+        with_adiab = "cooling_free_adiabatic_n_gaps_5_2024_03_07_18_07_55.json"
+        wout_adiab = "cooling_free_none_n_gaps_5_2024_03_07_18_19_55.json"
     var_dump = load_json(os.path.join(dirname, "../logging", var_dump_fpath))
     sys_eig_energies = var_dump["sys_eig_energies"]
     fig = plot_comparison_fast_sweep(

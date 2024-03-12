@@ -26,6 +26,9 @@ from fermionic_cooling.plotting.plot_thermalizing_vs_beta_init import (
 import numpy as np
 
 
+from fermionic_cooling.runs.encode_bogos_with_jw import plot_bogo_jw_coefficients
+
+
 def show_if_dry(dry_run: bool):
     if dry_run:
         plt.show()
@@ -91,11 +94,15 @@ edm.save_figure(fig, "thermal_results_1by2", add_timestamp=False)
 
 sys_eig_energies = get_spectrum(2, 2, 1, 2, [2, 2])
 
+jobj = {}
+
 fpath = r"c:\Users\Moi4\Desktop\current\FAU\phd\projects\cooling_fermions\graph_data\fh_new_freecouplers_11h41\run_00000\data\cooling_free_2024_02_27_13_50_01.json"
 fig_filename = "nice_cooling"
 controlled_cooling_load_plot(edm, fpath, fig_filename, sys_eig_energies)
 show_if_dry(dry_run)
 # 1e5 depol
+jobj[fig_filename] = fpath
+
 
 fpath = r"c:\Users\Moi4\Desktop\current\FAU\phd\projects\cooling_fermions\graph_data\fh_new_freecouplers_13h58\run_00000\data\cooling_free_2024_02_27_16_18_15.json"
 fig_filename = "depol_1e5"
@@ -103,11 +110,14 @@ controlled_cooling_load_plot(edm, fpath, fig_filename, sys_eig_energies)
 show_if_dry(dry_run)
 # 1e5 fermion depol
 
+jobj[fig_filename] = fpath
+
 fpath = r"c:\Users\Moi4\Desktop\current\FAU\phd\projects\cooling_fermions\graph_data\fh_new_freecouplers_17h41\run_00000\data\cooling_free_2024_02_27_19_54_06.json"
 fig_filename = "depol_fermion_1e5"
 controlled_cooling_load_plot(edm, fpath, fig_filename, sys_eig_energies)
 show_if_dry(dry_run)
 
+jobj[fig_filename] = fpath
 # controlled therm
 
 fpath = r"c:\Users\Moi4\Desktop\current\FAU\phd\projects\cooling_fermions\graph_data\fh22_0_target_beta_11h04\run_00000\data\cooling_free_2024_02_29_08_51_07.json"
@@ -116,31 +126,58 @@ controlled_cooling_load_plot(
     edm, fpath, fig_filename, sys_eig_energies, tf_minus_val=0.5
 )
 show_if_dry(dry_run)
+jobj[fig_filename] = fpath
 
-# fast sweep v m
-dirname = r"c:\Users\Moi4\Desktop\current\FAU\phd\projects\cooling_fermions\graph_data\cooling_with_initial_adiab_sweep_10h10\run_00000\data"
-fig = plot_fast_sweep_vs_m(dirname)
+# fast sweep v m slater
+fpath = r"c:\Users\Moi4\Desktop\current\FAU\phd\projects\cooling_fermions\graph_data\cooling_with_initial_adiab_sweep_slater_15h12\run_00000\data"
+fig = plot_fast_sweep_vs_m(fpath, 0.49844239875687185)
 show_if_dry(dry_run)
-edm.save_figure(fig, "fast_sweep_vs_m", add_timestamp=False, fig_shape="half-y")
+edm.save_figure(fig, "fast_sweep_vs_m_slater", add_timestamp=False, fig_shape="half-y")
 
+jobj[fig_filename] = fpath
+
+# fast sweep v m coulomb
+fpath = r"c:\Users\Moi4\Desktop\current\FAU\phd\projects\cooling_fermions\graph_data\cooling_with_initial_adiab_sweep_coulomb_17h20\run_00000\data"
+fig = plot_fast_sweep_vs_m(fpath, 0.08333327548043287)
+show_if_dry(dry_run)
+edm.save_figure(fig, "fast_sweep_vs_m_coulomb", add_timestamp=False, fig_shape="half-y")
+
+jobj[fig_filename] = fpath
 
 # each coupler
-dirname = r"C:\Users\Moi4\Desktop\current\FAU\phd\projects\cooling_fermions\graph_data\fh22_oneatatime_09h25"
-fig = plot_each_coupler_perf(dirname)
+fpath = r"C:\Users\Moi4\Desktop\current\FAU\phd\projects\cooling_fermions\graph_data\fh22_oneatatime_09h25"
+fig = plot_each_coupler_perf(fpath)
 show_if_dry(dry_run)
 edm.save_figure(fig, "plot_each_coupler_resonance", add_timestamp=False)
 
+jobj[fig_filename] = fpath
 # preprocess_adiabsweep
 
-with_adiab = r"c:\Users\Moi4\Desktop\current\FAU\phd\projects\cooling_fermions\graph_data\cooling_with_initial_adiab_sweep_13h33\run_00000\data\cooling_free_adiabatic_2024_02_07_14_04_53.json"
-wout_adiab = r"c:\Users\Moi4\Desktop\current\FAU\phd\projects\cooling_fermions\graph_data\cooling_with_initial_adiab_sweep_13h33\run_00000\data\cooling_free_none_2024_02_07_14_37_28.json"
-fig_filename = "preprocess_adiabsweep"
+with_adiab = r"c:\Users\Moi4\Desktop\current\FAU\phd\projects\cooling_fermions\graph_data\single_fast_sweep_run\run_00000\data\cooling_free_adiabatic_2024_02_07_14_04_53.json"
+wout_adiab = r"c:\Users\Moi4\Desktop\current\FAU\phd\projects\cooling_fermions\graph_data\single_fast_sweep_run\run_00000\data\cooling_free_none_2024_02_07_14_37_28.json"
+fig_filename = "fast_sweep_single_comp"
 fig = plot_comparison_fast_sweep(
     with_adiab=with_adiab, wout_adiab=wout_adiab, sys_eig_energies=sys_eig_energies
 )
 show_if_dry(dry_run)
 edm.save_figure(fig, fig_filename, add_timestamp=False)
 
+jobj[fig_filename] = {"with_adiab": with_adiab, "wout_adiab": wout_adiab}
+
+# bogos
+
+
+fpath = r"c:\Users\Moi4\Desktop\current\FAU\phd\data\2024_03_10\jw_encode_bogos_coeff_2_2_2u_2d_15h36\run_00000\data\carissa_00000_2024_03_10_15_38_50.json"
+jobj = load_json(fpath)
+
+total_coefficients = jobj["total_coefficients"]
+max_pauli_strs = jobj["max_pauli_strs"]
+
+fig = plot_bogo_jw_coefficients(total_coefficients, max_pauli_strs)
+fig_filename = "bogo_jw_coefficients"
+edm.save_figure(fig, fig_filename, add_timestamp=False)
+
+jobj[fig_filename] = fpath
 
 if dry_run:
     n_steps = 10
@@ -162,3 +199,6 @@ fig = plot_amplitudes_vs_beta(2, 2, 1, 2, [2, 2], False, n_steps)
 fig_filename = "fh22_22_components_vs_beta"
 show_if_dry(dry_run)
 edm.save_figure(fig, fig_filename, add_timestamp=False)
+
+
+edm.save_dict_to_experiment(jobj)

@@ -29,7 +29,7 @@ def get_times_from_comp(dirname):
     return times
 
 
-def plot_fast_sweep_vs_m(dirname):
+def plot_fast_sweep_vs_m(dirname, max_sweep_fid=None):
     files = os.listdir(dirname)
     final_fids = np.zeros((len(files) // 2 + 1, 2))
     for f in files:
@@ -57,6 +57,16 @@ def plot_fast_sweep_vs_m(dirname):
         label="Without fast sweep",
     )
 
+    if max_sweep_fid is not None:
+        ax.hlines(
+            max_sweep_fid,
+            ms[0],
+            ms[-1],
+            "r",
+            label="Adiabatic sweep only",
+            linestyles="dashed",
+        )
+
     ax.set_ylabel("Final fidelity")
     ax.set_xlabel(r"$M$")
 
@@ -68,15 +78,34 @@ if __name__ == "__main__":
     use_style()
     edm = ExperimentDataManager(experiment_name="plot_fastsweep_vs_m", dry_run=False)
 
-    which = "coulomb"
+    graph_dir = (
+        r"C:\Users\Moi4\Desktop\current\FAU\phd\projects\cooling_fermions\graph_data"
+    )
+    which = "slater"
     if which == "slater":
-        dirname = r"C:\Users\Moi4\Desktop\current\FAU\phd\projects\cooling_fermions\graph_data\cooling_with_initial_adiab_sweep_10h10\run_00000\data"
-    elif which == "coulomb":
-        dirname = r"c:\Users\Moi4\Desktop\current\FAU\phd\projects\cooling_fermions\graph_data\cooling_with_initial_adiab_sweep_08h57\run_00000\data"
-        dirname = r"c:\Users\Moi4\Desktop\current\FAU\phd\projects\cooling_fermions\graph_data\compare_fast_sweep_coulomb_index_2_bad\run_00000\data"
-        dirname = r"c:\Users\Moi4\Desktop\current\FAU\phd\projects\cooling_fermions\graph_data\cooling_with_initial_adiab_sweep_11h48\run_00000\data"
-        dirname = r"C:\Users\Moi4\Desktop\current\FAU\phd\projects\cooling_fermions\graph_data\cooling_with_initial_adiab_sweep_17h20\run_00000\data"
+        dirname = dirname = os.path.join(
+            graph_dir, r"cooling_with_initial_adiab_sweep_10h10\run_00000\data"
+        )
+        dirname = os.path.join(
+            graph_dir, r"cooling_with_initial_adiab_sweep_15h12\run_00000\data"
+        )
 
-    fig = plot_fast_sweep_vs_m(dirname)
+    elif which == "coulomb":
+        dirname = os.path.join(
+            graph_dir, r"cooling_with_initial_adiab_sweep_08h57\run_00000\data"
+        )
+        dirname = os.path.join(
+            graph_dir, r"compare_fast_sweep_coulomb_index_2_bad\run_00000\data"
+        )
+        dirname = os.path.join(
+            graph_dir, r"cooling_with_initial_adiab_sweep_11h48\run_00000\data"
+        )
+        dirname = os.path.join(
+            graph_dir, r"cooling_with_initial_adiab_sweep_17h20\run_00000\data"
+        )
+
+    fig = plot_fast_sweep_vs_m(dirname, max_sweep_fid=0)
+
+    edm.dump_some_variables(start_ham=which)
     edm.save_figure(fig)
     plt.show()
