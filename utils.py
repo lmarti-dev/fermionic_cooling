@@ -433,7 +433,10 @@ def fidelity(a: np.ndarray, b: np.ndarray) -> float:
 
 
 def state_fidelity_to_eigenstates(
-    state: np.ndarray, eigenstates: np.ndarray, expanded: bool = True
+    state: np.ndarray,
+    eigenstates: np.ndarray,
+    expanded: bool = True,
+    subspace_simulation: bool = False,
 ):
     # eigenstates have shape N * M where M is the number of eigenstates
 
@@ -442,8 +445,11 @@ def state_fidelity_to_eigenstates(
     for jj in range(eigenstates.shape[1]):
         if expanded:
             fids.append(
-                cirq.fidelity(
-                    state, eigenstates[:, jj], qid_shape=(2,) * int(np.log2(len(state)))
+                fidelity_wrapper(
+                    state,
+                    eigenstates[:, jj],
+                    qid_shape=(2,) * int(np.log2(len(state))),
+                    subspace_simulation=subspace_simulation,
                 )
             )
         else:

@@ -54,19 +54,23 @@ def __main__(args):
     use_style()
     # model stuff
 
-    model_name = "fh"
-    model = FermiHubbardModel(x_dimension=2, y_dimension=2, tunneling=1, coulomb=2)
-    n_qubits = len(model.flattened_qubits)
-    n_electrons = [2, 2]
-    subspace_dim = len(list(combinations(range(n_qubits // 2), n_electrons[0]))) * len(
-        list(combinations(range(n_qubits // 2), n_electrons[1]))
-    )
-    non_interacting_model = model.non_interacting_model.fock_hamiltonian
+    model_name = "fh_coulomb"
+    if "fh_" in model_name:
+        model = FermiHubbardModel(x_dimension=2, y_dimension=2, tunneling=1, coulomb=2)
+        n_qubits = len(model.flattened_qubits)
+        n_electrons = [2, 2]
+        if "coulomb" in model_name:
+            start_fock_hamiltonian = model.coulomb_model.fock_hamiltonian
+            couplers_fock_hamiltonian = model.non_interacting_model.fock_hamiltonian
+        elif "slater" in model_name:
+            start_fock_hamiltonian = model.non_interacting_model.fock_hamiltonian
+            couplers_fock_hamiltonian = start_fock_hamiltonian
+    # define inverse temp
 
     gs_index = 2
     free_sys_eig_energies, free_sys_eig_states = jw_eigenspectrum_at_particle_number(
         sparse_operator=get_sparse_operator(
-            non_interacting_model,
+            couplers_fock_hamiltonian,
             n_qubits=len(model.flattened_qubits),
         ),
         particle_number=n_electrons,
@@ -75,6 +79,9 @@ def __main__(args):
 
     sys_qubits = model.flattened_qubits
     n_sys_qubits = len(sys_qubits)
+    subspace_dim = len(
+        list(combinations(range(n_sys_qubits // 2), n_electrons[0]))
+    ) * len(list(combinations(range(n_sys_qubits // 2), n_electrons[1])))
     sys_hartree_fock = np.zeros((subspace_dim,))
     sys_hartree_fock[0] = 1
 
@@ -167,7 +174,6 @@ def __main__(args):
 
     if use_fast_sweep:
         sweep_time_mult = 0.01
-        start_fock_hamiltonian = non_interacting_model
         initial_ground_state = ketbra(sys_slater_state)
         final_ground_state = sys_eig_states[:, 0]
         ham_start = dense_restricted_ham(
