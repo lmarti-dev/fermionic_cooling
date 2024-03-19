@@ -27,10 +27,14 @@ def get_cheat_thermalizers(
     env_eig_states,
     reverse: bool = True,
     add_non_cross_terms: bool = False,
+    max_k: int = None,
 ):
+    if max_k is None:
+        max_k = sys_eig_states.shape[1] - 1
+
     couplers = []
     env_up = np.outer(env_eig_states[:, 1], np.conjugate(env_eig_states[:, 0]))
-    for j in range(0, sys_eig_states.shape[1] - 1):
+    for j in range(0, max_k):
         # |sys_j X sys_j+1| otimes |env_1 X env_0|, j<j+1
         sys_coupler = np.outer(
             sys_eig_states[:, j], np.conjugate(sys_eig_states[:, j + 1])
@@ -68,7 +72,8 @@ def get_cheat_coupler_list(
     if max_k is None:
         max_k = sys_eig_states.shape[1]
     for gs_index in gs_indices:
-        for k in range(1, max_k):
+        k_range = [k for k in range(max_k) if k != gs_index]
+        for k in k_range:
             # |sys_0Xsys_k| O |env_1Xenv_0|
             if use_pauli_x:
                 env_part = env_up + env_down

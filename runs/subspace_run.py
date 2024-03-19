@@ -38,19 +38,14 @@ from fermionic_cooling.utils import (
     state_fidelity_to_eigenstates,
     subspace_energy_expectation,
     fidelity,
-    local_partial_trace,
+    two_tensor_partial_trace,
+    dense_restricted_ham,
 )
-
-
-def dense_restricted_ham(ham: FermionOperator, n_electrons: list, n_qubits: int):
-    return jw_spin_restrict_operator(
-        get_sparse_operator(ham), particle_number=n_electrons, n_qubits=n_qubits
-    ).toarray()
 
 
 def __main__(args):
     # whether we want to skip all saving data
-    dry_run = False
+    dry_run = True
     edm = ExperimentDataManager(
         experiment_name="fh_bigbrain_subspace",
         notes="fh cooling with subspace simulation, aiming for larger systems",
@@ -166,12 +161,9 @@ def __main__(args):
     # evolution_time = 1e-3
 
     # call cool
-    use_fast_sweep = False
-    depol_noise = 1e-4
+    use_fast_sweep = True
+    depol_noise = None
     is_noise_spin_conserving = False
-
-    n_up, n_down = model.fermion_spins_expectations(sys_initial_state)
-    print(f"Before fast sweep: up: {n_up:.4f} down: {n_down:.4f}")
 
     if use_fast_sweep:
         sweep_time_mult = 0.01
@@ -205,6 +197,7 @@ def __main__(args):
             total_time=total_sweep_time,
             get_populations=True,
             depol_noise=depol_noise,
+            n_qubits=n_sys_qubits,
             is_noise_spin_conserving=is_noise_spin_conserving,
             n_electrons=n_electrons,
             subspace_simulation=True,
@@ -212,9 +205,6 @@ def __main__(args):
         sys_initial_state = final_state
     else:
         total_sweep_time = 0
-
-    n_up, n_down = model.fermion_spins_expectations(sys_initial_state)
-    print(f"After fast sweep: up: {n_up:.4f} down: n_down: {n_down:.4f}")
 
     cooler = Cooler(
         sys_hamiltonian=sys_ham_matrix,
@@ -227,6 +217,7 @@ def __main__(args):
         env_ground_state=env_ground_state,
         sys_env_coupler_data=couplers,
         verbosity=5,
+        subspace_simulation=True,
         time_evolve_method="expm",
     )
     n_rep = 1
@@ -277,6 +268,7 @@ def __main__(args):
         "fidelities": fidelities,
         "sys_energies": sys_ev_energies,
         "env_energies": env_ev_energies,
+        "ansatz_options": ansatz_options,
     }
     edm.save_dict_to_experiment(filename="cooling_free", jobj=jobj)
 

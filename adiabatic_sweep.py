@@ -105,6 +105,7 @@ def run_sweep(
     single_unitary: bool = False,
     depol_noise: float = None,
     is_noise_spin_conserving: bool = False,
+    n_qubits: int = None,
     n_electrons: list = None,
     subspace_simulation: bool = False,
 ):
@@ -112,7 +113,7 @@ def run_sweep(
     state = initial_state
 
     # basic stuff
-    n_qubits = int(np.log2(len(state)))
+
     qid_shape = (2,) * n_qubits
 
     sweep_hamiltonian = get_sweep_hamiltonian(ham_start=ham_start, ham_stop=ham_stop)
@@ -176,7 +177,10 @@ def run_sweep(
 
     if get_populations:
         end_energies, end_spectrum = np.linalg.eigh(ham_stop)
-        populations = np.zeros((2**n_qubits, n_steps))
+        if subspace_simulation:
+            populations = np.zeros((state.shape[0], n_steps))
+        else:
+            populations = np.zeros((2**n_qubits, n_steps))
 
     fidelities.append(initial_fid)
     instant_fidelities.append(initial_instant_fid)
@@ -211,8 +215,8 @@ def run_sweep(
                 eig_state = eig_state.squeeze()
                 state_pops.append(
                     fidelity_wrapper(
-                        state1=state,
-                        state2=eig_state,
+                        a=state,
+                        b=eig_state,
                         qid_shape=qid_shape,
                         subspace_simulation=subspace_simulation,
                     )

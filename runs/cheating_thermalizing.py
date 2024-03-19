@@ -1,28 +1,34 @@
 import sys
+from itertools import combinations
 
 import matplotlib.pyplot as plt
 import numpy as np
 from building_blocks import (
-    get_cheat_thermalizers,
     get_cheat_coupler_list,
     get_cheat_sweep,
-    get_Z_env,
+    get_cheat_thermalizers,
     get_matrix_coupler,
+    get_Z_env,
 )
-from thermalizer import Thermalizer
 from openfermion import get_sparse_operator, jw_hartree_fock_state
-from fermionic_cooling.utils import (
-    ketbra,
-    state_fidelity_to_eigenstates,
-    thermal_density_matrix_at_particle_number,
-    thermal_density_matrix,
-    get_min_gap,
-)
+from thermalizer import Thermalizer
 
 from data_manager import ExperimentDataManager
-from fauvqe.models.fermiHubbardModel import FermiHubbardModel
-from fauvqe.utilities import jw_eigenspectrum_at_particle_number, spin_dicke_state, qmap
 from fauplotstyle.styler import use_style
+from fauvqe.models.fermiHubbardModel import FermiHubbardModel
+from fauvqe.utilities import jw_eigenspectrum_at_particle_number, qmap, spin_dicke_state
+from fermionic_cooling.utils import (
+    dense_restricted_ham,
+    get_min_gap,
+    ketbra,
+    state_fidelity_to_eigenstates,
+    thermal_density_matrix,
+    thermal_density_matrix_at_particle_number,
+    spin_dicke_mixed_state,
+)
+
+
+from adiabatic_sweep import run_sweep
 
 
 def print_thermalizing_stats(
@@ -106,14 +112,12 @@ def main_run(edm: ExperimentDataManager, initial_beta, target_beta):
     n_sys_qubits = len(sys_qubits)
     n_env_qubits = 1
     n_total_qubits = n_sys_qubits + n_env_qubits
-
     n_electrons = [2, 2]
-    sys_hartree_fock = jw_hartree_fock_state(
-        n_orbitals=n_sys_qubits, n_electrons=sum(n_electrons)
-    )
-    sys_dicke = spin_dicke_state(
-        n_qubits=n_sys_qubits, Nf=n_electrons, right_to_left=True
-    )
+
+    subspace_dim = len(
+        list(combinations(range(n_sys_qubits // 2), n_electrons[0]))
+    ) * len(list(combinations(range(n_sys_qubits // 2), n_electrons[1])))
+    non_interacting_model = model.non_interacting_model.fock_hamiltonian
 
     sys_eig_energies, sys_eig_states = jw_eigenspectrum_at_particle_number(
         sparse_operator=get_sparse_operator(
@@ -121,8 +125,73 @@ def main_run(edm: ExperimentDataManager, initial_beta, target_beta):
             n_qubits=len(model.flattened_qubits),
         ),
         particle_number=n_electrons,
-        expanded=True,
+        expanded=False,
     )
+
+    sys_ham_matrix = dense_restricted_ham(
+        model.fock_hamiltonian, n_electrons, n_sys_qubits
+    )
+
+    gs_index = 2
+    free_sys_eig_energies, free_sys_eig_states = jw_eigenspectrum_at_particle_number(
+        sparse_operator=get_sparse_operator(
+            non_interacting_model,
+            n_qubits=len(model.flattened_qubits),
+        ),
+        particle_number=n_electrons,
+        expanded=False,
+    )
+
+    spectrum_width = np.abs(np.max(sys_eig_energies) - np.min(sys_eig_energies))
+    min_gap = get_min_gap(sys_eig_energies, threshold=1e-8)
+    # sys_slater_state = free_sys_eig_states[:, gs_index]
+    # ketbra(sys_slater_state)
+    initial_state = spin_dicke_mixed_state(n_qubits=n_sys_qubits, Nf=n_electrons)
+
+    use_fast_sweep = True
+    depol_noise = None
+    is_noise_spin_conserving = False
+
+    if use_fast_sweep:
+        sweep_time_mult = 0.01
+        start_fock_hamiltonian = non_interacting_model
+        initial_ground_state = initial_state
+        final_ground_state = sys_eig_states[:, 0]
+        ham_start = dense_restricted_ham(
+            start_fock_hamiltonian, n_electrons, n_sys_qubits
+        )
+        ham_stop = sys_ham_matrix
+        n_steps = 10
+        total_sweep_time = (
+            sweep_time_mult
+            * spectrum_width
+            / (get_min_gap(sys_eig_energies, threshold=1e-12) ** 2)
+        )
+
+        (
+            fidelities,
+            instant_fidelities,
+            final_ground_state,
+            populations,
+            final_state,
+        ) = run_sweep(
+            initial_state=initial_ground_state,
+            ham_start=ham_start,
+            ham_stop=ham_stop,
+            final_ground_state=final_ground_state,
+            instantaneous_ground_states=None,
+            n_steps=n_steps,
+            total_time=total_sweep_time,
+            get_populations=True,
+            depol_noise=depol_noise,
+            n_qubits=n_sys_qubits,
+            is_noise_spin_conserving=is_noise_spin_conserving,
+            n_electrons=n_electrons,
+            subspace_simulation=True,
+        )
+        sys_initial_state = final_state
+    else:
+        total_sweep_time = 0
 
     # renormalize target beta with ground state
     target_beta = target_beta / np.abs(sys_eig_energies[0])
@@ -134,7 +203,7 @@ def main_run(edm: ExperimentDataManager, initial_beta, target_beta):
             n_qubits=len(model.flattened_qubits),
         ),
         particle_number=n_electrons,
-        expanded=True,
+        expanded=False,
     )
     sys_ground_state = sys_eig_states[:, np.argmin(sys_eig_energies)]
     sys_ground_energy = np.min(sys_eig_energies)
@@ -151,6 +220,7 @@ def main_run(edm: ExperimentDataManager, initial_beta, target_beta):
         beta=target_beta,
         sparse_operator=get_sparse_operator(model.fock_hamiltonian),
         particle_number=n_electrons,
+        expanded=False,
     )
     # Important part of the script where things that matter happen
 
@@ -158,6 +228,7 @@ def main_run(edm: ExperimentDataManager, initial_beta, target_beta):
         beta=initial_beta,
         sparse_operator=get_sparse_operator(model.fock_hamiltonian),
         particle_number=n_electrons,
+        expanded=False,
     )
 
     sys_initial_state = thermal_sys_initial_density
@@ -166,22 +237,24 @@ def main_run(edm: ExperimentDataManager, initial_beta, target_beta):
         sys_eig_states=free_sys_eig_states,
         env_eig_states=env_eig_states,
         add_non_cross_terms=True,
+        max_k=None,
     )
 
     n_rep = 10
-
-    spectrum_width = np.abs(np.max(sys_eig_energies) - np.min(sys_eig_energies))
-    min_gap = get_min_gap(sys_eig_energies, threshold=1e-8)
     sweep_values = np.tile(np.linspace(min_gap, spectrum_width, 40), n_rep)[::-1]
     # sweep_values = get_cheat_sweep(spectrum=sys_eig_energies)
     alphas = sweep_values / 100
     evolution_times = np.pi / np.abs(alphas)
 
+    fridge_thermal_energy = env_ham.expectation_from_density_matrix(
+        thermal_env_density, qubit_map={k: v for v, k in enumerate(env_qubits)}
+    )
+
     thermalizer = Thermalizer(
         beta=target_beta,
         thermal_env_density=thermal_env_density,
         thermal_sys_density=thermal_sys_density,
-        sys_hamiltonian=model.hamiltonian,
+        sys_hamiltonian=sys_ham_matrix,
         n_electrons=n_electrons,
         sys_qubits=model.flattened_qubits,
         sys_ground_state=sys_ground_state,
@@ -191,7 +264,8 @@ def main_run(edm: ExperimentDataManager, initial_beta, target_beta):
         env_ground_state=env_ground_state,
         sys_env_coupler_data=couplers,
         verbosity=5,
-        time_evolve_method="diag",
+        subspace_simulation=True,
+        time_evolve_method="expm",
     )
     edm.dump_some_variables(
         initial_beta=initial_beta,
@@ -253,23 +327,14 @@ def main_run(edm: ExperimentDataManager, initial_beta, target_beta):
         # plt.show()
 
     elif method == "bigbrain":
-        ansatz_options = {
-            "beta": 1,
-            "mu": 30,
-            "c": 20,
-            "minus": env_ham.expectation_from_density_matrix(
-                thermal_env_density, qubit_map={k: v for v, k in enumerate(env_qubits)}
-            ),
-        }
-        weaken_coupling = 100
+        ansatz_options = {"beta": 1, "mu": 60, "c": 20, "minus": fridge_thermal_energy}
+        weaken_coupling = 50
 
-        start_omega = 1.01 * spectrum_width
+        start_omega = 2
 
-        stop_omega = 0.1 * min_gap
+        stop_omega = 0.3
 
         n_rep = 1
-        n_qubits = len(thermalizer.sys_hamiltonian.qubits)
-
         (
             fidelities,
             sys_ev_energies,
@@ -283,6 +348,7 @@ def main_run(edm: ExperimentDataManager, initial_beta, target_beta):
             n_rep=n_rep,
             weaken_coupling=weaken_coupling,
             coupler_transitions=None,
+            use_random_coupler=True,
         )
 
         jobj = {
@@ -299,14 +365,15 @@ def main_run(edm: ExperimentDataManager, initial_beta, target_beta):
             env_energies=env_ev_energies,
             omegas=omegas,
             eigenspectrums=[
-                sys_eig_energies - sys_eig_energies[0],
+                np.diff(sys_eig_energies),
             ],
+            substract_energy=fridge_thermal_energy,
         )
 
         edm.save_figure(
             fig,
         )
-        # plt.show()
+        plt.show()
 
 
 def loop_over_betas():

@@ -34,6 +34,7 @@ from fauvqe.utilities import (
     jw_get_true_ground_state_at_particle_number,
     normalize_vec,
     spin_dicke_state,
+    jw_spin_restrict_operator,
     spin_dicke_mixed_state,
 )
 
@@ -264,7 +265,7 @@ def subspace_partial_trace(rho: np.ndarray, n2: int):
     pass
 
 
-def local_partial_trace(rho: np.ndarray, dim1: int, dim2: int, trace_out="dim2"):
+def two_tensor_partial_trace(rho: np.ndarray, dim1: int, dim2: int, trace_out="dim2"):
     traced_rho = np.zeros((dim1, dim1), dtype="complex_")
     # rho dim1 x dim2, dim1 x dim2
     if trace_out == "dim2":
@@ -283,8 +284,8 @@ def local_partial_trace(rho: np.ndarray, dim1: int, dim2: int, trace_out="dim2")
         reshaped_array = np.array(
             [
                 rho[d : dim1 * dim2 : dim2, f : dim1 * dim2 : dim2]
-                for d in range(0, dim1)
-                for f in range(0, dim1)
+                for d in range(0, dim2)
+                for f in range(0, dim2)
             ]
         )
         traced_rho = np.trace(reshaped_array, axis1=1, axis2=2)
@@ -406,7 +407,7 @@ def fidelity(a: np.ndarray, b: np.ndarray) -> float:
         raise ValueError("Dimension mismatch: {} and {}".format(squa.shape, squb.shape))
     # case for two vectors
     if len(squa.shape) == 1 and len(squb.shape) == 1:
-        return (
+        return np.real(
             np.sqrt(np.abs(np.dot(np.conj(squa), squb) * np.dot(np.conj(squb), squa)))
             ** 2
         )
@@ -428,7 +429,7 @@ def fidelity(a: np.ndarray, b: np.ndarray) -> float:
             np.matmul, items[0], items[1], items[0]
         )
         final_mat = sqrtm(rho_sigma_rho)
-        return np.trace(final_mat) ** 2
+        return np.real(np.trace(final_mat) ** 2)
 
 
 def state_fidelity_to_eigenstates(
@@ -632,6 +633,12 @@ def get_extrapolated_superposition(
     for ind in indices:
         coefficients.append(np.vdot(eigenstates[:, ind], close_ground_state))
     return eigenstates[:, indices] @ np.array(coefficients)
+
+
+def dense_restricted_ham(ham: FermionOperator, n_electrons: list, n_qubits: int):
+    return jw_spin_restrict_operator(
+        get_sparse_operator(ham), particle_number=n_electrons, n_qubits=n_qubits
+    ).toarray()
 
 
 def thermal_density_matrix_at_particle_number(

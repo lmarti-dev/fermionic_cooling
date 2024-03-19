@@ -1,0 +1,79 @@
+from fauvqe.models import FermiHubbardModel
+from fauvqe.utilities import (
+    jw_eigenspectrum_at_particle_number,
+    jw_spin_correct_indices,
+)
+from openfermion import get_sparse_operator
+import numpy as np
+
+from fermionic_cooling.utils import (
+    trace_out_sys,
+    trace_out_env,
+    two_tensor_partial_trace,
+    subspace_energy_expectation,
+)
+
+
+if __name__ == "__main__":
+
+    def vanilla_expec(rho, observable, qubits):
+        return np.real(
+            observable.expectation_from_density_matrix(
+                rho.astype("complex_"),
+                qubit_map={k: v for k, v in zip(qubits, range(len(qubits)))},
+            )
+        )
+
+    def expand_rho(rho, particle_number, n_qubits):
+        expanded_rho = np.zeros((2**n_qubits, 2**n_qubits), dtype=complex)
+        idx = jw_spin_correct_indices(n_electrons=particle_number, n_qubits=n_qubits)
+        expanded_rho[np.ix_(idx, idx)] = rho
+        return expanded_rho
+
+    model = FermiHubbardModel(x_dimension=2, y_dimension=2, tunneling=1, coulomb=2)
+    n_electrons = [2, 2]
+    n_sys_qubits = len(model.flattened_qubits)
+    sys_eig_energies, sys_eig_states = jw_eigenspectrum_at_particle_number(
+        sparse_operator=get_sparse_operator(model.fock_hamiltonian),
+        particle_number=n_electrons,
+    )
+    state = np.random.rand(36) + 1j * np.random.rand(36)
+    rho = np.outer(np.conjugate(state), state)
+    rho += np.conjugate(rho.T)
+    rho /= np.trace(rho)
+    expanded_rho = expand_rho(rho, particle_number=n_electrons, n_qubits=n_sys_qubits)
+
+    env_mat = np.array([[1, 0], [0, 0]])
+    n_env_qubits = 1
+
+    expanded_tensor = np.kron(expanded_rho, env_mat)
+    subspace_tensor = np.kron(rho, env_mat)
+
+    print(
+        "vanilla energy:",
+        vanilla_expec(expanded_rho, model.hamiltonian, model.flattened_qubits),
+    )
+    print(
+        "subspace energy:",
+        subspace_energy_expectation(rho, sys_eig_energies, sys_eig_states),
+    )
+
+    expanded_traced_sys = trace_out_env(
+        rho=expanded_tensor, n_sys_qubits=n_sys_qubits, n_env_qubits=n_env_qubits
+    )
+    subspace_traced_sys = expand_rho(
+        two_tensor_partial_trace(subspace_tensor, dim1=36, dim2=2, trace_out="dim2"),
+        particle_number=n_electrons,
+        n_qubits=n_sys_qubits,
+    )
+
+    print("trace env diff", np.sum(expanded_traced_sys - subspace_traced_sys))
+
+    expanded_traced_env = trace_out_sys(
+        rho=expanded_tensor, n_sys_qubits=n_sys_qubits, n_env_qubits=n_env_qubits
+    )
+    subspace_traced_env = two_tensor_partial_trace(
+        subspace_tensor, dim1=36, dim2=2, trace_out="dim1"
+    )
+
+    print("trace env diff", np.sum(expanded_traced_env - subspace_traced_env))
