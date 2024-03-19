@@ -24,22 +24,27 @@ import matplotlib.colors as colors
 import matplotlib.pyplot as plt
 import numpy as np
 from building_blocks import control_function
-from fermionic_cooling.utils import (
-    NO_CUPY,
-    depth_indexing,
-    expectation_wrapper,
-    get_list_depth,
-    is_density_matrix,
-    ketbra,
-    time_evolve_density_matrix,
-    trace_out_env,
-    trace_out_sys,
-)
+from openfermion import expectation, get_sparse_operator, variance
+from scipy.sparse import csc_matrix
 
+from fauvqe.models import FermionicModel
 from fauvqe.utilities import (
     flatten,
     ket_in_subspace,
-    spin_dicke_mixed_state,
+)
+from fermionic_cooling.utils import (
+    NO_CUPY,
+    add_depol_noise,
+    depth_indexing,
+    expectation_wrapper,
+    fidelity_wrapper,
+    get_list_depth,
+    is_density_matrix,
+    ketbra,
+    subspace_energy_expectation,
+    time_evolve_density_matrix,
+    trace_out_env,
+    trace_out_sys,
 )
 
 
@@ -57,6 +62,7 @@ class Cooler:
         sys_env_coupler_data: Union[cirq.PauliSum, list],
         verbosity: int = 0,
         time_evolve_method: str = "diag",
+        subspace_simulation: bool = False,
     ):
         if NO_CUPY:
             print("Cupy not installed, using CPU")
@@ -68,7 +74,9 @@ class Cooler:
         self.sys_qubits = sys_qubits
         self.sys_initial_state = sys_initial_state
         self.sys_ground_state = sys_ground_state
+        self._sys_eig_energies = None
         self._sys_eig_states = None
+
         self.env_hamiltonian = env_hamiltonian
         self.env_qubits = env_qubits
         self.env_ground_state = env_ground_state
@@ -86,6 +94,15 @@ class Cooler:
         else:
             self.sys_env_coupler_data_dims = get_list_depth(sys_env_coupler_data)
         self.sys_env_coupler = self.get_coupler_from_data()
+
+        # setup subspace simulation
+
+        self.subspace_simulation = subspace_simulation
+        if self.subspace_simulation:
+            self._sys_eig_energies, self._sys_eig_states = np.linalg.eigh(
+                sys_hamiltonian
+            )
+            time_evolve_method = "expm"
 
         # message for verbose printing
         self.msg = {}
@@ -106,15 +123,21 @@ class Cooler:
     def msg_out(self):
         print("\x1B[#B" * (2 + len(self.msg.keys())))
 
+    def to_matrix_if_pauli(self, obj):
+        if isinstance(obj, (cirq.PauliSum, cirq.PauliString)):
+            return obj.matrix(qubits=self.total_qubits)
+        else:
+            return obj
+
     def cooling_hamiltonian(self, env_coupling: float, alpha: float):
         if isinstance(self.sys_env_coupler, (cirq.PauliSum, cirq.PauliString)):
             coupler = self.sys_env_coupler.matrix(qubits=self.total_qubits)
         else:
             coupler = self.sys_env_coupler
         return (
-            self.sys_hamiltonian.matrix(qubits=self.total_qubits)
-            + env_coupling * self.env_hamiltonian.matrix(qubits=self.total_qubits)
-            + float(alpha) * coupler
+            self.to_matrix_if_pauli(self.sys_hamiltonian)
+            + env_coupling * self.to_matrix_if_pauli(self.env_hamiltonian)
+            + float(alpha) * self.to_matrix_if_pauli(coupler)
         )
 
     @property
@@ -133,14 +156,22 @@ class Cooler:
         return ketbra(self.env_ground_state)
 
     def sys_fidelity(self, state: np.ndarray):
-        return cirq.fidelity(
+        return fidelity_wrapper(
             state.astype("complex_"),
             self.sys_ground_state,
             qid_shape=(2,) * (len(self.sys_qubits)),
+            subspace_simulation=self.subspace_simulation,
         )
 
     def sys_energy(self, sys_state: np.ndarray):
-        return expectation_wrapper(self.sys_hamiltonian, sys_state, self.sys_qubits)
+        if self.subspace_simulation:
+            return subspace_energy_expectation(
+                sys_state,
+                sys_eig_energies=self._sys_eig_energies,
+                sys_eig_states=self._sys_eig_states,
+            )
+        else:
+            return expectation_wrapper(self.sys_hamiltonian, sys_state, self.sys_qubits)
 
     def env_energy(self, env_state: np.ndarray):
         return expectation_wrapper(
@@ -386,6 +417,7 @@ class Cooler:
         coupler_transitions: list = None,
         depol_noise: float = None,
         is_noise_spin_conserving: bool = False,
+        use_random_coupler: bool = False,
     ):
         initial_density_matrix = self.total_initial_state
         if not cirq.is_hermitian(initial_density_matrix):
@@ -443,6 +475,8 @@ class Cooler:
                 evolution_time = np.pi / alpha
                 self.total_cooling_time += evolution_time
 
+                # cool with all couplers for a given gap
+                coupler_indices = range(coupler_number)
                 if coupler_transitions is not None:
                     assert len(coupler_transitions) == coupler_number
                     # cool with couplers for a given gap ONLY IF THEIR ENERGY IS CLOSE
@@ -454,9 +488,11 @@ class Cooler:
                         # either we use all coupler in omega steppes or none
                         coupler_indices = range(coupler_number)
                         coupler_indices = []
-                else:
-                    # cool with all couplers for a given gap
-                    coupler_indices = range(coupler_number)
+                if use_random_coupler:
+                    # pick a random coupler among those available
+                    # compatible with coupler tranisition
+                    coupler_indices = [np.random.choice(coupler_indices)]
+
                 measured_env_energies = []
                 for coupler_index in coupler_indices:
                     overall_steps += 1
@@ -635,18 +671,48 @@ class Cooler:
         )
 
         if depol_noise is not None:
-            # add depol noise
+            traced_density_matrix = add_depol_noise(
+                rho=traced_density_matrix,
+                depol_noise=depol_noise,
+                n_qubits=len(self.sys_qubits),
+                n_electrons=self.n_electrons,
+                is_noise_spin_conserving=is_noise_spin_conserving,
+            )
+            n_up_op, n_down_op, _ = FermionicModel.spin_and_number_operator(
+                n_qubits=len(self.sys_qubits)
+            )
 
-            if is_noise_spin_conserving is True:
-                rho_err = spin_dicke_mixed_state(
-                    n_qubits=len(self.sys_qubits), Nf=self.n_electrons, expanded=True
+            n_up = np.real(
+                expectation(
+                    get_sparse_operator(n_up_op, len(self.sys_qubits)),
+                    csc_matrix(traced_density_matrix),
                 )
-            else:
-                rho_err = np.eye(len(traced_density_matrix))
+            )
+            n_down = np.real(
+                expectation(
+                    get_sparse_operator(n_down_op, len(self.sys_qubits)),
+                    csc_matrix(traced_density_matrix),
+                )
+            )
 
-            traced_density_matrix = (
-                1 - depol_noise
-            ) * traced_density_matrix + depol_noise * rho_err
+            var_up = np.real(
+                variance(
+                    get_sparse_operator(n_up_op, len(self.sys_qubits)),
+                    csc_matrix(traced_density_matrix),
+                )
+            )
+            var_down = np.real(
+                variance(
+                    get_sparse_operator(n_down_op, len(self.sys_qubits)),
+                    csc_matrix(traced_density_matrix),
+                )
+            )
+
+            self.update_message(
+                "nelecnoise",
+                f"e up: {n_up:.2f} vup: {var_up:.4f} e down: {n_down:.2f} vdown: {var_down:.4f}",
+                message_level=5,
+            )
 
         # renormalizing to avoid errors
         traced_density_matrix /= np.trace(traced_density_matrix)
@@ -677,6 +743,7 @@ class Cooler:
         omegas: list,
         eigenspectrums: list[list],
         suptitle: str = None,
+        plot_infidelity: bool = True,
     ):
         more_than_one_rep = len(env_energies) > 1
         nrows = 2
@@ -707,11 +774,16 @@ class Cooler:
                 kwargs = {"color": cmap(rep)}
             else:
                 kwargs = {}
-            axes[0].plot(omegas[rep], fidelities[rep], **kwargs)
+            if plot_infidelity:
+                axes[0].plot(
+                    omegas[rep][1:], 1 - np.array(fidelities[rep][1:]), **kwargs
+                )
+            else:
+                axes[0].plot(omegas[rep][1:], fidelities[rep][1:], **kwargs)
 
             ax_bottom.plot(
-                omegas[rep],
-                env_energies[rep],
+                omegas[rep][1:],
+                env_energies[rep][1:],
                 **kwargs,
             )
         all_env_energies = np.array(list(flatten(env_energies)))
@@ -723,11 +795,24 @@ class Cooler:
                 linestyle="--",
                 color=spectrum_cmap(ind),
             )
-        axes[0].set_ylabel(r"Fidelity", labelpad=0)
+        if plot_infidelity:
+            axes_0_label = r"Infidelity"
+        else:
+            axes_0_label = r"Fidelity"
+        axes[0].set_ylabel(axes_0_label, labelpad=0)
 
         ax_bottom.set_ylabel(r"$E_F$")
         ax_bottom.tick_params(axis="y")
         ax_bottom.set_yscale("log")
+
+        max_gap = np.abs(omegas[rep][-1] - omegas[rep][0])
+        ax_bottom.set_xlim(
+            [omegas[rep][-1] - max_gap / 100, omegas[rep][0] + max_gap / 100]
+        )
+
+        if plot_infidelity:
+            axes[0].set_yscale("log")
+
         ax_bottom.invert_xaxis()
         ax_bottom.set_xlabel("$\omega$")
         if plot_temp:

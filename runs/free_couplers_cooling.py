@@ -21,6 +21,7 @@ from fermionic_cooling.utils import (
     ketbra,
     state_fidelity_to_eigenstates,
     get_min_gap,
+    s_squared_penalty,
 )
 from fauvqe.utilities import (
     jw_eigenspectrum_at_particle_number,
@@ -35,6 +36,8 @@ from openfermion import (
 )
 import matplotlib.pyplot as plt
 
+
+from fermionic_cooling.adiabatic_sweep import fermion_to_dense, run_sweep
 
 from data_manager import ExperimentDataManager
 from fauplotstyle.styler import use_style
@@ -70,6 +73,7 @@ def __main__(args):
             ignore_incompatible_terms=True,
         )
 
+    gs_index = 2
     free_sys_eig_energies, free_sys_eig_states = jw_eigenspectrum_at_particle_number(
         sparse_operator=get_sparse_operator(
             non_interacting_model,
@@ -89,7 +93,7 @@ def __main__(args):
         n_qubits=n_sys_qubits, Nf=n_electrons, right_to_left=False
     )
     sys_mixed_state = np.ones(2**n_sys_qubits) / (2 ** (n_sys_qubits / 2))
-    sys_slater_state = free_sys_eig_states[:, 2]
+    sys_slater_state = free_sys_eig_states[:, gs_index]
 
     sys_eig_energies, sys_eig_states = jw_eigenspectrum_at_particle_number(
         sparse_operator=get_sparse_operator(
@@ -101,7 +105,7 @@ def __main__(args):
     )
 
     # initial state setting
-    sys_initial_state = ketbra(sys_hartree_fock)
+    sys_initial_state = ketbra(sys_slater_state)
 
     sys_ground_state = sys_eig_states[:, np.argmin(sys_eig_energies)]
     sys_ground_energy = np.min(sys_eig_energies)
@@ -146,12 +150,15 @@ def __main__(args):
         model=model.to_json_dict()["constructor_params"],
     )
 
+    max_k = 6
+
     couplers = get_cheat_coupler_list(
         sys_eig_states=free_sys_eig_states,
         env_eig_states=env_eig_states,
         qubits=sys_qubits + env_qubits,
-        gs_indices=(0,),
+        gs_indices=(gs_index,),
         noise=0,
+        max_k=max_k,
     )  # Interaction only on Qubit 0?
     print("coupler done")
 
@@ -166,9 +173,63 @@ def __main__(args):
     # evolution_time = 1e-3
 
     # call cool
+    use_fast_sweep = False
+    depol_noise = 1e-4
+    is_noise_spin_conserving = False
+
+    n_up, n_down = model.fermion_spins_expectations(sys_initial_state)
+    print(f"Before fast sweep: up: {n_up:.4f} down: {n_down:.4f}")
+
+    if use_fast_sweep:
+        sweep_time_mult = 0.01
+        start_fock_hamiltonian = non_interacting_model
+        initial_ground_state = ketbra(sys_slater_state)
+        final_ground_state = sys_eig_states[:, 0]
+        ham_start = fermion_to_dense(start_fock_hamiltonian)
+        ham_stop = fermion_to_dense(model.fock_hamiltonian)
+        n_steps = 5
+        total_sweep_time = (
+            sweep_time_mult
+            * spectrum_width
+            / (get_min_gap(sys_eig_energies, threshold=1e-12) ** 2)
+        )
+
+        (
+            fidelities,
+            instant_fidelities,
+            final_ground_state,
+            populations,
+            final_state,
+        ) = run_sweep(
+            initial_state=initial_ground_state,
+            ham_start=ham_start,
+            ham_stop=ham_stop,
+            final_ground_state=final_ground_state,
+            instantaneous_ground_states=None,
+            n_steps=n_steps,
+            total_time=total_sweep_time,
+            get_populations=True,
+            depol_noise=depol_noise,
+            is_noise_spin_conserving=is_noise_spin_conserving,
+            n_electrons=n_electrons,
+        )
+        sys_initial_state = final_state
+    else:
+        total_sweep_time = 0
+
+    penalty = s_squared_penalty(n_qubits=n_sys_qubits, n_electrons=n_electrons)
+    use_penalty = False
+    if use_penalty:
+        jw_penalty = model.encode_as_self(penalty)
+        total_ham = model.hamiltonian + jw_penalty
+    else:
+        total_ham = model.hamiltonian
+
+    n_up, n_down = model.fermion_spins_expectations(sys_initial_state)
+    print(f"After fast sweep: up: {n_up:.4f} down: n_down: {n_down:.4f}")
 
     cooler = Cooler(
-        sys_hamiltonian=model.hamiltonian,
+        sys_hamiltonian=total_ham,
         n_electrons=n_electrons,
         sys_qubits=model.flattened_qubits,
         sys_ground_state=sys_ground_state,
@@ -178,26 +239,35 @@ def __main__(args):
         env_ground_state=env_ground_state,
         sys_env_coupler_data=couplers,
         verbosity=5,
-        time_evolve_method="expm",
+        time_evolve_method="diag",
     )
     n_rep = 1
 
     print(f"coupler dim: {cooler.sys_env_coupler_data_dims}")
 
-    ansatz_options = {"beta": 1, "mu": 20, "c": 40}
+    ansatz_options = {"beta": 1, "mu": 30, "c": 20}
     weaken_coupling = 100
 
-    start_omega = 1.01 * spectrum_width
-
-    stop_omega = 0.1 * min_gap
+    start_omega = 1.75
+    stop_omega = 0.3
 
     method = "bigbrain"
+
+    edm.dump_some_variables(
+        depol_noise=depol_noise,
+        use_fast_sweep=use_fast_sweep,
+        is_noise_spin_conserving=is_noise_spin_conserving,
+        max_k=max_k,
+        ansatz_options=ansatz_options,
+        use_penalty=use_penalty,
+        method=method,
+    )
 
     if method == "bigbrain":
         coupler_transitions = np.abs(
             np.array(free_sys_eig_energies[1:]) - free_sys_eig_energies[0]
         )
-        depol_noise = 1e-5
+
         (
             fidelities,
             sys_ev_energies,
@@ -212,7 +282,8 @@ def __main__(args):
             weaken_coupling=weaken_coupling,
             coupler_transitions=None,
             depol_noise=depol_noise,
-            is_noise_spin_conserving=True,
+            is_noise_spin_conserving=is_noise_spin_conserving,
+            use_random_coupler=False,
         )
 
         jobj = {
@@ -220,7 +291,6 @@ def __main__(args):
             "fidelities": fidelities,
             "sys_energies": sys_ev_energies,
             "env_energies": env_ev_energies,
-            "depol_noise": depol_noise,
         }
         edm.save_dict_to_experiment(filename="cooling_free", jobj=jobj)
 
@@ -236,6 +306,7 @@ def __main__(args):
             fig,
         )
         plt.show()
+
     elif method == "zipcool":
         initial_pops = state_fidelity_to_eigenstates(
             state=sys_initial_state, eigenstates=sys_eig_states
@@ -272,6 +343,8 @@ def __main__(args):
             "fidelities": fidelities,
             "sys_energies": sys_energies,
             "env_energies": env_energies,
+            "total_sweep_time": total_sweep_time,
+            "total_cooling_time": cooler.total_cooling_time,
         }
         edm.save_dict_to_experiment(filename="cooling_free_couplers", jobj=jobj)
 

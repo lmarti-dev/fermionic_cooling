@@ -37,7 +37,7 @@ def comparison_ngaps(edm, n_gaps):
 
     # model stuff
 
-    model_name = "fh_slater"
+    model_name = "fh_coulomb"
     if "fh_" in model_name:
         model = FermiHubbardModel(x_dimension=2, y_dimension=2, tunneling=1, coulomb=2)
         n_qubits = len(model.flattened_qubits)
@@ -79,7 +79,7 @@ def comparison_ngaps(edm, n_gaps):
         expanded=True,
     )
 
-    slater_index = 0
+    slater_index = 2
     sys_slater_state = start_eig_states[:, slater_index]
     sys_eig_energies, sys_eig_states = jw_eigenspectrum_at_particle_number(
         sparse_operator=get_sparse_operator(
@@ -158,17 +158,20 @@ def comparison_ngaps(edm, n_gaps):
 
     fpaths = []
     sweep_time_mult = 0.01
+    depol_noise = 1e-4
+    is_noise_spin_conserving = False
+
     for which_initial_process in ("adiabatic", "none"):
         print(f"Initial process: {which_initial_process}")
 
         if which_initial_process == "adiabatic":
             # call sweep
-            initial_ground_state = sys_slater_state
+            initial_ground_state = ketbra(sys_slater_state)
             final_ground_state = sys_eig_states[:, 0]
             ham_start = fermion_to_dense(start_fock_hamiltonian)
             ham_stop = fermion_to_dense(model.fock_hamiltonian)
-            n_steps = 100
-            total_time = (
+            n_steps = 5
+            total_sweep_time = (
                 sweep_time_mult
                 * spectrum_width
                 / (get_min_gap(sys_eig_energies, threshold=1e-12) ** 2)
@@ -187,8 +190,10 @@ def comparison_ngaps(edm, n_gaps):
                 final_ground_state=final_ground_state,
                 instantaneous_ground_states=None,
                 n_steps=n_steps,
-                total_time=total_time,
+                total_time=total_sweep_time,
                 get_populations=True,
+                depol_noise=depol_noise,
+                is_noise_spin_conserving=is_noise_spin_conserving,
             )
             sys_initial_state = final_state
         elif which_initial_process == "none":
@@ -205,12 +210,25 @@ def comparison_ngaps(edm, n_gaps):
             sys_env_coupler_data=couplers,
             verbosity=5,
         )
+
         n_rep = 1
 
         print(f"coupler dim: {cooler.sys_env_coupler_data_dims}")
 
         ansatz_options = {"beta": 1, "mu": 30, "c": 20}
         weaken_coupling = 20
+
+        dump_vars = {
+            "start_omega": start_omega,
+            "stop_omega": stop_omega,
+            "sweep_time_mult": sweep_time_mult,
+            "n_gaps": n_gaps,
+            "ansatz_options": ansatz_options,
+            "total_sweep_time": total_sweep_time,
+            "total_cool_time": cooler.total_cooling_time,
+            "weaken_coupling": weaken_coupling,
+        }
+        edm.dump_some_variables(**dump_vars)
 
         (
             fidelities,
@@ -225,6 +243,8 @@ def comparison_ngaps(edm, n_gaps):
             n_rep=n_rep,
             weaken_coupling=weaken_coupling,
             coupler_transitions=None,
+            depol_noise=depol_noise,
+            is_noise_spin_conserving=is_noise_spin_conserving,
         )
 
         jobj = {
@@ -232,13 +252,6 @@ def comparison_ngaps(edm, n_gaps):
             "fidelities": fidelities,
             "sys_energies": sys_ev_energies,
             "env_ev_energies": env_ev_energies,
-            "start_omega": start_omega,
-            "stop_omega": stop_omega,
-            "sweep_time_mult": sweep_time_mult,
-            "n_gaps": n_gaps,
-            "ansatz_options": ansatz_options,
-            "total_sweep_time": total_time,
-            "total_cool_time": cooler.total_cooling_time,
         }
         edm.save_dict_to_experiment(
             filename=f"cooling_free_{which_initial_process}_n_gaps_{n_gaps}",
@@ -252,13 +265,14 @@ def comparison_ngaps(edm, n_gaps):
 if __name__ == "__main__":
     use_style()
 
-    dry_run = False
+    dry_run = True
     edm = ExperimentDataManager(
         experiment_name="cooling_with_initial_adiab_sweep",
         notes="adding an initial sweep before the cooling run",
         dry_run=dry_run,
     )
-    pool = mp.Pool(mp.cpu_count())
-    n_gaps = list(range(1, 36))
+    # pool = mp.Pool(mp.cpu_count())
+    # n_gaps = list(range(1, 36))
+    # result = pool.starmap(comparison_ngaps, zip([edm] * len(n_gaps), n_gaps))
 
-    result = pool.starmap(comparison_ngaps, zip([edm] * len(n_gaps), n_gaps))
+    comparison_ngaps(edm, 6)

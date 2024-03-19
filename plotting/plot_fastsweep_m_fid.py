@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 from fauplotstyle.styler import use_style
 import numpy as np
 import io
+from matplotlib.ticker import MaxNLocator
 
 
 def load_json(fpath):
@@ -63,20 +64,21 @@ def plot_fast_sweep_vs_m(dirname, max_sweep_fid=None):
             ms[0],
             ms[-1],
             "r",
-            label="Adiabatic sweep only",
+            label="Adiabatic sweep",
             linestyles="dashed",
         )
 
     ax.set_ylabel("Final fidelity")
     ax.set_xlabel(r"$M$")
+    ax.xaxis.set_major_locator(MaxNLocator(integer=True))
 
-    ax.legend()
+    ax.legend(loc="center right", bbox_to_anchor=(1, 0.3))
     return fig
 
 
 if __name__ == "__main__":
     use_style()
-    edm = ExperimentDataManager(experiment_name="plot_fastsweep_vs_m", dry_run=False)
+    edm = ExperimentDataManager(experiment_name="plot_fastsweep_vs_m", dry_run=True)
 
     graph_dir = (
         r"C:\Users\Moi4\Desktop\current\FAU\phd\projects\cooling_fermions\graph_data"
@@ -87,8 +89,9 @@ if __name__ == "__main__":
             graph_dir, r"cooling_with_initial_adiab_sweep_10h10\run_00000\data"
         )
         dirname = os.path.join(
-            graph_dir, r"cooling_with_initial_adiab_sweep_15h12\run_00000\data"
+            graph_dir, r"cooling_with_initial_adiab_sweep_slater_15h12\run_00000\data"
         )
+        max_sweep_fid = 0.49844239875687185
 
     elif which == "coulomb":
         dirname = os.path.join(
@@ -103,9 +106,10 @@ if __name__ == "__main__":
         dirname = os.path.join(
             graph_dir, r"cooling_with_initial_adiab_sweep_17h20\run_00000\data"
         )
+        max_sweep_fid = 0.08333327548043287
 
-    fig = plot_fast_sweep_vs_m(dirname, max_sweep_fid=0)
+    fig = plot_fast_sweep_vs_m(dirname, max_sweep_fid=max_sweep_fid)
 
     edm.dump_some_variables(start_ham=which)
-    edm.save_figure(fig)
+    edm.save_figure(fig, fig_shape="half-y")
     plt.show()

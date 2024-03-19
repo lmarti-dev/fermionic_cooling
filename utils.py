@@ -15,10 +15,16 @@ try:
     NO_CUPY = False
 except ImportError:
     NO_CUPY = True
-from openfermion import FermionOperator, get_sparse_operator, jw_hartree_fock_state
+from openfermion import (
+    FermionOperator,
+    get_sparse_operator,
+    jw_hartree_fock_state,
+    normal_ordered,
+)
 from scipy.linalg import sqrtm
 from scipy.sparse import csc_matrix
 from scipy.sparse.linalg import eigsh, expm, expm_multiply
+
 
 from fauvqe.models.fermiHubbardModel import FermiHubbardModel
 from fauvqe.utilities import (
@@ -28,6 +34,7 @@ from fauvqe.utilities import (
     jw_get_true_ground_state_at_particle_number,
     normalize_vec,
     spin_dicke_state,
+    spin_dicke_mixed_state,
 )
 
 # this file contains general utils for the cooling.
@@ -113,6 +120,39 @@ def get_transition_rates(eigenspectrum):
         )
     )
     return transitions
+
+
+def add_depol_noise(
+    rho: np.ndarray,
+    depol_noise: float,
+    n_qubits: int,
+    n_electrons: list,
+    is_noise_spin_conserving: bool = False,
+):
+    if depol_noise is None:
+        # return the matrix
+        return rho
+
+    if is_noise_spin_conserving:
+        rho_err = spin_dicke_mixed_state(
+            n_qubits=n_qubits, Nf=n_electrons, expanded=True
+        )
+    else:
+        rho_err = np.eye(N=len(rho)) / len(rho)
+
+    return (1 - depol_noise) * rho + depol_noise * rho_err
+
+
+def s_squared_penalty(n_qubits: int, n_electrons: list):
+    s_plus = FermionOperator()
+    s_minus = FermionOperator()
+    for x in range(0, n_qubits, 2):
+        s_plus += FermionOperator(f"{x}^ {x}")
+    for x in range(1, n_qubits, 2):
+        s_minus += FermionOperator(f"{x}^ {x}")
+    s_squared = (n_electrons[0] - s_plus) ** 2 + (n_electrons[1] - s_minus) ** 2
+
+    return normal_ordered(s_squared)
 
 
 def mean_gap(spectrum: np.ndarray):
@@ -220,27 +260,38 @@ def depth_indexing(_list, indices: Iterator):
     return _list
 
 
-def two_tensors_partial_trace(rho: np.ndarray, n1: int, n2: int):
-    """Compute the partial trace of a two density matrix tensor product, ie rho = rho_a otimes rho_b, tr_b(rho) = rho_a
-    The density matrices are assumed to have shapes rho_a = 2**n1 x 2**n2 and rho_b = 2**n2 x 2**n2
+def subspace_partial_trace(rho: np.ndarray, n2: int):
+    pass
 
-    Args:
-        rho (np.ndarray): the total matrix
-        n1 (int): the number of qubits in the first matrix
-        n2 (int): the number of qubits in the second matrix
-    """
-    traced_rho = np.zeros((2**n1, 2**n1), dtype="complex_")
-    # print("traced rho shape: {} rho shape: {}".format(traced_rho.shape, rho.shape))
-    for iii in range(2**n1):
-        for jjj in range(2**n1):
-            # take rho[i*env qubits:i*env qubits + env qubtis]
-            traced_rho[iii, jjj] = np.trace(
-                rho[
-                    iii * (2**n2) : (iii + 1) * (2**n2),
-                    jjj * (2**n2) : (jjj + 1) * (2**n2),
-                ]
-            )
-    return traced_rho
+
+def local_partial_trace(rho: np.ndarray, dim1: int, dim2: int, trace_out="dim2"):
+    traced_rho = np.zeros((dim1, dim1), dtype="complex_")
+    # rho dim1 x dim2, dim1 x dim2
+    if trace_out == "dim2":
+        reshaped_array = np.array(
+            [
+                rho[d : d + dim2, f : f + dim2]
+                for d in range(0, dim1 * dim2, dim2)
+                for f in range(0, dim1 * dim2, dim2)
+            ]
+        )
+        traced_rho = np.trace(reshaped_array, axis1=1, axis2=2)
+        out_shape = (dim1, dim1)
+        out_rho = np.reshape(traced_rho, out_shape)
+
+    elif trace_out == "dim1":
+        reshaped_array = np.array(
+            [
+                rho[d : dim1 * dim2 : dim2, f : dim1 * dim2 : dim2]
+                for d in range(0, dim1)
+                for f in range(0, dim1)
+            ]
+        )
+        traced_rho = np.trace(reshaped_array, axis1=1, axis2=2)
+        out_shape = (dim2, dim2)
+        out_rho = np.reshape(traced_rho, out_shape)
+
+    return out_rho
 
 
 def trace_out_env(
@@ -253,7 +304,6 @@ def trace_out_env(
         range(n_sys_qubits),
     ).reshape(2**n_sys_qubits, 2**n_sys_qubits)
     # cirq is faster
-    return two_tensors_partial_trace(rho=rho, n1=n_sys_qubits, n2=n_env_qubits)
 
 
 def trace_out_sys(
@@ -356,8 +406,9 @@ def fidelity(a: np.ndarray, b: np.ndarray) -> float:
         raise ValueError("Dimension mismatch: {} and {}".format(squa.shape, squb.shape))
     # case for two vectors
     if len(squa.shape) == 1 and len(squb.shape) == 1:
-        return np.sqrt(
-            np.abs(np.dot(np.conj(squa), squb) * np.dot(np.conj(squb), squa))
+        return (
+            np.sqrt(np.abs(np.dot(np.conj(squa), squb) * np.dot(np.conj(squb), squa)))
+            ** 2
         )
     else:
         # case for one matrix and one vector, or two matrices
@@ -397,7 +448,7 @@ def state_fidelity_to_eigenstates(
         else:
             # in case we have fermionic vectors which aren't 2**n
             # expanded refers to jw_ restricted spaces functions
-            fids.append(fidelity(state, eigenstates[:, jj]) ** 2)
+            fids.append(fidelity(state, eigenstates[:, jj]))
     return fids
 
 
@@ -618,3 +669,28 @@ def thermal_density_matrix(beta: float, ham: cirq.PauliSum, qubits: list[cirq.Qi
     )
     thermal_density /= np.trace(thermal_density)
     return thermal_density
+
+
+def subspace_energy_expectation(
+    rho: np.ndarray, sys_eig_energies: np.ndarray, sys_eig_states: np.ndarray
+):
+    # rho is N by N and projectors M by N by N
+    if len(rho.shape) == 1:
+        state = np.outer(rho.conjugate(), rho)
+    else:
+        state = rho
+    return np.real(
+        np.trace(
+            sys_eig_states.T.conjugate()
+            @ state
+            @ sys_eig_states
+            @ np.diag(sys_eig_energies)
+        )
+    )
+
+
+def fidelity_wrapper(a, b, qid_shape=None, subspace_simulation: bool = False):
+    if subspace_simulation:
+        return fidelity(a, b)
+    else:
+        return cirq.fidelity(a, b, qid_shape=qid_shape)

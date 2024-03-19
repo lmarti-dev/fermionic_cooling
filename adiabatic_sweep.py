@@ -1,5 +1,6 @@
 import numpy as np
-from cirq import PauliSum, fidelity
+from cirq import PauliSum
+from cirq import fidelity as cirq_fidelity
 from openfermion import FermionOperator, get_sparse_operator
 from scipy.linalg import expm
 from scipy.sparse import csc_matrix
@@ -13,9 +14,11 @@ from fauvqe.utilities import (
 
 import multiprocessing as mp
 
+from fermionic_cooling.utils import add_depol_noise, fidelity_wrapper
+
 
 def fermion_to_dense(ham: FermionOperator):
-    return get_sparse_operator(ham).todense()
+    return get_sparse_operator(ham).toarray()
 
 
 def ham_to_sparse(ham):
@@ -100,6 +103,10 @@ def run_sweep(
     total_time: float,
     get_populations: bool = True,
     single_unitary: bool = False,
+    depol_noise: float = None,
+    is_noise_spin_conserving: bool = False,
+    n_electrons: list = None,
+    subspace_simulation: bool = False,
 ):
     # set state to initial value
     state = initial_state
@@ -114,12 +121,27 @@ def run_sweep(
         unitary = get_trotterized_sweep_unitary(
             sweep_hamiltonian=sweep_hamiltonian, n_steps=n_steps, total_time=total_time
         )
-        initial_fid = fidelity(state, final_ground_state, qid_shape=qid_shape)
-        initial_instant_fid = fidelity(state, initial_state, qid_shape=qid_shape)
+        initial_fid = fidelity_wrapper(
+            state,
+            final_ground_state,
+            qid_shape=qid_shape,
+            subspace_simulation=subspace_simulation,
+        )
+        initial_instant_fid = fidelity_wrapper(
+            state,
+            initial_state,
+            qid_shape=qid_shape,
+            subspace_simulation=subspace_simulation,
+        )
 
         state = unitary @ state
 
-        final_fid = fidelity(state, final_ground_state, qid_shape=qid_shape)
+        final_fid = fidelity_wrapper(
+            state,
+            final_ground_state,
+            qid_shape=qid_shape,
+            subspace_simulation=subspace_simulation,
+        )
 
         return (
             [initial_fid, final_fid],
@@ -139,8 +161,18 @@ def run_sweep(
     fidelities = []
     instant_fidelities = []
 
-    initial_fid = fidelity(state, final_ground_state, qid_shape=qid_shape)
-    initial_instant_fid = fidelity(state, initial_state, qid_shape=qid_shape)
+    initial_fid = fidelity_wrapper(
+        state,
+        final_ground_state,
+        qid_shape=qid_shape,
+        subspace_simulation=subspace_simulation,
+    )
+    initial_instant_fid = fidelity_wrapper(
+        state,
+        initial_state,
+        qid_shape=qid_shape,
+        subspace_simulation=subspace_simulation,
+    )
 
     if get_populations:
         end_energies, end_spectrum = np.linalg.eigh(ham_stop)
@@ -161,6 +193,16 @@ def run_sweep(
         # statevector
         else:
             state /= np.linalg.norm(state)
+
+        if depol_noise is not None:
+            state = add_depol_noise(
+                rho=state,
+                depol_noise=depol_noise,
+                n_qubits=n_qubits,
+                n_electrons=n_electrons,
+                is_noise_spin_conserving=is_noise_spin_conserving,
+            )
+
         if get_populations:
             state_pops = []
             for ind_spec in range(end_spectrum.shape[1]):
@@ -168,21 +210,30 @@ def run_sweep(
                 eig_state = np.array(end_spectrum[:, ind_spec])
                 eig_state = eig_state.squeeze()
                 state_pops.append(
-                    fidelity(
+                    fidelity_wrapper(
                         state1=state,
                         state2=eig_state,
                         qid_shape=qid_shape,
+                        subspace_simulation=subspace_simulation,
                     )
                 )
             populations[:, ind] = state_pops
 
-        fid = fidelity(state, final_ground_state, qid_shape=qid_shape)
+        fid = fidelity_wrapper(
+            state,
+            final_ground_state,
+            qid_shape=qid_shape,
+            subspace_simulation=subspace_simulation,
+        )
         fidelities.append(fid)
 
         instant_fid = -1
         if instantaneous_ground_states is not None:
-            instant_fid = fidelity(
-                state, next(instantaneous_ground_states), qid_shape=qid_shape
+            instant_fid = fidelity_wrapper(
+                state,
+                next(instantaneous_ground_states),
+                qid_shape=qid_shape,
+                subspace_simulation=subspace_simulation,
             )
             instant_fidelities.append(instant_fid)
 

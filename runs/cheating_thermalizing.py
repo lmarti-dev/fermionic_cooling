@@ -103,8 +103,6 @@ def main_run(edm: ExperimentDataManager, initial_beta, target_beta):
 
     # define inverse temp
 
-    env_beta = 1 * target_beta
-
     n_sys_qubits = len(sys_qubits)
     n_env_qubits = 1
     n_total_qubits = n_sys_qubits + n_env_qubits
@@ -128,6 +126,7 @@ def main_run(edm: ExperimentDataManager, initial_beta, target_beta):
 
     # renormalize target beta with ground state
     target_beta = target_beta / np.abs(sys_eig_energies[0])
+    env_beta = 1 * target_beta
 
     free_sys_eig_energies, free_sys_eig_states = jw_eigenspectrum_at_particle_number(
         sparse_operator=get_sparse_operator(
@@ -256,8 +255,8 @@ def main_run(edm: ExperimentDataManager, initial_beta, target_beta):
     elif method == "bigbrain":
         ansatz_options = {
             "beta": 1,
-            "mu": 10,
-            "c": 40,
+            "mu": 30,
+            "c": 20,
             "minus": env_ham.expectation_from_density_matrix(
                 thermal_env_density, qubit_map={k: v for v, k in enumerate(env_qubits)}
             ),
@@ -291,6 +290,7 @@ def main_run(edm: ExperimentDataManager, initial_beta, target_beta):
             "fidelities": fidelities,
             "sys_energies": sys_ev_energies,
             "env_energies": env_ev_energies,
+            "ansatz_options": ansatz_options,
         }
         edm.save_dict_to_experiment(filename="cooling_free", jobj=jobj)
 
@@ -310,7 +310,7 @@ def main_run(edm: ExperimentDataManager, initial_beta, target_beta):
 
 
 def loop_over_betas():
-    dry_run = False
+    dry_run = True
 
     for initial_beta in (10,):
         edm = ExperimentDataManager(
@@ -327,7 +327,7 @@ def loop_over_betas():
 
 
 def normal_run():
-    dry_run = False
+    dry_run = True
     initial_beta = 0
     target_beta = 1
 
