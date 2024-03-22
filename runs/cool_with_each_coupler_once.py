@@ -1,83 +1,94 @@
 import sys
+from itertools import combinations
 
-# tsk tsk
-# sys.path.append("/home/Refik/Data/My_files/Dropbox/PhD/repos/fauvqe/")
-
-from fauvqe.models.fermiHubbardModel import FermiHubbardModel
-from chemical_models.specificModel import SpecificModel
-
-from coolerClass import Cooler
-
+import matplotlib.pyplot as plt
+import numpy as np
 from building_blocks import (
-    get_cheat_sweep,
     get_cheat_coupler,
+    get_cheat_coupler_list,
+    get_cheat_sweep,
     get_perturbed_sweep,
     get_Z_env,
-    get_cheat_coupler_list,
 )
-
-from fermionic_cooling.utils import (
-    expectation_wrapper,
-    ketbra,
-    state_fidelity_to_eigenstates,
-    get_min_gap,
-)
-from fauvqe.utilities import (
-    jw_eigenspectrum_at_particle_number,
-    spin_dicke_state,
-    flatten,
-)
-import cirq
+from coolerClass import Cooler
 from openfermion import (
+    get_quadratic_hamiltonian,
     get_sparse_operator,
     jw_hartree_fock_state,
-    get_quadratic_hamiltonian,
 )
-import matplotlib.pyplot as plt
 
-
+from chemical_models.specificModel import SpecificModel
 from data_manager import ExperimentDataManager
 from fauplotstyle.styler import use_style
-import numpy as np
+from fauvqe.models.fermiHubbardModel import FermiHubbardModel
+from fauvqe.utilities import (
+    flatten,
+    jw_eigenspectrum_at_particle_number,
+    spin_dicke_state,
+)
+from fermionic_cooling.utils import (
+    expectation_wrapper,
+    get_min_gap,
+    ketbra,
+    print_state_fidelity_to_eigenstates,
+    state_fidelity_to_eigenstates,
+    dense_restricted_ham,
+    subspace_energy_expectation,
+)
+
+from adiabatic_sweep import run_sweep
 
 
 def __main__(args):
     # whether we want to skip all saving data
     dry_run = False
     edm = ExperimentDataManager(
-        experiment_name="fh22_oneatatime",
-        notes="cooling bigbrain run with one coupler each time",
+        experiment_name="fh_bigbrain_subspace",
+        notes="fh cooling with subspace simulation, with coulomb",
         dry_run=dry_run,
     )
     use_style()
     # model stuff
 
-    model_name = "fh"
-    model = FermiHubbardModel(x_dimension=2, y_dimension=2, tunneling=1, coulomb=2)
-    n_qubits = len(model.flattened_qubits)
-    n_electrons = [2, 2]
-    non_interacting_model = model.non_interacting_model.fock_hamiltonian
+    model_name = "fh_coulomb"
+    if "fh_" in model_name:
+        model = FermiHubbardModel(x_dimension=2, y_dimension=2, tunneling=1, coulomb=2)
+        n_qubits = len(model.flattened_qubits)
+        n_electrons = [2, 2]
+        if "coulomb" in model_name:
+            start_fock_hamiltonian = model.coulomb_model.fock_hamiltonian
+            couplers_fock_hamiltonian = model.non_interacting_model.fock_hamiltonian
+        elif "slater" in model_name:
+            start_fock_hamiltonian = model.non_interacting_model.fock_hamiltonian
+            couplers_fock_hamiltonian = start_fock_hamiltonian
+    # define inverse temp
 
-    free_sys_eig_energies, free_sys_eig_states = jw_eigenspectrum_at_particle_number(
+    coupler_sys_eig_energies, couplers_sys_eig_states = (
+        jw_eigenspectrum_at_particle_number(
+            sparse_operator=get_sparse_operator(
+                couplers_fock_hamiltonian,
+                n_qubits=len(model.flattened_qubits),
+            ),
+            particle_number=n_electrons,
+            expanded=False,
+        )
+    )
+    start_sys_eig_energies, start_sys_eig_states = jw_eigenspectrum_at_particle_number(
         sparse_operator=get_sparse_operator(
-            non_interacting_model,
+            start_fock_hamiltonian,
             n_qubits=len(model.flattened_qubits),
         ),
         particle_number=n_electrons,
-        expanded=True,
+        expanded=False,
     )
 
     sys_qubits = model.flattened_qubits
     n_sys_qubits = len(sys_qubits)
-    sys_hartree_fock = jw_hartree_fock_state(
-        n_orbitals=n_sys_qubits, n_electrons=sum(n_electrons)
-    )
-
-    sys_dicke = spin_dicke_state(
-        n_qubits=n_sys_qubits, Nf=n_electrons, right_to_left=False
-    )
-    sys_mixed_state = np.ones(2**n_sys_qubits) / (2 ** (n_sys_qubits / 2))
-    sys_slater_state = free_sys_eig_states[:, 2]
+    subspace_dim = len(
+        list(combinations(range(n_sys_qubits // 2), n_electrons[0]))
+    ) * len(list(combinations(range(n_sys_qubits // 2), n_electrons[1])))
+    sys_hartree_fock = np.zeros((subspace_dim,))
+    sys_hartree_fock[0] = 1
 
     sys_eig_energies, sys_eig_states = jw_eigenspectrum_at_particle_number(
         sparse_operator=get_sparse_operator(
@@ -85,37 +96,34 @@ def __main__(args):
             n_qubits=len(model.flattened_qubits),
         ),
         particle_number=n_electrons,
-        expanded=True,
+        expanded=False,
     )
 
     # initial state setting
-    sys_initial_state = ketbra(sys_slater_state)
+    gs_index = 2
+    sys_initial_state = ketbra(start_sys_eig_states[:, gs_index])
 
     sys_ground_state = sys_eig_states[:, np.argmin(sys_eig_energies)]
     sys_ground_energy = np.min(sys_eig_energies)
 
-    eig_fids = state_fidelity_to_eigenstates(
-        state=sys_initial_state, eigenstates=sys_eig_states
+    print("BEFORE SWEEP")
+    print_state_fidelity_to_eigenstates(
+        state=sys_initial_state,
+        eigenenergies=sys_eig_energies,
+        eigenstates=sys_eig_states,
+        expanded=False,
     )
-    print("Initial populations")
-    for fid, sys_eig_energy in zip(eig_fids, sys_eig_energies):
-        print(
-            f"fid: {np.abs(fid):.4f} gap: {np.abs(sys_eig_energy-sys_eig_energies[0]):.3f}"
-        )
-    print(f"sum fids {sum(eig_fids)}")
-    sys_initial_energy = expectation_wrapper(
-        model.hamiltonian, sys_initial_state, model.flattened_qubits
+    sys_initial_energy = subspace_energy_expectation(
+        sys_initial_state, sys_eig_energies, sys_eig_states
     )
-    sys_ground_energy_exp = expectation_wrapper(
-        model.hamiltonian, sys_ground_state, model.flattened_qubits
+    sys_ground_energy_exp = subspace_energy_expectation(
+        sys_ground_state, sys_eig_energies, sys_eig_states
     )
 
-    fidelity = cirq.fidelity(
-        sys_initial_state,
-        sys_ground_state,
-        qid_shape=(2,) * (len(model.flattened_qubits)),
+    sys_ham_matrix = dense_restricted_ham(
+        model.fock_hamiltonian, n_electrons, n_sys_qubits
     )
-    print("initial fidelity: {}".format(fidelity))
+
     print("ground energy from spectrum: {}".format(sys_ground_energy))
     print("ground energy from model: {}".format(sys_ground_energy_exp))
     print("initial energy from model: {}".format(sys_initial_energy))
@@ -134,12 +142,16 @@ def __main__(args):
         model=model.to_json_dict()["constructor_params"],
     )
 
+    max_k = None
+
+    coupler_gs_index = 2
     couplers = get_cheat_coupler_list(
-        sys_eig_states=free_sys_eig_states,
+        sys_eig_states=couplers_sys_eig_states,
         env_eig_states=env_eig_states,
         qubits=sys_qubits + env_qubits,
-        gs_indices=(0,),
-        noise=0,
+        gs_indices=(coupler_gs_index,),
+        noise=None,
+        max_k=max_k,
     )  # Interaction only on Qubit 0?
     print("coupler done")
 
@@ -149,18 +161,69 @@ def __main__(args):
     # get environment ham sweep values
     spectrum_width = max(sys_eig_energies) - min(sys_eig_energies)
 
-    min_gap = get_min_gap(free_sys_eig_energies, threshold=1e-6)
+    min_gap = get_min_gap(coupler_sys_eig_energies, threshold=1e-6)
 
     # evolution_time = 1e-3
 
     # call cool
+    use_fast_sweep = True
+    depol_noise = None
+    is_noise_spin_conserving = False
+
+    if use_fast_sweep:
+        sweep_time_mult = 1
+        initial_ground_state = sys_initial_state
+        final_ground_state = sys_eig_states[:, 0]
+        ham_start = dense_restricted_ham(
+            start_fock_hamiltonian, n_electrons, n_sys_qubits
+        )
+        ham_stop = sys_ham_matrix
+        n_steps = 10
+        total_sweep_time = (
+            sweep_time_mult
+            * spectrum_width
+            / (get_min_gap(sys_eig_energies, threshold=1e-12) ** 2)
+        )
+
+        (
+            fidelities,
+            instant_fidelities,
+            final_ground_state,
+            populations,
+            final_state,
+        ) = run_sweep(
+            initial_state=initial_ground_state,
+            ham_start=ham_start,
+            ham_stop=ham_stop,
+            final_ground_state=final_ground_state,
+            instantaneous_ground_states=None,
+            n_steps=n_steps,
+            total_time=total_sweep_time,
+            get_populations=True,
+            depol_noise=depol_noise,
+            n_qubits=n_sys_qubits,
+            is_noise_spin_conserving=is_noise_spin_conserving,
+            n_electrons=n_electrons,
+            subspace_simulation=True,
+        )
+        sys_initial_state = final_state
+    else:
+        total_sweep_time = 0
+
+    print("AFTER SWEEP")
+    print_state_fidelity_to_eigenstates(
+        state=sys_initial_state,
+        eigenenergies=sys_eig_energies,
+        eigenstates=sys_eig_states,
+        expanded=False,
+    )
 
     for ind, coupler in enumerate(couplers):
         if ind > 0:
-            edm.new_run(notes=f"coupler n={ind}")
+            edm.new_run(notes=f"coupler ({ind+1},0)")
 
         cooler = Cooler(
-            sys_hamiltonian=model.hamiltonian,
+            sys_hamiltonian=sys_ham_matrix,
             n_electrons=n_electrons,
             sys_qubits=model.flattened_qubits,
             sys_ground_state=sys_ground_state,
@@ -171,6 +234,7 @@ def __main__(args):
             sys_env_coupler_data=[coupler],
             verbosity=5,
             time_evolve_method="expm",
+            subspace_simulation=True,
         )
         n_rep = 1
 
@@ -181,14 +245,12 @@ def __main__(args):
 
         start_omega = 1.01 * spectrum_width
 
-        stop_omega = 0.1 * min_gap
+        stop_omega = 0.1
 
         method = "bigbrain"
 
         if method == "bigbrain":
-            coupler_transitions = np.abs(
-                np.array(free_sys_eig_energies[1:]) - free_sys_eig_energies[0]
-            )
+
             (
                 fidelities,
                 sys_ev_energies,
@@ -223,7 +285,14 @@ def __main__(args):
             edm.save_figure(
                 fig,
             )
+
+            print(f"coupler number: {ind} final fidelity: {fidelities[0][-1]}")
             # plt.show()
+            edm.dump_some_variables(
+                coupler_number=ind,
+                final_fidelity=fidelities[0][-1],
+                delta_fidelity=fidelities[0][-1] - fidelities[0][0],
+            )
 
 
 if __name__ == "__main__":

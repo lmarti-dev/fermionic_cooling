@@ -84,11 +84,11 @@ edm = ExperimentDataManager(
 )
 
 
-# thermal_results_1by2
-dirnames = afternoon_plot()
-fig = plot_single(dirnames)
-show_if_dry(dry_run)
-edm.save_figure(fig, "thermal_results_1by2", add_timestamp=False)
+# # thermal_results_1by2
+# dirnames = afternoon_plot()
+# fig = plot_single(dirnames)
+# show_if_dry(dry_run)
+# edm.save_figure(fig, "thermal_results_1by2", add_timestamp=False)
 
 # nice cooling
 sys_eig_energies = get_spectrum(2, 2, 1, 2, [2, 2])
@@ -141,14 +141,14 @@ edm.save_figure(
 
 jobj[fig_filename] = fpath
 
-# each coupler
-fpath = r"C:\Users\Moi4\Desktop\current\FAU\phd\projects\cooling_fermions\graph_data\fh22_oneatatime_09h25"
-fig = plot_each_coupler_perf(fpath)
-show_if_dry(dry_run)
-edm.save_figure(
-    fig, "plot_each_coupler_resonance", add_timestamp=False, fig_shape="page-wide"
-)
-jobj[fig_filename] = fpath
+# # each coupler
+# fpath = r"C:\Users\Moi4\Desktop\current\FAU\phd\projects\cooling_fermions\graph_data\fh22_oneatatime_09h25"
+# fig = plot_each_coupler_perf(fpath)
+# show_if_dry(dry_run)
+# edm.save_figure(
+#     fig, "plot_each_coupler_resonance", add_timestamp=False, fig_shape="page-wide"
+# )
+# jobj[fig_filename] = fpath
 
 
 # single comp
@@ -176,23 +176,23 @@ edm.save_figure(fig, fig_filename, add_timestamp=False)
 
 jobj[fig_filename] = fpath
 
-if dry_run:
-    n_steps = 10
-else:
-    n_steps = 200
+# if dry_run:
+#     n_steps = 10
+# else:
+#     n_steps = 200
 
-# fh_12_11_components_vs_beta
-fig = plot_amplitudes_vs_beta(2, 1, 1, 2, [1, 1], False, n_steps)
-fig_filename = "fh_12_11_components_vs_beta"
-show_if_dry(dry_run)
-edm.save_figure(fig, fig_filename, add_timestamp=False)
+# # fh_12_11_components_vs_beta
+# fig = plot_amplitudes_vs_beta(2, 1, 1, 2, [1, 1], False, n_steps)
+# fig_filename = "fh_12_11_components_vs_beta"
+# show_if_dry(dry_run)
+# edm.save_figure(fig, fig_filename, add_timestamp=False)
 
 
-# fh22_22_components_vs_beta
-fig = plot_amplitudes_vs_beta(2, 2, 1, 2, [2, 2], False, n_steps)
-fig_filename = "fh22_22_components_vs_beta"
-show_if_dry(dry_run)
-edm.save_figure(fig, fig_filename, add_timestamp=False)
+# # fh22_22_components_vs_beta
+# fig = plot_amplitudes_vs_beta(2, 2, 1, 2, [2, 2], False, n_steps)
+# fig_filename = "fh22_22_components_vs_beta"
+# show_if_dry(dry_run)
+# edm.save_figure(fig, fig_filename, add_timestamp=False)
 
 
 edm.save_dict_to_experiment(jobj)

@@ -432,30 +432,44 @@ def fidelity(a: np.ndarray, b: np.ndarray) -> float:
         return np.real(np.trace(final_mat) ** 2)
 
 
+def print_state_fidelity_to_eigenstates(
+    state: np.ndarray,
+    eigenenergies: np.ndarray,
+    eigenstates: np.ndarray,
+    expanded: bool = True,
+):
+    eig_fids = state_fidelity_to_eigenstates(
+        state=state,
+        eigenstates=eigenstates,
+        expanded=expanded,
+    )
+    print("Initial populations")
+    for ind, (fid, sys_eig_energy) in enumerate(zip(eig_fids, eigenenergies)):
+        if not np.isclose(fid, 0):
+            print(
+                f"E_{ind}: fid: {np.abs(fid):.4f} gap: {np.abs(sys_eig_energy-eigenenergies[0]):.3f}"
+            )
+    print(f"sum fids {sum(eig_fids)}")
+
+
 def state_fidelity_to_eigenstates(
     state: np.ndarray,
     eigenstates: np.ndarray,
     expanded: bool = True,
-    subspace_simulation: bool = False,
 ):
     # eigenstates have shape N * M where M is the number of eigenstates
 
     fids = []
 
     for jj in range(eigenstates.shape[1]):
-        if expanded:
-            fids.append(
-                fidelity_wrapper(
-                    state,
-                    eigenstates[:, jj],
-                    qid_shape=(2,) * int(np.log2(len(state))),
-                    subspace_simulation=subspace_simulation,
-                )
+        fids.append(
+            fidelity_wrapper(
+                state,
+                eigenstates[:, jj],
+                qid_shape=(2,) * int(np.log2(len(state))),
+                subspace_simulation=not expanded,
             )
-        else:
-            # in case we have fermionic vectors which aren't 2**n
-            # expanded refers to jw_ restricted spaces functions
-            fids.append(fidelity(state, eigenstates[:, jj]))
+        )
     return fids
 
 

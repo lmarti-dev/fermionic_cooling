@@ -79,7 +79,7 @@ def comparison_ngaps(edm, n_gaps):
         expanded=True,
     )
 
-    slater_index = 2
+    slater_index = 0
     sys_slater_state = start_eig_states[:, slater_index]
     sys_eig_energies, sys_eig_states = jw_eigenspectrum_at_particle_number(
         sparse_operator=get_sparse_operator(

@@ -304,6 +304,8 @@ class Cooler:
         sweep_values: Iterable[float],
         pooling_method: str = "max",
         use_trotter: bool = False,
+        random_coupler: bool = False,
+        weights: list = None,
     ):
         initial_density_matrix = self.total_initial_state
         if not cirq.is_hermitian(initial_density_matrix):
@@ -334,7 +336,16 @@ class Cooler:
             temp_fidelities = []
             temp_sys_energies = []
             temp_env_energies = []
-            for coupler_idx in range(self.get_coupler_number(rep=None)):
+            n_couplers = self.get_coupler_number(rep=None)
+            if random_coupler is not None:
+                if weights is not None:
+                    p_kwargs = {"p": weights}
+                else:
+                    p_kwargs = {}
+                coupler_indices = [np.random.choice(np.arange(n_couplers), **p_kwargs)]
+            else:
+                coupler_indices = range(n_couplers)
+            for coupler_idx in coupler_indices:
                 self.update_message(
                     "coupn",
                     f"coupler number {coupler_idx}",
@@ -387,7 +398,9 @@ class Cooler:
                 sys_energies.append(pool_fn(temp_sys_energies))
                 env_energies.append(pool_fn(temp_env_energies))
 
-        final_sys_density_matrix = self.partial_trace_wrapper(rho=total_density_matrix)
+        final_sys_density_matrix = self.partial_trace_wrapper(
+            rho=total_density_matrix, which="env"
+        )
 
         self.msg_out()
         return fidelities, sys_energies, env_energies, final_sys_density_matrix
@@ -789,6 +802,7 @@ class Cooler:
         suptitle: str = None,
         plot_infidelity: bool = True,
         substract_energy: float = 0,
+        annotate_gaps: bool = True,
     ):
         more_than_one_rep = len(env_energies) > 1
         nrows = 2
@@ -833,23 +847,32 @@ class Cooler:
                     np.array(np.array(env_energies[rep][1:])) - substract_energy,
                     **kwargs,
                 )
-                ax_bottom.set_ylabel(r"$|E_F-\langle E_F \rangle|$")
+                ax_bottom.set_ylabel(r"$|E_F-\langle E_F \rangle|/\omega$")
             else:
                 ax_bottom.plot(
                     omegas[rep][1:],
                     env_energies[rep][1:],
                     **kwargs,
                 )
-                ax_bottom.set_ylabel(r"$E_F$")
+                ax_bottom.set_ylabel(r"$E_F/\omega$")
         all_env_energies = np.array(list(flatten(env_energies)))
         for ind, spectrum in enumerate(eigenspectrums):
+            ymax = np.nanmax(all_env_energies[np.isfinite(all_env_energies)])
             ax_bottom.vlines(
                 spectrum,
                 ymin=0,
-                ymax=np.nanmax(all_env_energies[np.isfinite(all_env_energies)]),
+                ymax=ymax,
                 linestyle="--",
                 color=spectrum_cmap(ind),
             )
+            for ray in sorted(list(set(spectrum))):
+                inds = np.where(
+                    np.array(np.round(spectrum, decimals=5))
+                    == np.round(ray, decimals=5)
+                )[0].astype("str")
+                ax_bottom.annotate(
+                    f"{', '.join(inds)}", (ray, ymax * 1.1), ha="center", va="center"
+                )
         if plot_infidelity:
             axes_0_label = r"Infidelity"
         else:
@@ -858,6 +881,7 @@ class Cooler:
 
         ax_bottom.tick_params(axis="y")
         ax_bottom.set_yscale("log")
+        ax_bottom.set_ylim([1e-4, 1])
 
         max_gap = np.abs(omegas[rep][-1] - omegas[rep][0])
         ax_bottom.set_xlim(

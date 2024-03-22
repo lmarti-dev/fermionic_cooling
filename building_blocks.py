@@ -71,8 +71,14 @@ def get_cheat_coupler_list(
     # in case there are multiple ground states we can cool to (if I may say so)
     if max_k is None:
         max_k = sys_eig_states.shape[1]
+
+    if isinstance(max_k, list):
+        c_range = max_k
+    else:
+        c_range = range(max_k)
+
     for gs_index in gs_indices:
-        k_range = [k for k in range(max_k) if k != gs_index]
+        k_range = [k for k in c_range if k != gs_index]
         for k in k_range:
             # |sys_0Xsys_k| O |env_1Xenv_0|
             if use_pauli_x:
@@ -85,7 +91,7 @@ def get_cheat_coupler_list(
                 ),
                 env_part,
             )
-            if abs(noise) > 0:
+            if noise is not None:
                 noisy_coupler = np.random.rand(*coupler.shape)
                 coupler = coupler + (noise * noisy_coupler)
             coupler = coupler + np.conjugate(np.transpose(coupler))

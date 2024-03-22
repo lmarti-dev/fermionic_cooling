@@ -53,14 +53,13 @@ def plot_comparison_fast_sweep(
                 color=colors[ind],
             )
             axes[1].set_yscale("log")
-            axes[1].set_ylabel(r"$|\Delta T_F|$")
         else:
             axes[1].plot(
                 jobj["omegas"][0],
                 jobj["env_ev_energies"][0],
                 color=colors[ind],
             )
-        axes[1].set_ylabel(r"$E_F$")
+        axes[1].set_ylabel(r"$E_F/\omega$")
 
     all_energies = np.array(list(flatten(jobj["env_ev_energies"])))
 

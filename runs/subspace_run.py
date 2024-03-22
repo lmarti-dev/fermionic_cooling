@@ -40,15 +40,16 @@ from fermionic_cooling.utils import (
     fidelity,
     two_tensor_partial_trace,
     dense_restricted_ham,
+    print_state_fidelity_to_eigenstates,
 )
 
 
 def __main__(args):
     # whether we want to skip all saving data
-    dry_run = True
+    dry_run = False
     edm = ExperimentDataManager(
         experiment_name="fh_bigbrain_subspace",
-        notes="fh cooling with subspace simulation, aiming for larger systems",
+        notes="fh cooling with subspace simulation, with coulomb",
         dry_run=dry_run,
     )
     use_style()
@@ -67,10 +68,19 @@ def __main__(args):
             couplers_fock_hamiltonian = start_fock_hamiltonian
     # define inverse temp
 
-    gs_index = 2
-    free_sys_eig_energies, free_sys_eig_states = jw_eigenspectrum_at_particle_number(
+    coupler_sys_eig_energies, couplers_sys_eig_states = (
+        jw_eigenspectrum_at_particle_number(
+            sparse_operator=get_sparse_operator(
+                couplers_fock_hamiltonian,
+                n_qubits=len(model.flattened_qubits),
+            ),
+            particle_number=n_electrons,
+            expanded=False,
+        )
+    )
+    start_sys_eig_energies, start_sys_eig_states = jw_eigenspectrum_at_particle_number(
         sparse_operator=get_sparse_operator(
-            couplers_fock_hamiltonian,
+            start_fock_hamiltonian,
             n_qubits=len(model.flattened_qubits),
         ),
         particle_number=n_electrons,
@@ -85,8 +95,6 @@ def __main__(args):
     sys_hartree_fock = np.zeros((subspace_dim,))
     sys_hartree_fock[0] = 1
 
-    sys_slater_state = free_sys_eig_states[:, gs_index]
-
     sys_eig_energies, sys_eig_states = jw_eigenspectrum_at_particle_number(
         sparse_operator=get_sparse_operator(
             model.fock_hamiltonian,
@@ -97,20 +105,19 @@ def __main__(args):
     )
 
     # initial state setting
-    sys_initial_state = ketbra(sys_slater_state)
+    gs_index = 2
+    sys_initial_state = ketbra(start_sys_eig_states[:, gs_index])
 
     sys_ground_state = sys_eig_states[:, np.argmin(sys_eig_energies)]
     sys_ground_energy = np.min(sys_eig_energies)
 
-    eig_fids = state_fidelity_to_eigenstates(
-        state=sys_initial_state, eigenstates=sys_eig_states, expanded=False
+    print("BEFORE SWEEP")
+    print_state_fidelity_to_eigenstates(
+        state=sys_initial_state,
+        eigenenergies=sys_eig_energies,
+        eigenstates=sys_eig_states,
+        expanded=False,
     )
-    print("Initial populations")
-    for fid, sys_eig_energy in zip(eig_fids, sys_eig_energies):
-        print(
-            f"fid: {np.abs(fid):.4f} gap: {np.abs(sys_eig_energy-sys_eig_energies[0]):.3f}"
-        )
-    print(f"sum fids {sum(eig_fids)}")
     sys_initial_energy = subspace_energy_expectation(
         sys_initial_state, sys_eig_energies, sys_eig_states
     )
@@ -145,14 +152,15 @@ def __main__(args):
         model=model.to_json_dict()["constructor_params"],
     )
 
-    max_k = 6
+    max_k = 16
 
+    coupler_gs_index = 2
     couplers = get_cheat_coupler_list(
-        sys_eig_states=free_sys_eig_states,
+        sys_eig_states=couplers_sys_eig_states,
         env_eig_states=env_eig_states,
         qubits=sys_qubits + env_qubits,
-        gs_indices=(gs_index,),
-        noise=0,
+        gs_indices=(coupler_gs_index,),
+        noise=None,
         max_k=max_k,
     )  # Interaction only on Qubit 0?
     print("coupler done")
@@ -163,7 +171,7 @@ def __main__(args):
     # get environment ham sweep values
     spectrum_width = max(sys_eig_energies) - min(sys_eig_energies)
 
-    min_gap = get_min_gap(free_sys_eig_energies, threshold=1e-6)
+    min_gap = get_min_gap(coupler_sys_eig_energies, threshold=1e-6)
 
     # evolution_time = 1e-3
 
@@ -173,14 +181,14 @@ def __main__(args):
     is_noise_spin_conserving = False
 
     if use_fast_sweep:
-        sweep_time_mult = 0.01
-        initial_ground_state = ketbra(sys_slater_state)
+        sweep_time_mult = 1
+        initial_ground_state = sys_initial_state
         final_ground_state = sys_eig_states[:, 0]
         ham_start = dense_restricted_ham(
             start_fock_hamiltonian, n_electrons, n_sys_qubits
         )
         ham_stop = sys_ham_matrix
-        n_steps = 5
+        n_steps = 10
         total_sweep_time = (
             sweep_time_mult
             * spectrum_width
@@ -212,6 +220,14 @@ def __main__(args):
     else:
         total_sweep_time = 0
 
+    print("AFTER SWEEP")
+    print_state_fidelity_to_eigenstates(
+        state=sys_initial_state,
+        eigenenergies=sys_eig_energies,
+        eigenstates=sys_eig_states,
+        expanded=False,
+    )
+
     cooler = Cooler(
         sys_hamiltonian=sys_ham_matrix,
         n_electrons=n_electrons,
@@ -230,11 +246,11 @@ def __main__(args):
 
     print(f"coupler dim: {cooler.sys_env_coupler_data_dims}")
 
-    ansatz_options = {"beta": 1, "mu": 30, "c": 20}
-    weaken_coupling = 100
+    ansatz_options = {"beta": 1, "mu": 40, "c": 30, "clamp": False}
+    weaken_coupling = 50
 
-    start_omega = 1.75
-    stop_omega = 0.3
+    start_omega = spectrum_width / 2
+    stop_omega = 0.1
 
     method = "bigbrain"
 
@@ -245,10 +261,12 @@ def __main__(args):
         max_k=max_k,
         ansatz_options=ansatz_options,
         method=method,
+        gs_index=gs_index,
+        coupler_gs_index=coupler_gs_index,
     )
 
     coupler_transitions = np.abs(
-        np.array(free_sys_eig_energies[1:]) - free_sys_eig_energies[0]
+        np.array(coupler_sys_eig_energies[1:]) - coupler_sys_eig_energies[0]
     )
 
     (

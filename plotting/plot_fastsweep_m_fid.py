@@ -69,7 +69,7 @@ def plot_fast_sweep_vs_m(dirname, max_sweep_fid=None):
         )
 
     ax.set_ylabel("Final fidelity")
-    ax.set_xlabel(r"$M$")
+    ax.set_xlabel(r"$d_c$")
     ax.xaxis.set_major_locator(MaxNLocator(integer=True))
 
     ax.legend(loc="center right", bbox_to_anchor=(1, 0.3))
