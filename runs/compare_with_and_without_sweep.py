@@ -21,7 +21,7 @@ from fermionic_cooling.utils import (
     expectation_wrapper,
     get_min_gap,
     ketbra,
-    state_fidelity_to_eigenstates,
+    print_state_fidelity_to_eigenstates,
 )
 
 from chemical_models.specificModel import SpecificModel
@@ -79,8 +79,8 @@ def comparison_ngaps(edm, n_gaps):
         expanded=True,
     )
 
-    slater_index = 0
-    sys_slater_state = start_eig_states[:, slater_index]
+    start_gs_index = 0
+    sys_start_state = start_eig_states[:, start_gs_index]
     sys_eig_energies, sys_eig_states = jw_eigenspectrum_at_particle_number(
         sparse_operator=get_sparse_operator(
             model.fock_hamiltonian,
@@ -93,20 +93,18 @@ def comparison_ngaps(edm, n_gaps):
     start_omega = 1.1 * (sys_eig_energies[n_gaps] - sys_eig_energies[0])
     stop_omega = 0.8
     # initial state setting
-    sys_initial_state = ketbra(sys_slater_state)
+    sys_initial_state = ketbra(sys_start_state)
 
     sys_ground_state = sys_eig_states[:, np.argmin(sys_eig_energies)]
     sys_ground_energy = np.min(sys_eig_energies)
 
-    eig_fids = state_fidelity_to_eigenstates(
-        state=sys_initial_state, eigenstates=sys_eig_states
+    print("BEFORE SWEEP")
+    print_state_fidelity_to_eigenstates(
+        state=sys_initial_state,
+        eigenenergies=sys_eig_states,
+        eigenstates=sys_eig_states,
+        expanded=False,
     )
-    print("Initial populations")
-    for fid, sys_eig_energy in zip(eig_fids, sys_eig_energies):
-        print(
-            f"fid: {np.abs(fid):.4f} gap: {np.abs(sys_eig_energy-sys_eig_energies[0]):.3f}"
-        )
-    print(f"sum fids {sum(eig_fids)}")
     sys_initial_energy = expectation_wrapper(
         model.hamiltonian, sys_initial_state, model.flattened_qubits
     )
@@ -141,7 +139,7 @@ def comparison_ngaps(edm, n_gaps):
         sys_eig_states=free_sys_eig_states,
         env_eig_states=env_eig_states,
         qubits=sys_qubits + env_qubits,
-        gs_indices=(slater_index,),
+        gs_indices=(start_gs_index,),
         noise=0,
         max_k=max_k,
         use_pauli_x=False,
@@ -166,7 +164,7 @@ def comparison_ngaps(edm, n_gaps):
 
         if which_initial_process == "adiabatic":
             # call sweep
-            initial_ground_state = ketbra(sys_slater_state)
+            initial_ground_state = ketbra(sys_start_state)
             final_ground_state = sys_eig_states[:, 0]
             ham_start = fermion_to_dense(start_fock_hamiltonian)
             ham_stop = fermion_to_dense(model.fock_hamiltonian)
@@ -197,7 +195,7 @@ def comparison_ngaps(edm, n_gaps):
             )
             sys_initial_state = final_state
         elif which_initial_process == "none":
-            sys_initial_state = sys_slater_state
+            sys_initial_state = sys_start_state
         cooler = Cooler(
             sys_hamiltonian=model.hamiltonian,
             n_electrons=n_electrons,
@@ -211,12 +209,20 @@ def comparison_ngaps(edm, n_gaps):
             verbosity=5,
         )
 
+        print("after sweep")
+        print_state_fidelity_to_eigenstates(
+            state=sys_initial_state,
+            eigenenergies=sys_eig_states,
+            eigenstates=sys_eig_states,
+            expanded=False,
+        )
+
         n_rep = 1
 
         print(f"coupler dim: {cooler.sys_env_coupler_data_dims}")
 
-        ansatz_options = {"beta": 1, "mu": 30, "c": 20}
-        weaken_coupling = 20
+        ansatz_options = {"beta": 1, "mu": 30, "c": 40}
+        weaken_coupling = 10
 
         dump_vars = {
             "start_omega": start_omega,
