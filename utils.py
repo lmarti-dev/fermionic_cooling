@@ -444,10 +444,10 @@ def print_state_fidelity_to_eigenstates(
         expanded=expanded,
     )
     print("Initial populations")
-    for ind, (fid, eigenenergies) in enumerate(zip(eig_fids, eigenenergies)):
+    for ind, (fid, eigenenergy) in enumerate(zip(eig_fids, eigenenergies)):
         if not np.isclose(fid, 0):
             print(
-                f"E_{ind}: fid: {np.abs(fid):.4f} gap: {np.abs(np.array(eigenenergies)-eigenenergies[0]):.3f}"
+                f"E_{ind}: fid: {np.abs(fid):.4f} gap: {np.abs(eigenenergy-eigenenergies[0]):.3f}"
             )
     print(f"sum fids {sum(eig_fids)}")
 

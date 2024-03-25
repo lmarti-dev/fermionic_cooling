@@ -39,9 +39,9 @@ def comparison_ngaps(edm, n_gaps):
 
     model_name = "fh_coulomb"
     if "fh_" in model_name:
-        model = FermiHubbardModel(x_dimension=2, y_dimension=2, tunneling=1, coulomb=2)
+        model = FermiHubbardModel(x_dimension=3, y_dimension=3, tunneling=1, coulomb=2)
         n_qubits = len(model.flattened_qubits)
-        n_electrons = [2, 2]
+        n_electrons = [3, 3]
         if "coulomb" in model_name:
             start_fock_hamiltonian = model.coulomb_model.fock_hamiltonian
             couplers_fock_hamiltonian = model.non_interacting_model.fock_hamiltonian
@@ -101,7 +101,7 @@ def comparison_ngaps(edm, n_gaps):
     print("BEFORE SWEEP")
     print_state_fidelity_to_eigenstates(
         state=sys_initial_state,
-        eigenenergies=sys_eig_states,
+        eigenenergies=sys_eig_energies,
         eigenstates=sys_eig_states,
         expanded=False,
     )
@@ -212,7 +212,7 @@ def comparison_ngaps(edm, n_gaps):
         print("after sweep")
         print_state_fidelity_to_eigenstates(
             state=sys_initial_state,
-            eigenenergies=sys_eig_states,
+            eigenenergies=sys_eig_energies,
             eigenstates=sys_eig_states,
             expanded=False,
         )
