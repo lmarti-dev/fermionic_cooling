@@ -47,6 +47,7 @@ from fermionic_cooling.utils import (
 def __main__(args):
     # whether we want to skip all saving data
     dry_run = False
+    dry_run = False
     edm = ExperimentDataManager(
         experiment_name="fh_bigbrain_subspace",
         notes="fh cooling with subspace simulation, with coulomb",
@@ -57,9 +58,9 @@ def __main__(args):
 
     model_name = "fh_coulomb"
     if "fh_" in model_name:
-        model = FermiHubbardModel(x_dimension=2, y_dimension=2, tunneling=1, coulomb=2)
+        model = FermiHubbardModel(x_dimension=3, y_dimension=2, tunneling=1, coulomb=2)
         n_qubits = len(model.flattened_qubits)
-        n_electrons = [2, 2]
+        n_electrons = [3, 3]
         if "coulomb" in model_name:
             start_fock_hamiltonian = model.coulomb_model.fock_hamiltonian
             couplers_fock_hamiltonian = model.non_interacting_model.fock_hamiltonian
@@ -68,17 +69,8 @@ def __main__(args):
             couplers_fock_hamiltonian = start_fock_hamiltonian
     # define inverse temp
 
-    coupler_sys_eig_energies, couplers_sys_eig_states = (
-        jw_eigenspectrum_at_particle_number(
-            sparse_operator=get_sparse_operator(
-                couplers_fock_hamiltonian,
-                n_qubits=len(model.flattened_qubits),
-            ),
-            particle_number=n_electrons,
-            expanded=False,
-        )
-    )
-    start_sys_eig_energies, start_sys_eig_states = jw_eigenspectrum_at_particle_number(
+    gs_index = 0
+    free_sys_eig_energies, free_sys_eig_states = jw_eigenspectrum_at_particle_number(
         sparse_operator=get_sparse_operator(
             start_fock_hamiltonian,
             n_qubits=len(model.flattened_qubits),
@@ -92,6 +84,7 @@ def __main__(args):
     subspace_dim = len(
         list(combinations(range(n_sys_qubits // 2), n_electrons[0]))
     ) * len(list(combinations(range(n_sys_qubits // 2), n_electrons[1])))
+    print(f"SUBSPACE: {subspace_dim} matrices will be {subspace_dim**2}")
     sys_hartree_fock = np.zeros((subspace_dim,))
     sys_hartree_fock[0] = 1
 
@@ -152,7 +145,7 @@ def __main__(args):
         model=model.to_json_dict()["constructor_params"],
     )
 
-    max_k = 16
+    max_k = 30
 
     coupler_gs_index = 2
     couplers = get_cheat_coupler_list(
@@ -188,6 +181,7 @@ def __main__(args):
             start_fock_hamiltonian, n_electrons, n_sys_qubits
         )
         ham_stop = sys_ham_matrix
+        n_steps = 10
         n_steps = 10
         total_sweep_time = (
             sweep_time_mult
@@ -246,11 +240,11 @@ def __main__(args):
 
     print(f"coupler dim: {cooler.sys_env_coupler_data_dims}")
 
-    ansatz_options = {"beta": 1, "mu": 40, "c": 30, "clamp": False}
+    ansatz_options = {"beta": 1, "mu": 30, "c": 40}
     weaken_coupling = 50
 
-    start_omega = spectrum_width / 2
-    stop_omega = 0.1
+    start_omega = spectrum_width / 3
+    stop_omega = 1
 
     method = "bigbrain"
 
