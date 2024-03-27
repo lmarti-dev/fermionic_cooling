@@ -154,7 +154,7 @@ if __name__ == "__main__":
 
     # eigvecs = np.round(eigvecs, 4)
 
-    edm.dump_some_variables(
+    edm.var_dump(
         n_electrons=n_electrons,
         matrix=matrix,
         model=model.to_json_dict()["constructor_params"],
@@ -185,7 +185,7 @@ if __name__ == "__main__":
 
     total_coefficients, max_pauli_strs = get_coeffs_and_maxpstr(jw_couplers)
 
-    edm.save_dict_to_experiment(
+    edm.save_dict(
         {
             "bogos_up": bogos_up,
             "bogos_down": bogos_down,

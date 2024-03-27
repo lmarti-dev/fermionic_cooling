@@ -60,7 +60,7 @@ def probe_times(
         "energies": energies,
         "env_energy_dynamics": env_energy_dynamics,
     }
-    edm.save_dict_to_experiment(jobj=jobj)
+    edm.save_dict(jobj=jobj)
     edm.save_figure(fig)
     plt.show()
 
@@ -127,7 +127,7 @@ def __main__(args):
         n_qubits=n_env_qubits
     )
 
-    edm.dump_some_variables(
+    edm.var_dump(
         n_electrons=n_electrons,
         n_sys_qubits=n_sys_qubits,
         n_env_qubits=n_env_qubits,
@@ -187,7 +187,7 @@ def __main__(args):
         "env_energies": env_energies,
         # "final_sys_density_matrix": final_sys_density_matrix,
     }
-    edm.save_dict_to_experiment(jobj=jobj)
+    edm.save_dict(jobj=jobj)
 
     print("Final Fidelity: {}".format(fidelities[-1]))
 

@@ -120,7 +120,7 @@ def run_comp(edm, model_name):
     total_time = 1000
     n_steps = 30000
 
-    edm.dump_some_variables(
+    edm.var_dump(
         model_name=model_name,
         n_qubits=n_qubits,
         n_electrons=n_electrons,
@@ -162,7 +162,7 @@ def run_comp(edm, model_name):
             f"E_{ind} init pop: {a:.3f} dE: {start_sys_eig_energies[ind]-start_sys_eig_energies[0]:.3f} final pop {b:.3f} dE: {sys_eig_energies[ind]-sys_eig_energies[0]:.3f}"
         )
 
-    edm.save_dict_to_experiment(
+    edm.save_dict(
         {
             "times": np.linspace(0, total_time, len(fidelities)),
             "n_steps": n_steps,

@@ -133,7 +133,7 @@ def __main__(args):
         n_qubits=n_env_qubits
     )
 
-    edm.dump_some_variables(
+    edm.var_dump(
         n_electrons=n_electrons,
         n_sys_qubits=n_sys_qubits,
         n_env_qubits=n_env_qubits,
@@ -272,7 +272,7 @@ def __main__(args):
                 "sys_energies": sys_ev_energies,
                 "env_energies": env_ev_energies,
             }
-            edm.save_dict_to_experiment(filename="cooling_free", jobj=jobj)
+            edm.save_dict(filename="cooling_free", jobj=jobj)
 
             fig = cooler.plot_controlled_cooling(
                 fidelities=fidelities,
@@ -288,7 +288,7 @@ def __main__(args):
 
             print(f"coupler number: {ind} final fidelity: {fidelities[0][-1]}")
             # plt.show()
-            edm.dump_some_variables(
+            edm.var_dump(
                 coupler_number=ind,
                 final_fidelity=fidelities[0][-1],
                 delta_fidelity=fidelities[0][-1] - fidelities[0][0],

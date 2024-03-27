@@ -97,7 +97,7 @@ jobj = {
     "env_energies": env_energies,
     # "final_sys_density_matrix": final_sys_density_matrix,
 }
-edm.save_dict_to_experiment(jobj=jobj)
+edm.save_dict(jobj=jobj)
 
 print("Final Fidelity: {}".format(fidelities[-1]))
 

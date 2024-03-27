@@ -104,9 +104,7 @@ def probe_reps_with_noise(
                 "fidelities": fidelities,
                 "energies": energies,
             }
-            edm.save_dict_to_experiment(
-                filename=f"data_noise_{n_rep}_{noise:.4f}", jobj=jobj
-            )
+            edm.save_dict(filename=f"data_noise_{n_rep}_{noise:.4f}", jobj=jobj)
 
             end_fidelities[n_rep, noise_ind] = fidelities[-1]
     fig, ax = plt.subplots()
@@ -209,7 +207,7 @@ def probe_alpha_with_noise(
                 "fidelities": fidelities,
                 "energies": energies,
             }
-            edm.save_dict_to_experiment(
+            edm.save_dict(
                 filename=f"data_noise_{weaken_coupling:.3f}_{noise:.4f}", jobj=jobj
             )
 
@@ -310,7 +308,7 @@ def probe_noise(
             "fidelities": fidelities,
             "energies": energies,
         }
-        edm.save_dict_to_experiment(
+        edm.save_dict(
             filename=f"data_noise_{weaken_coupling:.3f}_{noise:.4f}", jobj=jobj
         )
 
@@ -388,7 +386,7 @@ def __main__(args):
         n_qubits=n_env_qubits
     )
 
-    edm.dump_some_variables(
+    edm.var_dump(
         n_electrons=n_electrons,
         n_sys_qubits=n_sys_qubits,
         n_env_qubits=n_env_qubits,

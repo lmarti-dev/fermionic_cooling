@@ -141,7 +141,7 @@ def __main__(args):
         n_qubits=n_env_qubits
     )
 
-    edm.dump_some_variables(
+    edm.var_dump(
         n_electrons=n_electrons,
         n_sys_qubits=n_sys_qubits,
         n_env_qubits=n_env_qubits,
@@ -253,7 +253,7 @@ def __main__(args):
 
     method = "bigbrain"
 
-    edm.dump_some_variables(
+    edm.var_dump(
         depol_noise=depol_noise,
         use_fast_sweep=use_fast_sweep,
         is_noise_spin_conserving=is_noise_spin_conserving,
@@ -292,7 +292,7 @@ def __main__(args):
             "sys_energies": sys_ev_energies,
             "env_energies": env_ev_energies,
         }
-        edm.save_dict_to_experiment(filename="cooling_free", jobj=jobj)
+        edm.save_dict(filename="cooling_free", jobj=jobj)
 
         fig = cooler.plot_controlled_cooling(
             fidelities=fidelities,
@@ -346,7 +346,7 @@ def __main__(args):
             "total_sweep_time": total_sweep_time,
             "total_cooling_time": cooler.total_cooling_time,
         }
-        edm.save_dict_to_experiment(filename="cooling_free_couplers", jobj=jobj)
+        edm.save_dict(filename="cooling_free_couplers", jobj=jobj)
 
         fig, ax = plt.subplots()
 

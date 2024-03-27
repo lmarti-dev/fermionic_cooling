@@ -60,7 +60,7 @@ total_qubits = sys_qubits + env_qubits
 coupler_index = 1
 gs_index = 0
 
-edm.dump_some_variables(
+edm.var_dump(
     n_electrons=n_electrons,
     model=model.to_json_dict()["constructor_params"],
     coupler_index=coupler_index,

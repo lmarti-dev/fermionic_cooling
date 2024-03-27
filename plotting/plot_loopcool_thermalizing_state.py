@@ -33,7 +33,7 @@ if __name__ == "__main__":
     jobj = load_json(fpath)
     fig = plot_fid_progression(jobj["fidelities"])
 
-    edm.dump_some_variables(fpath=fpath)
+    edm.var_dump(fpath=fpath)
     edm.save_figure(
         fig, filename="single_therm_zipcool", add_timestamp=False, fig_shape="half-y"
     )

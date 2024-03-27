@@ -126,7 +126,7 @@ def comparison_ngaps(edm, n_gaps):
         n_qubits=n_env_qubits
     )
 
-    edm.dump_some_variables(
+    edm.var_dump(
         n_electrons=n_electrons,
         n_sys_qubits=n_sys_qubits,
         n_env_qubits=n_env_qubits,
@@ -234,7 +234,7 @@ def comparison_ngaps(edm, n_gaps):
             "total_cool_time": cooler.total_cooling_time,
             "weaken_coupling": weaken_coupling,
         }
-        edm.dump_some_variables(**dump_vars)
+        edm.var_dump(**dump_vars)
 
         (
             fidelities,
@@ -259,7 +259,7 @@ def comparison_ngaps(edm, n_gaps):
             "sys_energies": sys_ev_energies,
             "env_ev_energies": env_ev_energies,
         }
-        edm.save_dict_to_experiment(
+        edm.save_dict(
             filename=f"cooling_free_{which_initial_process}_n_gaps_{n_gaps}",
             jobj=jobj,
             return_fpath=True,

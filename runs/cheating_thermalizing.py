@@ -336,7 +336,7 @@ def main_run(edm: ExperimentDataManager, initial_beta, target_beta, **kwargs):
         subspace_simulation=True,
         time_evolve_method="expm",
     )
-    edm.dump_some_variables(
+    edm.var_dump(
         initial_beta=initial_beta,
         target_beta=target_beta,
         env_beta=env_beta,
@@ -378,7 +378,7 @@ def main_run(edm: ExperimentDataManager, initial_beta, target_beta, **kwargs):
             "env_energies": env_energies,
             # "final_sys_density_matrix": final_sys_density_matrix,
         }
-        edm.save_dict_to_experiment(
+        edm.save_dict(
             jobj=jobj,
             filename=f"thermalizin_free_{model_name}_{gs_index}",
             add_timestamp=False,
@@ -451,7 +451,7 @@ def main_run(edm: ExperimentDataManager, initial_beta, target_beta, **kwargs):
             "env_energies": env_ev_energies,
             "ansatz_options": ansatz_options,
         }
-        edm.save_dict_to_experiment(filename=f"cooling_free_{gs_index}", jobj=jobj)
+        edm.save_dict(filename=f"cooling_free_{gs_index}", jobj=jobj)
 
         dashes = "diff"
         if dashes == "diff":

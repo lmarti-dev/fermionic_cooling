@@ -195,4 +195,4 @@ jobj[fig_filename] = fpath
 # edm.save_figure(fig, fig_filename, add_timestamp=False)
 
 
-edm.save_dict_to_experiment(jobj)
+edm.save_dict(jobj)

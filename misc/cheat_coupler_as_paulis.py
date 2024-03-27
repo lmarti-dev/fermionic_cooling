@@ -60,4 +60,4 @@ if __name__ == "__main__":
 
     jobj = {"couplers": couplers}
 
-    edm.save_dict_to_experiment(jobj)
+    edm.save_dict(jobj)

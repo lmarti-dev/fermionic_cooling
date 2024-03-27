@@ -110,6 +110,6 @@ if __name__ == "__main__":
 
     fig = plot_fast_sweep_vs_m(dirname, max_sweep_fid=max_sweep_fid)
 
-    edm.dump_some_variables(start_ham=which)
+    edm.var_dump(start_ham=which)
     edm.save_figure(fig, fig_shape="half-y")
     plt.show()

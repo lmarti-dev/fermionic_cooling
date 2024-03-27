@@ -89,7 +89,7 @@ def plot_mms_fidelity_vs_beta(edm):
 
         n_steps = 200
 
-        edm.dump_some_variables(
+        edm.var_dump(
             model=model.to_json_dict()["constructor_params"], n_electrons=n_electrons
         )
 
