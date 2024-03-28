@@ -44,23 +44,13 @@ from fermionic_cooling.utils import (
 )
 
 
-def __main__(args):
-    # whether we want to skip all saving data
-    dry_run = False
-    dry_run = False
-    edm = ExperimentDataManager(
-        experiment_name="fh_bigbrain_subspace",
-        notes="fh cooling with subspace simulation, with coulomb",
-        dry_run=dry_run,
-    )
-    use_style()
-    # model stuff
+def __main__(edm, start_gs_index, coupler_gs_index):
 
     model_name = "fh_coulomb"
     if "fh_" in model_name:
-        model = FermiHubbardModel(x_dimension=3, y_dimension=2, tunneling=1, coulomb=2)
+        model = FermiHubbardModel(x_dimension=2, y_dimension=2, tunneling=1, coulomb=2)
         n_qubits = len(model.flattened_qubits)
-        n_electrons = [3, 3]
+        n_electrons = [2, 2]
         if "coulomb" in model_name:
             start_fock_hamiltonian = model.coulomb_model.fock_hamiltonian
             couplers_fock_hamiltonian = model.non_interacting_model.fock_hamiltonian
@@ -69,14 +59,23 @@ def __main__(args):
             couplers_fock_hamiltonian = start_fock_hamiltonian
     # define inverse temp
 
-    gs_index = 0
-    free_sys_eig_energies, free_sys_eig_states = jw_eigenspectrum_at_particle_number(
+    start_sys_eig_energies, start_sys_eig_states = jw_eigenspectrum_at_particle_number(
         sparse_operator=get_sparse_operator(
             start_fock_hamiltonian,
             n_qubits=len(model.flattened_qubits),
         ),
         particle_number=n_electrons,
         expanded=False,
+    )
+    couplers_sys_eig_energies, couplers_sys_eig_states = (
+        jw_eigenspectrum_at_particle_number(
+            sparse_operator=get_sparse_operator(
+                couplers_fock_hamiltonian,
+                n_qubits=len(model.flattened_qubits),
+            ),
+            particle_number=n_electrons,
+            expanded=False,
+        )
     )
 
     sys_qubits = model.flattened_qubits
@@ -85,8 +84,6 @@ def __main__(args):
         list(combinations(range(n_sys_qubits // 2), n_electrons[0]))
     ) * len(list(combinations(range(n_sys_qubits // 2), n_electrons[1])))
     print(f"SUBSPACE: {subspace_dim} matrices will be {subspace_dim**2}")
-    sys_hartree_fock = np.zeros((subspace_dim,))
-    sys_hartree_fock[0] = 1
 
     sys_eig_energies, sys_eig_states = jw_eigenspectrum_at_particle_number(
         sparse_operator=get_sparse_operator(
@@ -98,8 +95,7 @@ def __main__(args):
     )
 
     # initial state setting
-    gs_index = 2
-    sys_initial_state = ketbra(start_sys_eig_states[:, gs_index])
+    sys_initial_state = ketbra(start_sys_eig_states[:, start_gs_index])
 
     sys_ground_state = sys_eig_states[:, np.argmin(sys_eig_energies)]
     sys_ground_energy = np.min(sys_eig_energies)
@@ -145,9 +141,8 @@ def __main__(args):
         model=model.to_json_dict()["constructor_params"],
     )
 
-    max_k = 30
+    max_k = None
 
-    coupler_gs_index = 2
     couplers = get_cheat_coupler_list(
         sys_eig_states=couplers_sys_eig_states,
         env_eig_states=env_eig_states,
@@ -164,7 +159,7 @@ def __main__(args):
     # get environment ham sweep values
     spectrum_width = max(sys_eig_energies) - min(sys_eig_energies)
 
-    min_gap = get_min_gap(coupler_sys_eig_energies, threshold=1e-6)
+    min_gap = get_min_gap(couplers_sys_eig_energies, threshold=1e-6)
 
     # evolution_time = 1e-3
 
@@ -255,12 +250,12 @@ def __main__(args):
         max_k=max_k,
         ansatz_options=ansatz_options,
         method=method,
-        gs_index=gs_index,
+        start_gs_index=start_gs_index,
         coupler_gs_index=coupler_gs_index,
     )
 
     coupler_transitions = np.abs(
-        np.array(coupler_sys_eig_energies[1:]) - coupler_sys_eig_energies[0]
+        np.array(couplers_sys_eig_energies[1:]) - couplers_sys_eig_energies[0]
     )
 
     (
@@ -288,7 +283,9 @@ def __main__(args):
         "env_energies": env_ev_energies,
         "ansatz_options": ansatz_options,
     }
-    edm.save_dict(filename="cooling_free", jobj=jobj)
+    edm.save_dict(
+        filename=f"cooling_free_{start_gs_index}_{coupler_gs_index}", jobj=jobj
+    )
 
     fig = cooler.plot_controlled_cooling(
         fidelities=fidelities,
@@ -301,8 +298,19 @@ def __main__(args):
     edm.save_figure(
         fig,
     )
-    plt.show()
 
 
 if __name__ == "__main__":
-    __main__(sys.argv)
+    # whether we want to skip all saving data
+    dry_run = False
+    edm = ExperimentDataManager(
+        experiment_name="fh_bigbrain_subspace_gs_index",
+        notes="fh cooling from coulomb loop over gs index and coupler gs index",
+        dry_run=dry_run,
+    )
+    use_style()
+    # model stuff
+    for s1 in range(7):
+        for s2 in range(7):
+            __main__(edm, s1, s2)
+            edm.new_run()

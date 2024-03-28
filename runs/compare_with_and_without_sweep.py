@@ -59,13 +59,15 @@ def comparison_ngaps(edm, n_gaps):
             ignore_incompatible_terms=True,
         )
 
-    free_sys_eig_energies, free_sys_eig_states = jw_eigenspectrum_at_particle_number(
-        sparse_operator=get_sparse_operator(
-            couplers_fock_hamiltonian,
-            n_qubits=len(model.flattened_qubits),
-        ),
-        particle_number=n_electrons,
-        expanded=True,
+    couplers_sys_eig_energies, couplers_sys_eig_states = (
+        jw_eigenspectrum_at_particle_number(
+            sparse_operator=get_sparse_operator(
+                couplers_fock_hamiltonian,
+                n_qubits=len(model.flattened_qubits),
+            ),
+            particle_number=n_electrons,
+            expanded=True,
+        )
     )
 
     sys_qubits = model.flattened_qubits
@@ -136,7 +138,7 @@ def comparison_ngaps(edm, n_gaps):
     )
     max_k = n_gaps + 1
     couplers = get_cheat_coupler_list(
-        sys_eig_states=free_sys_eig_states,
+        sys_eig_states=couplers_sys_eig_states,
         env_eig_states=env_eig_states,
         qubits=sys_qubits + env_qubits,
         gs_indices=(start_gs_index,),
@@ -150,7 +152,7 @@ def comparison_ngaps(edm, n_gaps):
 
     # get environment ham sweep values
 
-    min_gap = get_min_gap(free_sys_eig_energies, threshold=1e-6)
+    min_gap = get_min_gap(couplers_sys_eig_energies, threshold=1e-6)
 
     # evolution_time = 1e-3
 
