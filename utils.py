@@ -164,7 +164,7 @@ def is_density_matrix(state):
     return len(state.shape) == 2
 
 
-def expectation_wrapper(observable, state, qubits):
+def expectation_wrapper(observable, state: np.ndarray, qubits: list[cirq.Qid]):
     if is_density_matrix(state):
         return np.real(
             observable.expectation_from_density_matrix(
@@ -259,10 +259,6 @@ def depth_indexing(_list, indices: Iterator):
             raise ValueError("Indices shorter than list depth")
         return depth_indexing(_list[ind], indices)
     return _list
-
-
-def subspace_partial_trace(rho: np.ndarray, n2: int):
-    pass
 
 
 def two_tensor_partial_trace(rho: np.ndarray, dim1: int, dim2: int, trace_out="dim2"):
