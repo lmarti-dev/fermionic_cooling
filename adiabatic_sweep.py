@@ -105,8 +105,8 @@ def run_sweep(
     single_unitary: bool = False,
     depol_noise: float = None,
     is_noise_spin_conserving: bool = False,
-    n_qubits: int = None,
     n_electrons: list = None,
+    n_qubits: int = None,
     subspace_simulation: bool = False,
 ):
     # set state to initial value
@@ -114,7 +114,10 @@ def run_sweep(
 
     # basic stuff
 
-    qid_shape = (2,) * n_qubits
+    if not subspace_simulation:
+        qid_shape = (2,) * n_qubits
+    else:
+        qid_shape = None
 
     sweep_hamiltonian = get_sweep_hamiltonian(ham_start=ham_start, ham_stop=ham_stop)
 
