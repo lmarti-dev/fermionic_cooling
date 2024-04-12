@@ -46,11 +46,11 @@ from fermionic_cooling.utils import (
 
 def __main__(edm, start_gs_index, coupler_gs_index):
 
-    model_name = "fh_coulomb"
+    model_name = "fh_slater"
     if "fh_" in model_name:
-        model = FermiHubbardModel(x_dimension=2, y_dimension=2, tunneling=1, coulomb=2)
+        model = FermiHubbardModel(x_dimension=3, y_dimension=2, tunneling=1, coulomb=2)
         n_qubits = len(model.flattened_qubits)
-        n_electrons = [2, 2]
+        n_electrons = [3, 3]
         if "coulomb" in model_name:
             start_fock_hamiltonian = model.coulomb_model.fock_hamiltonian
             couplers_fock_hamiltonian = model.non_interacting_model.fock_hamiltonian
@@ -235,11 +235,12 @@ def __main__(edm, start_gs_index, coupler_gs_index):
 
     print(f"coupler dim: {cooler.sys_env_coupler_data_dims}")
 
-    ansatz_options = {"beta": 1, "mu": 30, "c": 40}
-    weaken_coupling = 50
+    ansatz_options = {"beta": 1, "mu": 20, "c": 40}
+    weaken_coupling = 40
 
     start_omega = spectrum_width / 3
-    stop_omega = 1
+    start_omega = 3
+    stop_omega = 0.8
 
     method = "bigbrain"
 
@@ -300,17 +301,22 @@ def __main__(edm, start_gs_index, coupler_gs_index):
     )
 
 
-if __name__ == "__main__":
-    # whether we want to skip all saving data
-    dry_run = False
-    edm = ExperimentDataManager(
-        experiment_name="fh_bigbrain_subspace_gs_index",
-        notes="fh cooling from coulomb loop over gs index and coupler gs index",
-        dry_run=dry_run,
-    )
-    use_style()
-    # model stuff
+def loop_gs(edm):
     for s1 in range(7):
         for s2 in range(7):
             __main__(edm, s1, s2)
             edm.new_run()
+
+
+if __name__ == "__main__":
+    # whether we want to skip all saving data
+    dry_run = False
+    edm = ExperimentDataManager(
+        experiment_name="fh_bigbrain_subspace_bigmodels",
+        notes="fh cooling from coulomb with",
+        project="fermionic cooling",
+        dry_run=dry_run,
+    )
+    use_style()
+    __main__(edm, 0, 0)
+    # model stuff
