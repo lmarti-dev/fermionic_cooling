@@ -384,7 +384,7 @@ def ndarray_to_psum(
     return pauli_sum
 
 
-def fidelity(a: np.ndarray, b: np.ndarray) -> float:
+def fidelity(a: np.ndarray, b: np.ndarray, use_eigvals: bool = False) -> float:
     """Returns the quantum fidelity between two objects, each of with being either a wavefunction (a vector) or a density matrix
     Args:
         a (np.ndarray): the first object
@@ -420,12 +420,20 @@ def fidelity(a: np.ndarray, b: np.ndarray) -> float:
                     "expected vector or matrix, got {}dimensions".format(item.shape)
                 )
 
-        items[0] = sqrtm(items[0])
-        rho_sigma_rho = chained_matrix_multiplication(
-            np.matmul, items[0], items[1], items[0]
-        )
-        final_mat = sqrtm(rho_sigma_rho)
-        return np.real(np.trace(final_mat) ** 2)
+        if use_eigvals:
+            raise NotImplementedError("This part doesn't work yet")
+            eigvals_a = np.linalg.eigvalsh(items[0])
+            eigvals_b = np.linalg.eigvalsh(items[1])
+            sqrt_eigvals_a = np.sqrt(eigvals_a + 0j)
+            rho_sigma_rho = sqrt_eigvals_a * eigvals_b * sqrt_eigvals_a
+            return np.real(np.sum(np.sqrt(rho_sigma_rho)) ** 2)
+        else:
+            items[0] = sqrtm(np.round(items[0], 10) + 0j)
+            rho_sigma_rho = chained_matrix_multiplication(
+                np.matmul, items[0], np.round(items[1], 10), items[0]
+            )
+            final_mat = sqrtm(rho_sigma_rho)
+            return np.real(np.trace(final_mat) ** 2)
 
 
 def print_state_fidelity_to_eigenstates(

@@ -44,20 +44,26 @@ from fermionic_cooling.utils import (
 )
 
 
-def __main__(edm, start_gs_index, coupler_gs_index):
+def __main__(edm: ExperimentDataManager, start_gs_index, coupler_gs_index):
 
-    model_name = "fh_slater"
+    model_name = "cooked/water_singlet_6e_10q"
     if "fh_" in model_name:
-        model = FermiHubbardModel(x_dimension=3, y_dimension=2, tunneling=1, coulomb=2)
+        model = FermiHubbardModel(x_dimension=3, y_dimension=3, tunneling=1, coulomb=2)
         n_qubits = len(model.flattened_qubits)
-        n_electrons = [3, 3]
+        n_electrons = [2, 1]
         if "coulomb" in model_name:
             start_fock_hamiltonian = model.coulomb_model.fock_hamiltonian
             couplers_fock_hamiltonian = model.non_interacting_model.fock_hamiltonian
         elif "slater" in model_name:
             start_fock_hamiltonian = model.non_interacting_model.fock_hamiltonian
             couplers_fock_hamiltonian = start_fock_hamiltonian
-    # define inverse temp
+    else:
+        spm = SpecificModel(model_name=model_name)
+        model = spm.current_model
+        n_qubits = len(model.flattened_qubits)
+        n_electrons = spm.Nf
+        start_fock_hamiltonian = spm.current_model.quadratic_terms
+        couplers_fock_hamiltonian = start_fock_hamiltonian
 
     start_sys_eig_energies, start_sys_eig_states = jw_eigenspectrum_at_particle_number(
         sparse_operator=get_sparse_operator(
@@ -139,9 +145,10 @@ def __main__(edm, start_gs_index, coupler_gs_index):
         sys_eig_energies=sys_eig_energies,
         env_eig_energies=env_eig_energies,
         model=model.to_json_dict()["constructor_params"],
+        model_name=model_name,
     )
 
-    max_k = None
+    max_k = 30
 
     couplers = get_cheat_coupler_list(
         sys_eig_states=couplers_sys_eig_states,
@@ -176,8 +183,7 @@ def __main__(edm, start_gs_index, coupler_gs_index):
             start_fock_hamiltonian, n_electrons, n_sys_qubits
         )
         ham_stop = sys_ham_matrix
-        n_steps = 10
-        n_steps = 10
+        n_steps = 100
         total_sweep_time = (
             sweep_time_mult
             * spectrum_width
@@ -235,11 +241,11 @@ def __main__(edm, start_gs_index, coupler_gs_index):
 
     print(f"coupler dim: {cooler.sys_env_coupler_data_dims}")
 
-    ansatz_options = {"beta": 1, "mu": 20, "c": 40}
-    weaken_coupling = 40
+    ansatz_options = {"beta": 1, "mu": 30, "c": 40}
+    weaken_coupling = 400
 
-    start_omega = spectrum_width / 3
-    start_omega = 3
+    start_omega = spectrum_width
+    start_omega = 5.5
     stop_omega = 0.8
 
     method = "bigbrain"
@@ -253,6 +259,9 @@ def __main__(edm, start_gs_index, coupler_gs_index):
         method=method,
         start_gs_index=start_gs_index,
         coupler_gs_index=coupler_gs_index,
+        spectrum_width=spectrum_width,
+        start_omega=start_omega,
+        stop_omega=stop_omega,
     )
 
     coupler_transitions = np.abs(
@@ -312,11 +321,10 @@ if __name__ == "__main__":
     # whether we want to skip all saving data
     dry_run = False
     edm = ExperimentDataManager(
-        experiment_name="fh_bigbrain_subspace_bigmodels",
-        notes="fh cooling from coulomb with",
+        experiment_name="bigbrain_subspace_bigmodels",
         project="fermionic cooling",
         dry_run=dry_run,
     )
     use_style()
-    __main__(edm, 0, 0)
+    __main__(edm, 1, 1)
     # model stuff

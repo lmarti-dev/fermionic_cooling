@@ -871,7 +871,11 @@ class Cooler:
                     == np.round(ray, decimals=5)
                 )[0].astype("str")
                 ax_bottom.annotate(
-                    f"{', '.join(inds)}", (ray, ymax * 1.1), ha="center", va="center"
+                    f"{', '.join(inds)}",
+                    (ray, ymax * 1.1),
+                    ha="center",
+                    va="center",
+                    fontsize="xx-small",
                 )
         if plot_infidelity:
             axes_0_label = r"Infidelity"
