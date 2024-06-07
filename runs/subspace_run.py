@@ -47,6 +47,7 @@ from fermionic_cooling.utils import (
 def __main__(edm: ExperimentDataManager, start_gs_index, coupler_gs_index):
 
     model_name = "cooked/water_singlet_6e_10q"
+    # model_name = "fh_slater"
     if "fh_" in model_name:
         model = FermiHubbardModel(x_dimension=3, y_dimension=3, tunneling=1, coulomb=2)
         n_qubits = len(model.flattened_qubits)
@@ -183,7 +184,7 @@ def __main__(edm: ExperimentDataManager, start_gs_index, coupler_gs_index):
             start_fock_hamiltonian, n_electrons, n_sys_qubits
         )
         ham_stop = sys_ham_matrix
-        n_steps = 100
+        n_steps = 10
         total_sweep_time = (
             sweep_time_mult
             * spectrum_width
@@ -222,7 +223,6 @@ def __main__(edm: ExperimentDataManager, start_gs_index, coupler_gs_index):
         eigenstates=sys_eig_states,
         expanded=False,
     )
-
     cooler = Cooler(
         sys_hamiltonian=sys_ham_matrix,
         n_electrons=n_electrons,
@@ -242,7 +242,7 @@ def __main__(edm: ExperimentDataManager, start_gs_index, coupler_gs_index):
     print(f"coupler dim: {cooler.sys_env_coupler_data_dims}")
 
     ansatz_options = {"beta": 1, "mu": 30, "c": 40}
-    weaken_coupling = 400
+    weaken_coupling = 10
 
     start_omega = spectrum_width
     start_omega = 5.5
@@ -319,7 +319,7 @@ def loop_gs(edm):
 
 if __name__ == "__main__":
     # whether we want to skip all saving data
-    dry_run = False
+    dry_run = True
     edm = ExperimentDataManager(
         experiment_name="bigbrain_subspace_bigmodels",
         project="fermionic cooling",
