@@ -802,7 +802,7 @@ class Cooler:
         suptitle: str = None,
         plot_infidelity: bool = True,
         substract_energy: float = 0,
-        annotate_gaps: bool = True,
+        annotate_gaps: bool = False,
     ):
         more_than_one_rep = len(env_energies) > 1
         nrows = 2
@@ -865,18 +865,19 @@ class Cooler:
                 linestyle="--",
                 color=spectrum_cmap(ind),
             )
-            for ray in sorted(list(set(spectrum))):
-                inds = np.where(
-                    np.array(np.round(spectrum, decimals=5))
-                    == np.round(ray, decimals=5)
-                )[0].astype("str")
-                ax_bottom.annotate(
-                    f"{', '.join(inds)}",
-                    (ray, ymax * 1.1),
-                    ha="center",
-                    va="center",
-                    fontsize="xx-small",
-                )
+            if annotate_gaps:
+                for ray in sorted(list(set(spectrum))):
+                    inds = np.where(
+                        np.array(np.round(spectrum, decimals=5))
+                        == np.round(ray, decimals=5)
+                    )[0].astype("str")
+                    ax_bottom.annotate(
+                        f"{', '.join(inds)}",
+                        (ray, ymax * 1.1),
+                        ha="center",
+                        va="center",
+                        fontsize="xx-small",
+                    )
         if plot_infidelity:
             axes_0_label = r"Infidelity"
         else:
