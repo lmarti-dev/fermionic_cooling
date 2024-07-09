@@ -1,9 +1,9 @@
 import sys
+from itertools import combinations
 
 import cirq
 import matplotlib.pyplot as plt
 import numpy as np
-from itertools import combinations
 from building_blocks import (
     get_cheat_coupler,
     get_cheat_coupler_list,
@@ -13,8 +13,8 @@ from building_blocks import (
 )
 from coolerClass import Cooler
 from openfermion import (
-    get_quadratic_hamiltonian,
     FermionOperator,
+    get_quadratic_hamiltonian,
     get_sparse_operator,
     jw_hartree_fock_state,
 )
@@ -26,33 +26,33 @@ from fauvqe.models.fermiHubbardModel import FermiHubbardModel
 from fauvqe.utilities import (
     flatten,
     jw_eigenspectrum_at_particle_number,
-    spin_dicke_state,
     jw_spin_restrict_operator,
+    spin_dicke_state,
 )
 from fermionic_cooling.adiabatic_sweep import fermion_to_dense, run_sweep
 from fermionic_cooling.utils import (
+    dense_restricted_ham,
     expectation_wrapper,
+    fidelity,
+    get_closest_degenerate_ground_state,
     get_min_gap,
     ketbra,
+    print_state_fidelity_to_eigenstates,
     s_squared_penalty,
     state_fidelity_to_eigenstates,
     subspace_energy_expectation,
-    fidelity,
     two_tensor_partial_trace,
-    dense_restricted_ham,
-    print_state_fidelity_to_eigenstates,
-    get_closest_degenerate_ground_state,
 )
 
 
 def __main__(edm: ExperimentDataManager):
 
     model_name = "cooked/water_singlet_6e_10q"
-    model_name = "fh_slater"
+    model_name = "fh_coulomb"
     if "fh_" in model_name:
-        model = FermiHubbardModel(x_dimension=3, y_dimension=2, tunneling=1, coulomb=6)
+        model = FermiHubbardModel(x_dimension=2, y_dimension=2, tunneling=1, coulomb=2)
         n_qubits = len(model.flattened_qubits)
-        n_electrons = [3, 3]
+        n_electrons = [2, 2]
         if "coulomb" in model_name:
             start_fock_hamiltonian = model.coulomb_model.fock_hamiltonian
             couplers_fock_hamiltonian = model.non_interacting_model.fock_hamiltonian
@@ -116,6 +116,11 @@ def __main__(edm: ExperimentDataManager):
     sys_ground_energy = np.min(sys_eig_energies)
 
     print("BEFORE SWEEP")
+    initial_pops = state_fidelity_to_eigenstates(
+        state=sys_initial_state,
+        eigenstates=sys_eig_states,
+        expanded=False,
+    )
     print_state_fidelity_to_eigenstates(
         state=sys_initial_state,
         eigenenergies=sys_eig_energies,
@@ -157,7 +162,7 @@ def __main__(edm: ExperimentDataManager):
         model_name=model_name,
     )
 
-    max_k = 10
+    max_k = None
 
     couplers = get_cheat_coupler_list(
         sys_eig_states=couplers_sys_eig_states,
@@ -169,13 +174,11 @@ def __main__(edm: ExperimentDataManager):
     )  # Interaction only on Qubit 0?
     print("coupler done")
 
-    print(f"number of couplers: {len(couplers)}")
+    print(f"number of couplers: {max_k}")
     # coupler = get_cheat_coupler(sys_eigenstates, env_eigenstates)
 
     # get environment ham sweep values
     spectrum_width = max(sys_eig_energies) - min(sys_eig_energies)
-
-    min_gap = get_min_gap(couplers_sys_eig_energies, threshold=1e-6)
 
     # evolution_time = 1e-3
 
@@ -248,75 +251,51 @@ def __main__(edm: ExperimentDataManager):
         time_evolve_method="expm",
         ancilla_split_spectrum=ancilla_split_spectrum,
     )
-    n_rep = 1
+    n_rep = 10
 
     print(f"coupler dim: {cooler.sys_env_coupler_data_dims}")
 
-    ansatz_options = {"beta": 1, "mu": 30, "c": 40}
-    weaken_coupling = 50
+    weaken_coupling = float(np.sqrt(3) / (2 * n_sys_qubits))
 
-    start_omega = spectrum_width / 5
-    stop_omega = 0.8
+    # omegas = np.linspace(0.1, spectrum_width, max_k)[::-1]
+    omegas = np.array([spectrum_width / 2])
 
-    method = "bigbrain"
+    alphas = omegas / (weaken_coupling * n_sys_qubits)
+    evolution_times = np.pi / alphas
 
     edm.var_dump(
         depol_noise=depol_noise,
         use_fast_sweep=use_fast_sweep,
         is_noise_spin_conserving=is_noise_spin_conserving,
         max_k=max_k,
-        ansatz_options=ansatz_options,
-        method=method,
         start_gs_index=start_gs_index,
         coupler_gs_index=coupler_gs_index,
         spectrum_width=spectrum_width,
-        start_omega=start_omega,
-        stop_omega=stop_omega,
         ancilla_split_spectrum=ancilla_split_spectrum,
     )
-
-    coupler_transitions = np.abs(
-        np.array(couplers_sys_eig_energies[1:]) - couplers_sys_eig_energies[0]
-    )
-
     (
         fidelities,
         sys_ev_energies,
-        omegas,
         env_ev_energies,
-        final_sys_density_matrix,
-    ) = cooler.big_brain_cool(
-        start_omega=start_omega,
-        stop_omega=stop_omega,
-        ansatz_options=ansatz_options,
+        _,
+    ) = cooler.zip_cool(
         n_rep=n_rep,
-        weaken_coupling=weaken_coupling,
-        coupler_transitions=None,
-        depol_noise=depol_noise,
-        is_noise_spin_conserving=is_noise_spin_conserving,
-        use_random_coupler=False,
+        alphas=alphas,
+        evolution_times=evolution_times,
+        sweep_values=omegas,
         fidelity_threshold=0.99,
     )
 
     jobj = {
-        "omegas": omegas,
         "fidelities": fidelities,
         "sys_energies": sys_ev_energies,
         "env_energies": env_ev_energies,
-        "ansatz_options": ansatz_options,
     }
-    edm.save_dict(
-        filename=f"cooling_free_{start_gs_index}_{coupler_gs_index}", jobj=jobj
-    )
+    edm.save_dict(filename=f"cooling_strong_coupling_{model_name}", jobj=jobj)
 
-    fig = cooler.plot_controlled_cooling(
-        fidelities=fidelities,
-        env_energies=env_ev_energies,
-        omegas=omegas,
-        eigenspectrums=[
-            sys_eig_energies - sys_eig_energies[0],
-        ],
-    )
+    fig, ax = plt.subplots()
+
+    ax.plot(range(len(list(flatten(fidelities)))), list(flatten(fidelities)))
     edm.save_figure(
         fig,
     )
@@ -325,9 +304,10 @@ def __main__(edm: ExperimentDataManager):
 
 if __name__ == "__main__":
     # whether we want to skip all saving data
-    dry_run = False
+    dry_run = True
     edm = ExperimentDataManager(
-        experiment_name="bigbrain_subspace_multi_ancillas",
+        experiment_name="strong_coupling cooling",
+        notes="looking at the obrien paper seems like I can cool with very high coupling, need to figure ts and alphas",
         project="fermionic cooling",
         dry_run=dry_run,
     )

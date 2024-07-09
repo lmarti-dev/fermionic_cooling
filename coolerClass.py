@@ -65,6 +65,7 @@ class Cooler:
         verbosity: int = 0,
         time_evolve_method: str = "diag",
         subspace_simulation: bool = False,
+        ancilla_split_spectrum: bool = False,
     ):
         if NO_CUPY:
             print("Cupy not installed, using CPU")
@@ -79,6 +80,7 @@ class Cooler:
         self.sys_ground_state = sys_ground_state
         self._sys_eig_energies = None
         self._sys_eig_states = None
+        self.ancilla_split_spectrum = ancilla_split_spectrum
 
         self.subspace_simulation = subspace_simulation
         if self.subspace_simulation:
@@ -161,9 +163,21 @@ class Cooler:
             coupler = self.sys_env_coupler.matrix(qubits=self.total_qubits)
         else:
             coupler = self.sys_env_coupler
+
+        env_hamiltonian = self.env_hamiltonian
+        if self.ancilla_split_spectrum:
+            env_hamiltonian = sum(
+                [
+                    x * pstring
+                    for x, pstring in zip(
+                        [2.0**-pw for pw in range(len(self.env_hamiltonian))],
+                        self.env_hamiltonian,
+                    )
+                ]
+            )
         return (
             self.to_matrix_if_pauli(self.sys_hamiltonian, which="sys")
-            + env_coupling * self.to_matrix_if_pauli(self.env_hamiltonian, which="env")
+            + env_coupling * self.to_matrix_if_pauli(env_hamiltonian, which="env")
             + float(alpha) * self.to_matrix_if_pauli(coupler, which="couplers")
         )
 
@@ -304,7 +318,7 @@ class Cooler:
         sweep_values: Iterable[float],
         pooling_method: str = "max",
         use_trotter: bool = False,
-        random_coupler: bool = False,
+        use_random_coupler: bool = False,
         weights: list = None,
     ):
         initial_density_matrix = self.total_initial_state
@@ -337,7 +351,7 @@ class Cooler:
             temp_sys_energies = []
             temp_env_energies = []
             n_couplers = self.get_coupler_number(rep=None)
-            if random_coupler is not None:
+            if use_random_coupler is not None:
                 if weights is not None:
                     p_kwargs = {"p": weights}
                 else:
@@ -452,6 +466,7 @@ class Cooler:
         depol_noise: float = None,
         is_noise_spin_conserving: bool = False,
         use_random_coupler: bool = False,
+        fidelity_threshold: float = 1.0,
     ):
         initial_density_matrix = self.total_initial_state
         if not cirq.is_hermitian(initial_density_matrix):
@@ -466,7 +481,7 @@ class Cooler:
         sys_fidelity = self.sys_fidelity(self.sys_initial_state)
         sys_energy = self.sys_energy(self.sys_initial_state)
         env_energy = self.env_energy(self.env_ground_state)
-        n_qubits = len(self.sys_qubits)
+        n_sys_qubits = len(self.sys_qubits)
 
         self.update_message(
             "figs",
@@ -496,14 +511,14 @@ class Cooler:
             # check number of couplers in list
             coupler_number = self.get_coupler_number(rep)
             overall_steps = 0
-            while omega > stop_omega:
+            while omega > stop_omega and fidelity_threshold > fidelities[-1][-1]:
                 self.update_message(
                     "ovstep",
                     f"overall steps: {overall_steps}, total cool. time: {self.total_cooling_time:.2f}",
                 )
 
                 # set alpha and t
-                alpha = omega / (weaken_coupling * n_qubits)
+                alpha = omega / (weaken_coupling * n_sys_qubits)
 
                 # there's not factor of two here, it's all correct
                 evolution_time = np.pi / alpha
@@ -922,45 +937,20 @@ class Cooler:
         omegas: np.ndarray,
         fidelities: np.ndarray,
         env_energies: np.ndarray,
-        suptitle: str,
+        suptitle: str = None,
         n_rep: int = None,
     ):
         fig, axes = plt.subplots(nrows=2, sharex=True)
-
+        cmap = plt.get_cmap("turbo", n_rep)
         if n_rep is not None and len(omegas) % n_rep == 0 and n_rep > 1:
             slice_size = int(len(omegas) / n_rep)
             for rep in range(n_rep):
                 idx = slice(rep * slice_size, (rep + 1) * slice_size)
-                axes[0].plot(
-                    omegas[idx],
-                    fidelities[idx],
-                )
-                axes[1].plot(
-                    omegas[idx],
-                    env_energies[idx],
-                )
-
-                if rep < n_rep - 1:
-                    axes[0].plot(
-                        [
-                            omegas[(rep + 1) * slice_size - 1],
-                            omegas[(rep + 1) * slice_size],
-                        ],
-                        [
-                            fidelities[(rep + 1) * slice_size - 1],
-                            fidelities[(rep + 1) * slice_size],
-                        ],
-                        "k:",
-                    )
+                axes[0].plot(omegas[idx], fidelities[idx], color=cmap(rep))
+                axes[1].plot(omegas[idx], env_energies[idx], color=cmap(rep))
         else:
-            axes[0].plot(
-                omegas,
-                fidelities,
-            )
-            axes[1].plot(
-                omegas,
-                env_energies,
-            )
+            axes[0].plot(omegas, fidelities)
+            axes[1].plot(omegas, env_energies)
         axes[0].set_ylabel("Fidelity")
         axes[1].set_ylabel(r"$E_F$")
         axes[1].set_xlabel(r"$\omega$")

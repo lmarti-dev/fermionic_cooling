@@ -71,6 +71,7 @@ def get_closest_degenerate_ground_state(
     ref_state: np.ndarray,
     comp_energies: np.ndarray,
     comp_states: np.ndarray,
+    subspace_simulation: bool = False,
 ):
     ix = np.argsort(comp_energies)
     comp_states = comp_states[:, ix]
@@ -83,10 +84,17 @@ def get_closest_degenerate_ground_state(
     if degeneracy > 1:
         print("ground state is {}-fold degenerate".format(degeneracy))
         for ind in range(degeneracy):
-            fidelities.append(cirq.fidelity(comp_states[:, ind], ref_state))
+            fidelities.append(
+                fidelity_wrapper(
+                    comp_states[:, ind],
+                    ref_state,
+                    qid_shape=(2,) * int(np.log2(len(ref_state))),
+                    subspace_simulation=subspace_simulation,
+                )
+            )
         max_ind = np.argmax(fidelities)
         print(f"degenerate fidelities: {fidelities}, max: {max_ind}")
-        return comp_ground_energy, comp_states[:, max_ind], max_ind
+        return comp_ground_energy, comp_states[:, max_ind], int(max_ind)
     else:
         return comp_ground_energy, comp_states[:, 0], 0
 

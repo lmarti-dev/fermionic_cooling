@@ -365,7 +365,7 @@ def main_run(edm: ExperimentDataManager, initial_beta, target_beta, **kwargs):
             evolution_times=evolution_times,
             sweep_values=sweep_values,
             pooling_method="max",
-            random_coupler=True,
+            use_random_coupler=True,
             weights=weights,
         )
 

@@ -18,8 +18,8 @@ def __main__():
 
     dry_run = False
     edm = ExperimentDataManager(
-        f"t_probe_couplers_{model_savename}",
-        notes="doing a more thorough investigation of tunneling vs coulomb",
+        f"tvar22_probe_couplers_{model_savename}",
+        notes="now trying the half slater half coulomb and variable tun",
         project="fermionic cooling",
         tags="couplers,overlap,probing stuff",
         dry_run=dry_run,
@@ -33,17 +33,13 @@ def __main__():
         new_run = True
         if "fh_" in model_name:
             model = FermiHubbardModel(
-                x_dimension=4, y_dimension=2, tunneling=t, coulomb=1
+                x_dimension=2, y_dimension=2, tunneling=t, coulomb=1
             )
             edm.var_dump(model=model.to_json_dict()["constructor_params"])
             n_qubits = len(model.flattened_qubits)
-            n_electrons = [4, 4]
-            if "coulomb" in model_name:
-                start_fock_hamiltonian = model.coulomb_model.fock_hamiltonian
-                couplers_fock_hamiltonian = model.non_interacting_model.fock_hamiltonian
-            elif "slater" in model_name:
-                start_fock_hamiltonian = model.non_interacting_model.fock_hamiltonian
-                couplers_fock_hamiltonian = start_fock_hamiltonian
+            n_electrons = [2, 2]
+            coulomb_fock_hamiltonian = model.coulomb_model.fock_hamiltonian
+            slater_fock_hamiltonian = model.non_interacting_model.fock_hamiltonian
         else:
             spm = SpecificModel(model_name=model_name)
             model = spm.current_model
@@ -60,14 +56,27 @@ def __main__():
             particle_number=n_electrons,
             expanded=False,
         )
-        _, couplers_sys_eig_states = jw_eigenspectrum_at_particle_number(
+        _, slater_sys_eig_states = jw_eigenspectrum_at_particle_number(
             sparse_operator=get_sparse_operator(
-                couplers_fock_hamiltonian,
+                slater_fock_hamiltonian,
                 n_qubits=len(model.flattened_qubits),
             ),
             particle_number=n_electrons,
             expanded=False,
         )
+        _, coulomb_sys_eig_states = jw_eigenspectrum_at_particle_number(
+            sparse_operator=get_sparse_operator(
+                coulomb_fock_hamiltonian,
+                n_qubits=len(model.flattened_qubits),
+            ),
+            particle_number=n_electrons,
+            expanded=False,
+        )
+
+        # couplers_sys_eig_states = t * slater_sys_eig_states + coulomb_sys_eig_states
+        # couplers_sys_eig_states /= np.linalg.norm(couplers_sys_eig_states, axis=0)
+
+        couplers_sys_eig_states = slater_sys_eig_states
 
         overlap_gs = np.zeros((couplers_sys_eig_states.shape[-1],))
         overlap_couplers = np.zeros(
