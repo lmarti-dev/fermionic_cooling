@@ -17,7 +17,6 @@ from fauplotstyle.styler import use_style
 from fermionic_cooling.adiabatic_sweep import run_sweep
 from fermionic_cooling.utils import (
     dense_restricted_ham,
-    fidelity,
     get_closest_degenerate_ground_state,
     get_min_gap,
     ketbra,
@@ -25,9 +24,7 @@ from fermionic_cooling.utils import (
     subspace_energy_expectation,
 )
 from qutlet.models.fermi_hubbard_model import FermiHubbardModel
-from qutlet.utilities import (
-    jw_eigenspectrum_at_particle_number,
-)
+from qutlet.utilities import jw_eigenspectrum_at_particle_number, fidelity
 
 
 def __main__(edm: ExperimentDataManager):
