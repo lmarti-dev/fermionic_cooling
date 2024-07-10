@@ -5,9 +5,9 @@ import os
 import json
 import numpy as np
 
-from fauvqe.models.fermiHubbardModel import FermiHubbardModel
+from qutlet.models.fermi_hubbard_model import FermiHubbardModel
 from openfermion import get_sparse_operator
-from fauvqe.utilities import jw_get_true_ground_state_at_particle_number
+from qutlet.utilities import jw_get_true_ground_state_at_particle_number
 from fauplotstyle.styler import use_style
 
 
@@ -72,9 +72,11 @@ def plot_separate(edm: ExperimentDataManager, dirname):
 
 def plot_single(dirnames):
 
-    model = FermiHubbardModel(x_dimension=1, y_dimension=2, tunneling=1, coulomb=2)
     n_electrons = [1, 1]
-    n_qubits = len(model.flattened_qubits)
+    model = FermiHubbardModel(
+        lattice_dimensions=(1, 2), n_electrons=n_electrons, tunneling=1, coulomb=2
+    )
+    n_qubits = len(model.qubits)
 
     ground_energy, _ = jw_get_true_ground_state_at_particle_number(
         sparse_operator=get_sparse_operator(model.fock_hamiltonian),

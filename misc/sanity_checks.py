@@ -4,7 +4,7 @@ import time
 import cirq
 import numpy as np
 
-from coolerClass import trace_out_env
+from cooler_class import trace_out_env
 
 
 def __main__(args):

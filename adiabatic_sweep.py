@@ -1,15 +1,11 @@
 import numpy as np
 from cirq import PauliSum
-from cirq import fidelity as cirq_fidelity
 from openfermion import FermionOperator, get_sparse_operator
 from scipy.linalg import expm
 from scipy.sparse import csc_matrix
-from scipy.sparse.linalg import expm_multiply
 
-from fauvqe.utilities import (
-    flatten,
+from qutlet.utilities import (
     jw_get_true_ground_state_at_particle_number,
-    jw_eigenspectrum_at_particle_number,
 )
 
 import multiprocessing as mp

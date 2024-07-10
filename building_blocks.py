@@ -2,8 +2,8 @@ import cirq
 import numpy as np
 from fermionic_cooling.utils import ndarray_to_psum, get_transition_rates
 from math import prod
-from fauvqe.models.fermiHubbardModel import FermiHubbardModel
-from fauvqe.utilities import jw_eigenspectrum_at_particle_number
+from qutlet.models.fermi_hubbard_model import FermiHubbardModel
+from qutlet.utilities import jw_eigenspectrum_at_particle_number
 from openfermion import get_sparse_operator
 
 # This file contains a lot of legos to help with the cooling sims,
@@ -338,7 +338,7 @@ def get_perturbed_free_couplers(
     sys_eig_energies, sys_eig_states = jw_eigenspectrum_at_particle_number(
         sparse_operator=get_sparse_operator(
             model.fock_hamiltonian,
-            n_qubits=len(model.flattened_qubits),
+            n_qubits=len(model.qubits),
         ),
         particle_number=n_electrons,
         expanded=True,
@@ -356,9 +356,7 @@ def get_perturbed_free_couplers(
             coupler = coupler + (noise * noisy_coupler)
         coupler = coupler + np.conjugate(np.transpose(coupler))
         if to_psum:
-            coupler = ndarray_to_psum(
-                coupler, qubits=(*model.flattened_qubits, *env_qubits)
-            )
+            coupler = ndarray_to_psum(coupler, qubits=(*model.qubits, *env_qubits))
         couplers.append(coupler)
 
     # bigger first to match cheat sweep

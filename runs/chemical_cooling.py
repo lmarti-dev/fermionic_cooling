@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 from building_blocks import get_cheat_coupler_list, get_cheat_sweep, get_Z_env
-from coolerClass import Cooler
+from cooler_class import Cooler
 from openfermion import (
     get_quadratic_hamiltonian,
     get_sparse_operator,
@@ -10,8 +10,8 @@ from openfermion import (
 from utils import ketbra
 
 from data_manager import ExperimentDataManager, set_color_cycler
-from fauvqe.utilities import jw_eigenspectrum_at_particle_number
-from fauvqe_running_code.chemical_models.specificModel import SpecificModel
+from qutlet.utilities import jw_eigenspectrum_at_particle_number
+from qutlet_running_code.chemical_models.specific_model import SpecificModel
 
 dry_run = True
 edm = ExperimentDataManager("chemical_cooling", dry_run=dry_run)
@@ -19,13 +19,13 @@ set_color_cycler()
 
 
 spm = SpecificModel("v3/FAU_O2_singlet_6e_4o_CASSCF")
-n_electrons = spm.Nf
-sys_qubits = spm.current_model.flattened_qubits
+n_electrons = spm.n_electrons
+sys_qubits = spm.current_model.qubits
 n_sys_qubits = len(sys_qubits)
 
 sys_eig_energies, sys_eig_states = jw_eigenspectrum_at_particle_number(
     sparse_operator=get_sparse_operator(spm.current_model.fock_hamiltonian),
-    particle_number=spm.Nf,
+    particle_number=spm.n_electrons,
     expanded=True,
 )
 sys_ground_state = sys_eig_states[:, 0]
@@ -38,7 +38,7 @@ free_sys_eig_energies, free_sys_eig_states = jw_eigenspectrum_at_particle_number
             ignore_incompatible_terms=True,
         )
     ),
-    particle_number=spm.Nf,
+    particle_number=spm.n_electrons,
     expanded=True,
 )
 
@@ -72,8 +72,8 @@ evolution_times = 2.5 * np.pi / np.abs(alphas)
 
 cooler = Cooler(
     sys_hamiltonian=spm.current_model.hamiltonian,
-    n_electrons=spm.Nf,
-    sys_qubits=spm.current_model.flattened_qubits,
+    n_electrons=spm.n_electrons,
+    sys_qubits=spm.current_model.qubits,
     sys_ground_state=sys_ground_state,
     sys_initial_state=sys_initial_state,
     env_hamiltonian=env_ham,

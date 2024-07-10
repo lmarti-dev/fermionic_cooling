@@ -28,8 +28,8 @@ from openfermion import expectation, get_sparse_operator, variance
 from scipy.sparse import csc_matrix
 from itertools import combinations
 
-from fauvqe.models import FermionicModel
-from fauvqe.utilities import (
+from qutlet.models import FermionicModel
+from qutlet.utilities import (
     flatten,
     ket_in_subspace,
 )

@@ -5,8 +5,8 @@ from fermionic_cooling.utils import (
     thermal_density_matrix_at_particle_number,
     fidelity,
 )
-from fauvqe.models.fermiHubbardModel import FermiHubbardModel
-from fauvqe.utilities import jw_eigenspectrum_at_particle_number, spin_dicke_mixed_state
+from qutlet.models.fermi_hubbard_model import FermiHubbardModel
+from qutlet.utilities import jw_eigenspectrum_at_particle_number, spin_dicke_mixed_state
 import matplotlib.pyplot as plt
 from data_manager import ExperimentDataManager
 from fauplotstyle.styler import use_style
@@ -16,9 +16,13 @@ def plot_amplitudes_vs_beta(
     x, y, tunneling, coulomb, n_electrons, zoom: bool = False, n_steps: int = 200
 ):
     model = FermiHubbardModel(
-        x_dimension=x, y_dimension=y, tunneling=tunneling, coulomb=coulomb
+        x_dimension=x,
+        y_dimension=y,
+        n_electrons=n_electrons,
+        tunneling=tunneling,
+        coulomb=coulomb,
     )
-    n_qubits = len(model.flattened_qubits)
+    n_qubits = len(model.qubits)
 
     eigenenergies, eigenstates = jw_eigenspectrum_at_particle_number(
         sparse_operator=get_sparse_operator(model.fock_hamiltonian),
@@ -82,15 +86,23 @@ def plot_amplitudes_vs_beta(
 def plot_mms_fidelity_vs_beta(edm):
     fig, ax = plt.subplots()
     for x, y, n_electrons in ((1, 2, [1, 1]), (2, 2, [2, 2]), (2, 3, [3, 3])):
-        model = FermiHubbardModel(x_dimension=x, y_dimension=y, tunneling=1, coulomb=2)
-        n_qubits = len(model.flattened_qubits)
+        model = FermiHubbardModel(
+            x_dimension=x,
+            y_dimension=y,
+            n_electrons=n_electrons,
+            tunneling=1,
+            coulomb=2,
+        )
+        n_qubits = len(model.qubits)
 
-        mms = spin_dicke_mixed_state(n_qubits=n_qubits, Nf=n_electrons, expanded=False)
+        mms = spin_dicke_mixed_state(
+            n_qubits=n_qubits, n_electrons=n_electrons, expanded=False
+        )
 
         n_steps = 200
 
         edm.var_dump(
-            model=model.to_json_dict()["constructor_params"], n_electrons=n_electrons
+            model=model.__to_json__()["constructor_params"], n_electrons=n_electrons
         )
 
         mms_fids = np.zeros((n_steps,))

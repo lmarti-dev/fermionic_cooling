@@ -1,7 +1,7 @@
 from fermionic_cooling.utils import add_depol_noise, ketbra
 
-from fauvqe.models import FermiHubbardModel
-from fauvqe.utilities import jw_eigenspectrum_at_particle_number
+from qutlet.models import FermiHubbardModel
+from qutlet.utilities import jw_eigenspectrum_at_particle_number
 from openfermion import get_sparse_operator
 import numpy as np
 
@@ -11,7 +11,9 @@ n_electrons = [2, 2]
 
 depol_noise = 1
 
-model = FermiHubbardModel(x_dimension=x, y_dimension=y, tunneling=1, coulomb=2)
+model = FermiHubbardModel(
+    lattice_dimensions=(x, y), n_electrons=n_electrons, tunneling=1, coulomb=2
+)
 
 eig_energies, eig_states = jw_eigenspectrum_at_particle_number(
     sparse_operator=get_sparse_operator(model.fock_hamiltonian),
@@ -27,7 +29,7 @@ print(f"Before: up: {n_up:.4f} down: {n_down:.4f}")
 noisy = add_depol_noise(
     rho=rho,
     depol_noise=depol_noise,
-    n_qubits=len(model.flattened_qubits),
+    n_qubits=len(model.qubits),
     n_electrons=n_electrons,
     is_noise_spin_conserving=False,
 )

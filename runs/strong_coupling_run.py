@@ -1,47 +1,34 @@
-import sys
 from itertools import combinations
 
-import cirq
 import matplotlib.pyplot as plt
 import numpy as np
 from building_blocks import (
-    get_cheat_coupler,
     get_cheat_coupler_list,
-    get_cheat_sweep,
-    get_perturbed_sweep,
     get_Z_env,
 )
-from coolerClass import Cooler
+from cooler_class import Cooler
 from openfermion import (
-    FermionOperator,
-    get_quadratic_hamiltonian,
     get_sparse_operator,
-    jw_hartree_fock_state,
 )
 
-from chemical_models.specificModel import SpecificModel
+from chemical_models.specific_model import SpecificModel
 from data_manager import ExperimentDataManager
 from fauplotstyle.styler import use_style
-from fauvqe.models.fermiHubbardModel import FermiHubbardModel
-from fauvqe.utilities import (
+from qutlet.models.fermi_hubbard_model import FermiHubbardModel
+from qutlet.utilities import (
     flatten,
     jw_eigenspectrum_at_particle_number,
-    jw_spin_restrict_operator,
-    spin_dicke_state,
 )
-from fermionic_cooling.adiabatic_sweep import fermion_to_dense, run_sweep
+from fermionic_cooling.adiabatic_sweep import run_sweep
 from fermionic_cooling.utils import (
     dense_restricted_ham,
-    expectation_wrapper,
     fidelity,
     get_closest_degenerate_ground_state,
     get_min_gap,
     ketbra,
     print_state_fidelity_to_eigenstates,
-    s_squared_penalty,
     state_fidelity_to_eigenstates,
     subspace_energy_expectation,
-    two_tensor_partial_trace,
 )
 
 
@@ -50,9 +37,11 @@ def __main__(edm: ExperimentDataManager):
     model_name = "cooked/water_singlet_6e_10q"
     model_name = "fh_coulomb"
     if "fh_" in model_name:
-        model = FermiHubbardModel(x_dimension=2, y_dimension=2, tunneling=1, coulomb=2)
-        n_qubits = len(model.flattened_qubits)
         n_electrons = [2, 2]
+        model = FermiHubbardModel(
+            lattice_dimensions=(2, 2), n_electrons=n_electrons, tunneling=1, coulomb=2
+        )
+        n_qubits = len(model.qubits)
         if "coulomb" in model_name:
             start_fock_hamiltonian = model.coulomb_model.fock_hamiltonian
             couplers_fock_hamiltonian = model.non_interacting_model.fock_hamiltonian
@@ -62,15 +51,15 @@ def __main__(edm: ExperimentDataManager):
     else:
         spm = SpecificModel(model_name=model_name)
         model = spm.current_model
-        n_qubits = len(model.flattened_qubits)
-        n_electrons = spm.Nf
+        n_qubits = len(model.qubits)
+        n_electrons = spm.n_electrons
         start_fock_hamiltonian = spm.current_model.quadratic_terms
         couplers_fock_hamiltonian = start_fock_hamiltonian
 
     start_sys_eig_energies, start_sys_eig_states = jw_eigenspectrum_at_particle_number(
         sparse_operator=get_sparse_operator(
             start_fock_hamiltonian,
-            n_qubits=len(model.flattened_qubits),
+            n_qubits=len(model.qubits),
         ),
         particle_number=n_electrons,
         expanded=False,
@@ -79,14 +68,14 @@ def __main__(edm: ExperimentDataManager):
         jw_eigenspectrum_at_particle_number(
             sparse_operator=get_sparse_operator(
                 couplers_fock_hamiltonian,
-                n_qubits=len(model.flattened_qubits),
+                n_qubits=len(model.qubits),
             ),
             particle_number=n_electrons,
             expanded=False,
         )
     )
 
-    sys_qubits = model.flattened_qubits
+    sys_qubits = model.qubits
     n_sys_qubits = len(sys_qubits)
     subspace_dim = len(
         list(combinations(range(n_sys_qubits // 2), n_electrons[0]))
@@ -96,7 +85,7 @@ def __main__(edm: ExperimentDataManager):
     sys_eig_energies, sys_eig_states = jw_eigenspectrum_at_particle_number(
         sparse_operator=get_sparse_operator(
             model.fock_hamiltonian,
-            n_qubits=len(model.flattened_qubits),
+            n_qubits=len(model.qubits),
         ),
         particle_number=n_electrons,
         expanded=False,
@@ -158,7 +147,7 @@ def __main__(edm: ExperimentDataManager):
         n_env_qubits=n_env_qubits,
         sys_eig_energies=sys_eig_energies,
         env_eig_energies=env_eig_energies,
-        model=model.to_json_dict()["constructor_params"],
+        model=model.__to_json__()["constructor_params"],
         model_name=model_name,
     )
 
@@ -239,7 +228,7 @@ def __main__(edm: ExperimentDataManager):
     cooler = Cooler(
         sys_hamiltonian=sys_ham_matrix,
         n_electrons=n_electrons,
-        sys_qubits=model.flattened_qubits,
+        sys_qubits=model.qubits,
         sys_ground_state=sys_ground_state,
         sys_initial_state=sys_initial_state,
         env_hamiltonian=env_ham,

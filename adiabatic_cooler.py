@@ -2,7 +2,7 @@ import cirq
 import numpy as np
 from adiabatic_sweep import get_sweep_hamiltonian, run_sweep
 from scipy.linalg import expm
-from coolerClass import Cooler
+from cooler_class import Cooler
 from fermionic_cooling.utils import trace_out_env, time_evolve_density_matrix
 
 

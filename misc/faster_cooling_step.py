@@ -1,22 +1,23 @@
 from utils import time_evolve_density_matrix, spin_dicke_state, ketbra
-from building_blocks import get_Z_env, get_cheat_coupler, get_cheat_coupler_list
+from building_blocks import get_Z_env, get_cheat_coupler_list
 import time
 import numpy as np
-from fauvqe.models.fermiHubbardModel import FermiHubbardModel
-from fauvqe.utilities import (
+from qutlet.models.fermi_hubbard_model import FermiHubbardModel
+from qutlet.utilities import (
     jw_eigenspectrum_at_particle_number,
     jw_get_true_ground_state_at_particle_number,
 )
 from cirq import X, Y
-import cupy as cp
-from coolerClass import Cooler
+from cooler_class import Cooler
 from openfermion import get_sparse_operator, jw_hartree_fock_state
 
 
 def setup_cooler(x, y, n_env_qubits, method):
-    model = FermiHubbardModel(x_dimension=x, y_dimension=y, tunneling=1, coulomb=2)
     n_electrons = [2, 2]
-    sys_qubits = model.flattened_qubits
+    model = FermiHubbardModel(
+        lattice_dimensions=(x, y), n_electrons=n_electrons, tunneling=1, coulomb=2
+    )
+    sys_qubits = model.qubits
     n_sys_qubits = len(sys_qubits)
 
     env_qubits, env_ground_state, env_ham, env_eig_energies, env_eig_states = get_Z_env(
@@ -24,7 +25,7 @@ def setup_cooler(x, y, n_env_qubits, method):
     )
     sparse_op = get_sparse_operator(
         model.non_interacting_model.fock_hamiltonian,
-        n_qubits=len(model.flattened_qubits),
+        n_qubits=len(model.qubits),
     )
     free_sys_eig_energies, free_sys_eig_states = jw_eigenspectrum_at_particle_number(
         sparse_operator=sparse_op,
@@ -48,7 +49,7 @@ def setup_cooler(x, y, n_env_qubits, method):
     cooler = Cooler(
         sys_hamiltonian=model.hamiltonian,
         n_electrons=n_electrons,
-        sys_qubits=model.flattened_qubits,
+        sys_qubits=model.qubits,
         sys_ground_state=sys_ground_state,
         sys_initial_state=sys_initial_state,
         env_hamiltonian=env_ham,
@@ -76,24 +77,24 @@ def time_func(func: callable):
 
 
 def get_ham_rho(x, y, n, which=np):
-    model = FermiHubbardModel(x_dimension=x, y_dimension=y, tunneling=1, coulomb=2)
     n_electrons = [2, 2]
-    n_sys_qubits = len(model.flattened_qubits)
+    model = FermiHubbardModel(
+        lattice_dimensions=(x, y), n_electrons=n_electrons, tunneling=1, coulomb=2
+    )
+    n_sys_qubits = len(model.qubits)
     env_qubits, env_ground_state, env_ham, env_eig_energies, env_eig_states = get_Z_env(
         n_qubits=n
     )
     sys_dicke = spin_dicke_state(
-        n_qubits=n_sys_qubits, Nf=n_electrons, right_to_left=False
+        n_qubits=n_sys_qubits, n_electrons=n_electrons, right_to_left=False
     )
-    coupler = prod(
-        *(np.random.choice((X, Y))(q1) for q1 in model.flattened_qubits)
-    ) * prod(*(np.random.choice((X, Y))(q2) for q2 in env_qubits))
+    coupler = prod(*(np.random.choice((X, Y))(q1) for q1 in model.qubits)) * prod(
+        *(np.random.choice((X, Y))(q2) for q2 in env_qubits)
+    )
     coupler_mat = which.array(
-        coupler.matrix(qubits=model.flattened_qubits + env_qubits), dtype=complex
+        coupler.matrix(qubits=model.qubits + env_qubits), dtype=complex
     )
-    sys_mat = which.array(
-        model.hamiltonian.matrix(qubits=model.flattened_qubits), dtype=complex
-    )
+    sys_mat = which.array(model.hamiltonian.matrix(qubits=model.qubits), dtype=complex)
     env_mat = which.array(env_ham.matrix(qubits=env_qubits), dtype=complex)
     ham = which.kron(sys_mat, env_mat) + coupler_mat
     rho = which.kron(

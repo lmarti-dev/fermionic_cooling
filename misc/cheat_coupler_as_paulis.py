@@ -1,4 +1,4 @@
-from fauvqe.models.fermiHubbardModel import FermiHubbardModel
+from qutlet.models.fermi_hubbard_model import FermiHubbardModel
 
 from building_blocks import (
     get_Z_env,
@@ -6,7 +6,7 @@ from building_blocks import (
 )
 
 from utils import ketbra
-from fauvqe.utilities import jw_eigenspectrum_at_particle_number, spin_dicke_state
+from qutlet.utilities import jw_eigenspectrum_at_particle_number, spin_dicke_state
 from openfermion import get_sparse_operator, jw_hartree_fock_state
 from data_manager import ExperimentDataManager
 
@@ -22,21 +22,23 @@ if __name__ == "__main__":
         dry_run=dry_run,
     )
 
-    model = FermiHubbardModel(x_dimension=2, y_dimension=2, tunneling=1, coulomb=2)
     n_electrons = [2, 1]
-    sys_qubits = model.flattened_qubits
+    model = FermiHubbardModel(
+        lattice_dimensions=(2, 2), n_electrons=n_electrons, tunneling=1, coulomb=2
+    )
+    sys_qubits = model.qubits
     n_sys_qubits = len(sys_qubits)
     sys_hartree_fock = jw_hartree_fock_state(
         n_orbitals=n_sys_qubits, n_electrons=sum(n_electrons)
     )
     sys_dicke = spin_dicke_state(
-        n_qubits=n_sys_qubits, Nf=n_electrons, right_to_left=True
+        n_qubits=n_sys_qubits, n_electrons=n_electrons, right_to_left=True
     )
     sys_initial_state = ketbra(sys_hartree_fock)
     sys_eig_energies, sys_eig_states = jw_eigenspectrum_at_particle_number(
         sparse_operator=get_sparse_operator(
             model.fock_hamiltonian,
-            n_qubits=len(model.flattened_qubits),
+            n_qubits=len(model.qubits),
         ),
         particle_number=n_electrons,
         expanded=True,

@@ -1,5 +1,5 @@
-from fauvqe.models import FermiHubbardModel
-from fauvqe.utilities import (
+from qutlet.models import FermiHubbardModel
+from qutlet.utilities import (
     jw_eigenspectrum_at_particle_number,
     jw_spin_correct_indices,
 )
@@ -13,20 +13,22 @@ from data_manager import ExperimentDataManager
 
 
 def plot_free_state_overlap():
-    model = FermiHubbardModel(x_dimension=2, y_dimension=2, tunneling=1, coulomb=2)
-    n_qubits = len(model.flattened_qubits)
     n_electrons = [2, 2]
+    model = FermiHubbardModel(
+        lattice_dimensions=(2, 2), n_electrons=n_electrons, tunneling=1, coulomb=2
+    )
+    n_qubits = len(model.qubits)
     free_sys_eig_energies, free_sys_eig_states = jw_eigenspectrum_at_particle_number(
         sparse_operator=get_sparse_operator(
             model.non_interacting_model.fock_hamiltonian,
-            n_qubits=len(model.flattened_qubits),
+            n_qubits=len(model.qubits),
         ),
         particle_number=n_electrons,
         expanded=True,
     )
 
-    sys_qubits = model.flattened_qubits
-    n_sys_qubits = len(sys_qubits)
+    sys_qubits = model.qubits
+    n_sys_qubits = len(sys_qubits)  # noqa f841
 
     matrix = get_sparse_operator(model.fock_hamiltonian, n_qubits=n_qubits).toarray()
 

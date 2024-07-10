@@ -1,10 +1,8 @@
 import sys
 
-sys.path.append("/home/Refik/Data/My_files/Dropbox/PhD/repos/fauvqe/")
+sys.path.append("/home/Refik/Data/My_files/Dropbox/PhD/repos/qutlet/")
 
-from fermionic_cooling.coolerClass import (
-    mean_gap,
-    get_log_sweep,
+from cooler_class import (
     get_cheat_sweep,
     expectation_wrapper,
     Cooler,
@@ -12,7 +10,7 @@ from fermionic_cooling.coolerClass import (
 )
 import cirq
 import numpy as np
-from fauvqe import Ising
+from qutlet import Ising
 
 
 # system stuff
@@ -25,7 +23,7 @@ model = Ising(
     np.ones((n[0], n[1])),
     "Z",
 )
-sys_qubits = model.flattened_qubits
+sys_qubits = model.qubits
 n_sys_qubits = len(sys_qubits)
 # sys_initial_state = np.random.rand(2 ** (n[0] * n[1]))
 # sys_initial_state = sys_initial_state / np.linalg.norm(sys_initial_state)
@@ -36,14 +34,14 @@ sys_ground_state = model.eig_vec[0]
 sys_ground_energy = model.eig_val[0]
 
 sys_initial_energy = expectation_wrapper(
-    model.hamiltonian, sys_initial_state, model.flattened_qubits
+    model.hamiltonian, sys_initial_state, model.qubits
 )
 sys_ground_energy_exp = expectation_wrapper(
-    model.hamiltonian, sys_ground_state, model.flattened_qubits
+    model.hamiltonian, sys_ground_state, model.qubits
 )
 
 fidelity = cirq.fidelity(
-    sys_initial_state, sys_ground_state, qid_shape=(2,) * (len(model.flattened_qubits))
+    sys_initial_state, sys_ground_state, qid_shape=(2,) * (len(model.qubits))
 )
 print("initial fidelity: {}".format(fidelity))
 print("ground energy from spectrum: {}".format(sys_ground_energy))
@@ -76,7 +74,7 @@ evolution_times = np.pi / alphas
 # call cool
 cooler = Cooler(
     sys_hamiltonian=model.hamiltonian,
-    sys_qubits=model.flattened_qubits,
+    sys_qubits=model.qubits,
     sys_ground_state=sys_ground_state,
     sys_initial_state=sys_initial_state,
     env_hamiltonian=env_ham,

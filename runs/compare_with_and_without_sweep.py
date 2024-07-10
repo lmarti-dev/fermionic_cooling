@@ -1,17 +1,11 @@
-import sys
-
 import cirq
-import matplotlib.pyplot as plt
 import numpy as np
 from adiabatic_sweep import fermion_to_dense, run_sweep
 from building_blocks import (
-    get_cheat_coupler,
     get_cheat_coupler_list,
-    get_cheat_sweep,
-    get_perturbed_sweep,
     get_Z_env,
 )
-from coolerClass import Cooler
+from cooler_class import Cooler
 from openfermion import (
     get_quadratic_hamiltonian,
     get_sparse_operator,
@@ -24,12 +18,11 @@ from fermionic_cooling.utils import (
     print_state_fidelity_to_eigenstates,
 )
 
-from chemical_models.specificModel import SpecificModel
+from chemical_models.specific_model import SpecificModel
 from data_manager import ExperimentDataManager
 from fauplotstyle.styler import use_style
-from fauvqe.models.fermiHubbardModel import FermiHubbardModel
-from fauvqe.utilities import jw_eigenspectrum_at_particle_number
-import multiprocessing as mp
+from qutlet.models.fermi_hubbard_model import FermiHubbardModel
+from qutlet.utilities import jw_eigenspectrum_at_particle_number
 
 
 def comparison_ngaps(edm, n_gaps):
@@ -39,9 +32,11 @@ def comparison_ngaps(edm, n_gaps):
 
     model_name = "fh_coulomb"
     if "fh_" in model_name:
-        model = FermiHubbardModel(x_dimension=3, y_dimension=3, tunneling=1, coulomb=2)
-        n_qubits = len(model.flattened_qubits)
         n_electrons = [3, 3]
+        model = FermiHubbardModel(
+            lattice_dimensions=(3, 3), n_electrons=n_electrons, tunneling=1, coulomb=2
+        )
+        n_qubits = len(model.qubits)
         if "coulomb" in model_name:
             start_fock_hamiltonian = model.coulomb_model.fock_hamiltonian
             couplers_fock_hamiltonian = model.non_interacting_model.fock_hamiltonian
@@ -51,8 +46,8 @@ def comparison_ngaps(edm, n_gaps):
     else:
         spm = SpecificModel(model_name=model_name)
         model = spm.current_model
-        n_qubits = len(model.flattened_qubits)
-        n_electrons = spm.Nf
+        n_qubits = len(model.qubits)
+        n_electrons = spm.n_electrons
         start_fock_hamiltonian = get_quadratic_hamiltonian(
             fermion_operator=model.fock_hamiltonian,
             n_qubits=n_qubits,
@@ -63,19 +58,19 @@ def comparison_ngaps(edm, n_gaps):
         jw_eigenspectrum_at_particle_number(
             sparse_operator=get_sparse_operator(
                 couplers_fock_hamiltonian,
-                n_qubits=len(model.flattened_qubits),
+                n_qubits=len(model.qubits),
             ),
             particle_number=n_electrons,
             expanded=True,
         )
     )
 
-    sys_qubits = model.flattened_qubits
+    sys_qubits = model.qubits
     n_sys_qubits = len(sys_qubits)
     _, start_eig_states = jw_eigenspectrum_at_particle_number(
         sparse_operator=get_sparse_operator(
             start_fock_hamiltonian,
-            n_qubits=len(model.flattened_qubits),
+            n_qubits=len(model.qubits),
         ),
         particle_number=n_electrons,
         expanded=True,
@@ -86,7 +81,7 @@ def comparison_ngaps(edm, n_gaps):
     sys_eig_energies, sys_eig_states = jw_eigenspectrum_at_particle_number(
         sparse_operator=get_sparse_operator(
             model.fock_hamiltonian,
-            n_qubits=len(model.flattened_qubits),
+            n_qubits=len(model.qubits),
         ),
         particle_number=n_electrons,
         expanded=True,
@@ -108,15 +103,15 @@ def comparison_ngaps(edm, n_gaps):
         expanded=False,
     )
     sys_initial_energy = expectation_wrapper(
-        model.hamiltonian, sys_initial_state, model.flattened_qubits
+        model.hamiltonian, sys_initial_state, model.qubits
     )
     sys_ground_energy_exp = expectation_wrapper(
-        model.hamiltonian, sys_ground_state, model.flattened_qubits
+        model.hamiltonian, sys_ground_state, model.qubits
     )
     fidelity = cirq.fidelity(
         sys_initial_state,
         sys_ground_state,
-        qid_shape=(2,) * (len(model.flattened_qubits)),
+        qid_shape=(2,) * (len(model.qubits)),
     )
     print("initial fidelity: {}".format(fidelity))
     print("ground energy from spectrum: {}".format(sys_ground_energy))
@@ -134,7 +129,7 @@ def comparison_ngaps(edm, n_gaps):
         n_env_qubits=n_env_qubits,
         sys_eig_energies=sys_eig_energies,
         env_eig_energies=env_eig_energies,
-        model=model.to_json_dict()["constructor_params"],
+        model=model.__to_json__()["constructor_params"],
     )
     max_k = n_gaps + 1
     couplers = get_cheat_coupler_list(
@@ -201,7 +196,7 @@ def comparison_ngaps(edm, n_gaps):
         cooler = Cooler(
             sys_hamiltonian=model.hamiltonian,
             n_electrons=n_electrons,
-            sys_qubits=model.flattened_qubits,
+            sys_qubits=model.qubits,
             sys_ground_state=sys_ground_state,
             sys_initial_state=sys_initial_state,
             env_hamiltonian=env_ham,

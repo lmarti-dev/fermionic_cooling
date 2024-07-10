@@ -1,10 +1,9 @@
-from fauvqe.models import FermiHubbardModel
+from qutlet.models import FermiHubbardModel
 import numpy as np
 from openfermion import (
     FermionOperator,
     jordan_wigner,
     hermitian_conjugated,
-    normal_ordered,
     qubit_operator_to_pauli_sum,
 )
 from itertools import combinations
@@ -144,7 +143,9 @@ if __name__ == "__main__":
         dry_run=dry_run,
     )
 
-    model = FermiHubbardModel(x_dimension=x, y_dimension=y, tunneling=1, coulomb=2)
+    model = FermiHubbardModel(
+        lattice_dimensions=(x, y), n_electrons=n_electrons, tunneling=1, coulomb=2
+    )
     fock_ham = model.non_interacting_model.fock_hamiltonian
 
     matrix = get_nn_bog_matrix(fock_ham)
@@ -157,7 +158,7 @@ if __name__ == "__main__":
     edm.var_dump(
         n_electrons=n_electrons,
         matrix=matrix,
-        model=model.to_json_dict()["constructor_params"],
+        model=model.__to_json__()["constructor_params"],
     )
 
     print("### getting bogos")

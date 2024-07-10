@@ -1,4 +1,4 @@
-from fermionic_cooling.coolerClass import Cooler
+from cooler_class import Cooler
 import numpy as np
 
 import matplotlib.pyplot as plt

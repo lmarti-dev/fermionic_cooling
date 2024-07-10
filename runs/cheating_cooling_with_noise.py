@@ -1,15 +1,14 @@
 import sys
 
 # tsk tsk
-# sys.path.append("/home/Refik/Data/My_files/Dropbox/PhD/repos/fauvqe/")
+# sys.path.append("/home/Refik/Data/My_files/Dropbox/PhD/repos/qutlet/")
 
-from fauvqe.models.fermiHubbardModel import FermiHubbardModel
+from qutlet.models.fermi_hubbard_model import FermiHubbardModel
 
-from coolerClass import Cooler
+from cooler_class import Cooler
 
 from building_blocks import (
     get_cheat_sweep,
-    get_cheat_coupler,
     get_Z_env,
     get_cheat_coupler_list,
 )
@@ -17,9 +16,8 @@ from building_blocks import (
 from utils import (
     expectation_wrapper,
     ketbra,
-    state_fidelity_to_eigenstates,
 )
-from fauvqe.utilities import jw_eigenspectrum_at_particle_number, spin_dicke_state
+from qutlet.utilities import jw_eigenspectrum_at_particle_number, spin_dicke_state
 import cirq
 from openfermion import get_sparse_operator, jw_hartree_fock_state
 import numpy as np
@@ -81,7 +79,7 @@ def probe_reps_with_noise(
             cooler = Cooler(
                 sys_hamiltonian=model.hamiltonian,
                 n_electrons=n_electrons,
-                sys_qubits=model.flattened_qubits,
+                sys_qubits=model.qubits,
                 sys_ground_state=sys_ground_state,
                 sys_initial_state=sys_initial_state,
                 env_hamiltonian=env_ham,
@@ -182,7 +180,7 @@ def probe_alpha_with_noise(
             cooler = Cooler(
                 sys_hamiltonian=model.hamiltonian,
                 n_electrons=n_electrons,
-                sys_qubits=model.flattened_qubits,
+                sys_qubits=model.qubits,
                 sys_ground_state=sys_ground_state,
                 sys_initial_state=sys_initial_state,
                 env_hamiltonian=env_ham,
@@ -283,7 +281,7 @@ def probe_noise(
         cooler = Cooler(
             sys_hamiltonian=model.hamiltonian,
             n_electrons=n_electrons,
-            sys_qubits=model.flattened_qubits,
+            sys_qubits=model.qubits,
             sys_ground_state=sys_ground_state,
             sys_initial_state=sys_initial_state,
             env_hamiltonian=env_ham,
@@ -342,21 +340,23 @@ def __main__(args):
         dry_run=dry_run,
     )
     # model stuff
-    model = FermiHubbardModel(x_dimension=2, y_dimension=2, tunneling=1, coulomb=2)
     n_electrons = [2, 1]
-    sys_qubits = model.flattened_qubits
+    model = FermiHubbardModel(
+        lattice_dimensions=(2, 2), n_electrons=n_electrons, tunneling=1, coulomb=2
+    )
+    sys_qubits = model.qubits
     n_sys_qubits = len(sys_qubits)
     sys_hartree_fock = jw_hartree_fock_state(
         n_orbitals=n_sys_qubits, n_electrons=sum(n_electrons)
     )
     sys_dicke = spin_dicke_state(
-        n_qubits=n_sys_qubits, Nf=n_electrons, right_to_left=True
+        n_qubits=n_sys_qubits, n_electrons=n_electrons, right_to_left=True
     )
     sys_initial_state = ketbra(sys_hartree_fock)
     sys_eig_energies, sys_eig_states = jw_eigenspectrum_at_particle_number(
         sparse_operator=get_sparse_operator(
             model.fock_hamiltonian,
-            n_qubits=len(model.flattened_qubits),
+            n_qubits=len(model.qubits),
         ),
         particle_number=n_electrons,
         expanded=True,
@@ -365,16 +365,16 @@ def __main__(args):
     sys_ground_energy = np.min(sys_eig_energies)
 
     sys_initial_energy = expectation_wrapper(
-        model.hamiltonian, sys_initial_state, model.flattened_qubits
+        model.hamiltonian, sys_initial_state, model.qubits
     )
     sys_ground_energy_exp = expectation_wrapper(
-        model.hamiltonian, sys_ground_state, model.flattened_qubits
+        model.hamiltonian, sys_ground_state, model.qubits
     )
 
     fidelity = cirq.fidelity(
         sys_initial_state,
         sys_ground_state,
-        qid_shape=(2,) * (len(model.flattened_qubits)),
+        qid_shape=(2,) * (len(model.qubits)),
     )
     print("initial fidelity: {}".format(fidelity))
     print("ground energy from spectrum: {}".format(sys_ground_energy))
@@ -392,7 +392,7 @@ def __main__(args):
         n_env_qubits=n_env_qubits,
         sys_eigenspectrum=sys_eig_energies,
         env_eigenergies=env_eig_energies,
-        model=model.to_json_dict()["constructor_params"],
+        model=model.__to_json__()["constructor_params"],
     )
     probe_noise(
         edm,

@@ -2,20 +2,17 @@ import matplotlib.pyplot as plt
 import numpy as np
 from adiabatic_sweep import (
     fermion_to_dense,
-    get_sweep_hamiltonian,
     run_sweep,
-    get_instantaneous_ground_states,
 )
-from adiabaticCooler import AdiabaticCooler
 from building_blocks import (
     control_function,
     get_cheat_coupler_list,
     get_cheat_sweep,
     get_Z_env,
 )
-from cirq import PauliSum, Qid
-from coolerClass import Cooler
-from openfermion import get_sparse_operator, jordan_wigner, jw_hartree_fock_state
+from cirq import Qid
+from cooler_class import Cooler
+from openfermion import get_sparse_operator, jw_hartree_fock_state
 from utils import (
     get_extrapolated_superposition,
     get_min_gap,
@@ -24,11 +21,9 @@ from utils import (
     trace_out_env,
 )
 
-from fauvqe.models.fermiHubbardModel import FermiHubbardModel
-from fauvqe.utilities import (
+from qutlet.models.fermi_hubbard_model import FermiHubbardModel
+from qutlet.utilities import (
     jw_eigenspectrum_at_particle_number,
-    jw_get_true_ground_state_at_particle_number,
-    wrapping_slice,
 )
 
 
@@ -84,7 +79,7 @@ def cooling_then_sweep(
     cooler = Cooler(
         sys_hamiltonian=model.non_interacting_model.hamiltonian,
         n_electrons=n_electrons,
-        sys_qubits=model.flattened_qubits,
+        sys_qubits=model.qubits,
         sys_ground_state=sys_ground_state,
         sys_initial_state=sys_initial_state,
         env_hamiltonian=env_ham,
@@ -95,7 +90,7 @@ def cooling_then_sweep(
     )
     cooling_fidelities = []
     weaken_coupling = 6
-    n_qubits = len(model.flattened_qubits)
+    n_qubits = len(model.qubits)
 
     total_density_matrix = cooler.total_initial_state
 
@@ -178,7 +173,7 @@ def sweep_then_cooling(
 ):
     cooling_fidelities = []
     weaken_coupling = 5
-    n_qubits = len(model.flattened_qubits)
+    n_qubits = len(model.qubits)
 
     initial_state = get_extrapolated_superposition(
         model, n_electrons=n_electrons, coulomb=1e-6
@@ -236,21 +231,23 @@ def sweep_then_cooling(
 
 
 def sequential_run():
-    model = FermiHubbardModel(x_dimension=2, y_dimension=2, tunneling=1, coulomb=2)
+    n_electrons = [2, 2]
+    model = FermiHubbardModel(
+        lattice_dimensions=(2, 2), n_electrons=n_electrons, tunneling=1, coulomb=2
+    )
     close_model = FermiHubbardModel(
-        x_dimension=2, y_dimension=2, tunneling=1, coulomb=1e-5
+        lattice_dimensions=(2, 2), n_electrons=n_electrons, tunneling=1, coulomb=1e-5
     )
 
-    n_electrons = [2, 2]
     n_env_qubits = 1
-    n_sys_qubits = len(model.flattened_qubits)
+    n_sys_qubits = len(model.qubits)
 
     ham_start = fermion_to_dense(close_model.fock_hamiltonian)
     ham_stop = fermion_to_dense(model.fock_hamiltonian)
 
     n_sweep_steps = 100
 
-    sys_qubits = model.flattened_qubits
+    sys_qubits = model.qubits
 
     slater_eig_energies, slater_eig_states = get_slater_spectrum(
         model, n_electrons=n_electrons

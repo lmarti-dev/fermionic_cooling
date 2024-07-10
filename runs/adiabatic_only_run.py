@@ -3,28 +3,23 @@ import numpy as np
 from adiabatic_sweep import (
     fermion_to_dense,
     get_instantaneous_ground_states,
-    get_sweep_hamiltonian,
     get_sweep_norms,
     run_sweep,
 )
 from cirq import fidelity
-from chemical_models.specificModel import SpecificModel
+from chemical_models.specific_model import SpecificModel
 from openfermion import (
     get_sparse_operator,
-    jw_hartree_fock_state,
     get_quadratic_hamiltonian,
 )
 from fermionic_cooling.utils import (
-    extrapolate_ground_state_non_interacting_fermi_hubbard,
-    get_closest_noninteracting_degenerate_ground_state,
-    get_extrapolated_superposition,
     get_min_gap,
     state_fidelity_to_eigenstates,
 )
 
 from data_manager import ExperimentDataManager
-from fauvqe.models.fermiHubbardModel import FermiHubbardModel
-from fauvqe.utilities import (
+from qutlet.models.fermi_hubbard_model import FermiHubbardModel
+from qutlet.utilities import (
     jw_eigenspectrum_at_particle_number,
 )
 
@@ -65,9 +60,11 @@ def run_comp(edm, model_name):
 
     # model stuff
     if "fh_" in model_name:
-        model = FermiHubbardModel(x_dimension=2, y_dimension=2, tunneling=1, coulomb=2)
-        n_qubits = len(model.flattened_qubits)
         n_electrons = [2, 2]
+        model = FermiHubbardModel(
+            lattice_dimensions=(2, 2), n_electrons=n_electrons, tunneling=1, coulomb=2
+        )
+        n_qubits = len(model.qubits)
         if "coulomb" in model_name:
             start_fock_hamiltonian = model.coulomb_model.fock_hamiltonian
         elif "slater" in model_name:
@@ -75,8 +72,8 @@ def run_comp(edm, model_name):
     else:
         spm = SpecificModel(model_name=model_name)
         model = spm.current_model
-        n_qubits = len(model.flattened_qubits)
-        n_electrons = spm.Nf
+        n_qubits = len(model.qubits)
+        n_electrons = spm.n_electrons
         start_fock_hamiltonian = get_quadratic_hamiltonian(
             fermion_operator=model.fock_hamiltonian,
             n_qubits=n_qubits,
@@ -128,7 +125,7 @@ def run_comp(edm, model_name):
         total_time=total_time,
         n_steps=n_steps,
         min_gap=min_gap,
-        model=model.to_json_dict()["constructor_params"],
+        model=model.__to_json__()["constructor_params"],
     )
     instantaneous_ground_states = get_instantaneous_ground_states(
         ham_start=ham_start, ham_stop=ham_stop, n_steps=n_steps, n_electrons=n_electrons

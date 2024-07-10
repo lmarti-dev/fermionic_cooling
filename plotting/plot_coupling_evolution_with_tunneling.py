@@ -1,11 +1,7 @@
 import matplotlib.pyplot as plt
-from openfermion import get_sparse_operator
-import os
-import io
 import numpy as np
 
 from data_manager import ExperimentDataManager
-from fauvqe.utilities import jw_eigenspectrum_at_particle_number
 from fauplotstyle.styler import use_style
 
 

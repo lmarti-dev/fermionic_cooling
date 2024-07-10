@@ -9,8 +9,8 @@ from openfermion import get_sparse_operator
 
 from data_manager import ExperimentDataManager, load_figure_data
 from fauplotstyle.styler import use_style
-from fauvqe.models.fermiHubbardModel import FermiHubbardModel
-from fauvqe.utilities import jw_eigenspectrum_at_particle_number
+from qutlet.models.fermi_hubbard_model import FermiHubbardModel
+from qutlet.utilities import jw_eigenspectrum_at_particle_number
 
 
 def get_values(ax: plt.Axes):
@@ -71,8 +71,10 @@ def restyle_fig(fpath: str, normalized: bool = False):
 dry_run = False
 edm = ExperimentDataManager(experiment_name="figure_restyling", dry_run=dry_run)
 
-model = FermiHubbardModel(x_dimension=2, y_dimension=2, tunneling=1, coulomb=2)
 n_electrons = [2, 2]
+model = FermiHubbardModel(
+    lattice_dimensions=(2, 2), n_electrons=n_electrons, tunneling=1, coulomb=2
+)
 eigenenergies, eigenstates = jw_eigenspectrum_at_particle_number(
     get_sparse_operator(model.fock_hamiltonian), particle_number=n_electrons
 )

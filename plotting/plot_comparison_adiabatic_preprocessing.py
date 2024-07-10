@@ -5,11 +5,9 @@ import os
 import matplotlib.pyplot as plt
 import numpy as np
 from fau_colors import colors_dark
-from openfermion import get_sparse_operator
 
-from data_manager import ExtendedJSONDecoder, read_data_path, ExperimentDataManager
-from fauvqe.models.fermiHubbardModel import FermiHubbardModel
-from fauvqe.utilities import flatten, jw_eigenspectrum_at_particle_number
+from data_manager import ExtendedJSONDecoder, ExperimentDataManager
+from qutlet.utilities import flatten
 
 
 def load_json(fpath: os.PathLike):

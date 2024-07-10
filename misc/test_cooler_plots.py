@@ -1,13 +1,15 @@
-from coolerClass import Cooler
-from fauvqe.models import FermiHubbardModel
+from cooler_class import Cooler
+from qutlet.models import FermiHubbardModel
 from building_blocks import get_cheat_coupler_list, get_Z_env
 import numpy as np
 import matplotlib.pyplot as plt
 
-model = FermiHubbardModel(x_dimension=2, y_dimension=2, tunneling=1, coulomb=2)
-sys_qubits = model.flattened_qubits
-n_qubits = len(sys_qubits)
 n_electrons = [2, 2]
+model = FermiHubbardModel(
+    lattice_dimensions=(2, 2), n_electrons=n_electrons, tunneling=1, coulomb=2
+)
+sys_qubits = model.qubits
+n_qubits = len(sys_qubits)
 non_interacting_model = model.non_interacting_model.fock_hamiltonian
 
 
@@ -32,7 +34,7 @@ couplers = get_cheat_coupler_list(
 cooler = Cooler(
     sys_hamiltonian=model.hamiltonian,
     n_electrons=n_electrons,
-    sys_qubits=model.flattened_qubits,
+    sys_qubits=model.qubits,
     sys_ground_state=sys_ground_state,
     sys_initial_state=sys_initial_state,
     env_hamiltonian=env_ham,

@@ -3,8 +3,8 @@ from openfermion import get_sparse_operator
 from scipy.sparse import csc_matrix
 
 from data_manager import ExperimentDataManager
-from fauvqe.models import FermiHubbardModel
-from fauvqe.utilities import jw_eigenspectrum_at_particle_number
+from qutlet.models import FermiHubbardModel
+from qutlet.utilities import jw_eigenspectrum_at_particle_number
 from fermionic_cooling.building_blocks import get_cheat_coupler_list, get_Z_env
 
 import matplotlib.pyplot as plt
@@ -17,10 +17,12 @@ model_name = "fh_slater"
 edm = ExperimentDataManager(
     experiment_name=f"sweep_alpha_coolham_{model_name}", dry_run=dry_run
 )
-
-model = FermiHubbardModel(x_dimension=2, y_dimension=2, tunneling=1, coulomb=2)
-n_qubits = len(model.flattened_qubits)
 n_electrons = [2, 2]
+model = FermiHubbardModel(
+    lattice_dimensions=(2, 2), n_electrons=n_electrons, tunneling=1, coulomb=2
+)
+n_qubits = len(model.qubits)
+
 if "coulomb" in model_name:
     start_fock_hamiltonian = model.coulomb_model.fock_hamiltonian
     couplers_fock_hamiltonian = model.non_interacting_model.fock_hamiltonian
@@ -31,20 +33,20 @@ elif "slater" in model_name:
 # free_sys_eig_energies, free_sys_eig_states = jw_eigenspectrum_at_particle_number(
 #     sparse_operator=get_sparse_operator(
 #         couplers_fock_hamiltonian,
-#         n_qubits=len(model.flattened_qubits),
+#         n_qubits=len(model.qubits),
 #     ),
 #     particle_number=n_electrons,
 #     expanded=True,
 # )
 
 
-sys_qubits = model.flattened_qubits
+sys_qubits = model.qubits
 n_sys_qubits = len(sys_qubits)
 slater_index = 0
 sys_eig_energies, sys_eig_states = jw_eigenspectrum_at_particle_number(
     sparse_operator=get_sparse_operator(
         model.fock_hamiltonian,
-        n_qubits=len(model.flattened_qubits),
+        n_qubits=len(model.qubits),
     ),
     particle_number=n_electrons,
     expanded=True,
@@ -62,7 +64,7 @@ gs_index = 0
 
 edm.var_dump(
     n_electrons=n_electrons,
-    model=model.to_json_dict()["constructor_params"],
+    model=model.__to_json__()["constructor_params"],
     coupler_index=coupler_index,
     n_sys_qubits=n_sys_qubits,
     n_env_qubits=n_env_qubits,

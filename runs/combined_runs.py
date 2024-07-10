@@ -1,35 +1,20 @@
 import matplotlib.pyplot as plt
 import numpy as np
-from adiabatic_sweep import (
-    fermion_to_dense,
-    get_sweep_hamiltonian,
-    run_sweep,
-    get_instantaneous_ground_states,
-)
-from adiabaticCooler import AdiabaticCooler
+from adiabatic_cooler import AdiabaticCooler
 from building_blocks import (
-    control_function,
-    get_cheat_coupler_list,
-    get_cheat_sweep,
     get_Z_env,
 )
-from cirq import PauliSum, Qid
-from coolerClass import Cooler
-from openfermion import get_sparse_operator, jordan_wigner, jw_hartree_fock_state
+from openfermion import get_sparse_operator, jw_hartree_fock_state
 from utils import (
-    get_extrapolated_superposition,
     get_min_gap,
     get_slater_spectrum,
     get_onsite_spectrum,
     ketbra,
-    trace_out_env,
 )
 
-from fauvqe.models.fermiHubbardModel import FermiHubbardModel
-from fauvqe.utilities import (
+from qutlet.models.fermi_hubbard_model import FermiHubbardModel
+from qutlet.utilities import (
     jw_eigenspectrum_at_particle_number,
-    jw_get_true_ground_state_at_particle_number,
-    wrapping_slice,
 )
 
 # there are five cases
@@ -51,7 +36,7 @@ def get_couplers_for_sweep(
     omegas = np.zeros((n_steps,))
     couplers = []
 
-    params = model.to_json_dict()["constructor_params"]
+    params = model.__to_json__()["constructor_params"]
     tunneling = params["tunneling"]
     coulomb = params["coulomb"]
 
@@ -109,7 +94,10 @@ def adiabatic_cooling(which="coulomb"):
         start_model_coulomb = coulomb
 
     model = FermiHubbardModel(
-        x_dimension=2, y_dimension=2, tunneling=tunneling, coulomb=coulomb
+        lattice_dimensions=(2, 2),
+        n_electrons=n_electrons,
+        tunneling=tunneling,
+        coulomb=coulomb,
     )
     close_model = FermiHubbardModel(
         x_dimension=x_dimension,
@@ -134,8 +122,8 @@ def adiabatic_cooling(which="coulomb"):
     n_steps = 1000
     weaken_coupling = 5
 
-    sys_qubits = model.flattened_qubits
-    n_sys_qubits = len(model.flattened_qubits)
+    sys_qubits = model.qubits
+    n_sys_qubits = len(model.qubits)
 
     ham_start = start_model.hamiltonian
     ham_stop = model.hamiltonian
@@ -192,7 +180,7 @@ def adiabatic_cooling(which="coulomb"):
     adiabatic_cooler = AdiabaticCooler(
         sys_hamiltonian=model.hamiltonian,
         n_electrons=n_electrons,
-        sys_qubits=model.flattened_qubits,
+        sys_qubits=model.qubits,
         sys_ground_state=sys_ground_state,
         sys_initial_state=sys_initial_state,
         env_hamiltonian=env_ham,

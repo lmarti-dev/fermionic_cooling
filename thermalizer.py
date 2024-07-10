@@ -1,4 +1,4 @@
-from coolerClass import Cooler
+from cooler_class import Cooler
 import numpy as np
 from fermionic_cooling.utils import fidelity_wrapper
 

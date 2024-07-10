@@ -1,16 +1,15 @@
 import sys
 
 # tsk tsk
-# sys.path.append("/home/Refik/Data/My_files/Dropbox/PhD/repos/fauvqe/")
+# sys.path.append("/home/Refik/Data/My_files/Dropbox/PhD/repos/qutlet/")
 
-from fauvqe.models.fermiHubbardModel import FermiHubbardModel
-from chemical_models.specificModel import SpecificModel
+from qutlet.models.fermi_hubbard_model import FermiHubbardModel
+from chemical_models.specific_model import SpecificModel
 
-from coolerClass import Cooler
+from cooler_class import Cooler
 
 from building_blocks import (
     get_cheat_sweep,
-    get_cheat_coupler,
     get_perturbed_sweep,
     get_Z_env,
     get_cheat_coupler_list,
@@ -23,7 +22,7 @@ from fermionic_cooling.utils import (
     get_min_gap,
     s_squared_penalty,
 )
-from fauvqe.utilities import (
+from qutlet.utilities import (
     jw_eigenspectrum_at_particle_number,
     spin_dicke_state,
     flatten,
@@ -58,15 +57,17 @@ def __main__(args):
     model_name = "cooked/SingletO2_6e_8q"
     model_name = "fh"
     if model_name == "fh":
-        model = FermiHubbardModel(x_dimension=2, y_dimension=2, tunneling=1, coulomb=2)
-        n_qubits = len(model.flattened_qubits)
         n_electrons = [2, 2]
+        model = FermiHubbardModel(
+            lattice_dimensions=(2, 2), n_electrons=n_electrons, tunneling=1, coulomb=2
+        )
+        n_qubits = len(model.qubits)
         non_interacting_model = model.non_interacting_model.fock_hamiltonian
     else:
         spm = SpecificModel(model_name=model_name)
         model = spm.current_model
-        n_qubits = len(model.flattened_qubits)
-        n_electrons = spm.Nf
+        n_qubits = len(model.qubits)
+        n_electrons = spm.n_electrons
         non_interacting_model = get_quadratic_hamiltonian(
             fermion_operator=model.fock_hamiltonian,
             n_qubits=n_qubits,
@@ -77,20 +78,20 @@ def __main__(args):
     free_sys_eig_energies, free_sys_eig_states = jw_eigenspectrum_at_particle_number(
         sparse_operator=get_sparse_operator(
             non_interacting_model,
-            n_qubits=len(model.flattened_qubits),
+            n_qubits=len(model.qubits),
         ),
         particle_number=n_electrons,
         expanded=True,
     )
 
-    sys_qubits = model.flattened_qubits
+    sys_qubits = model.qubits
     n_sys_qubits = len(sys_qubits)
     sys_hartree_fock = jw_hartree_fock_state(
         n_orbitals=n_sys_qubits, n_electrons=sum(n_electrons)
     )
 
     sys_dicke = spin_dicke_state(
-        n_qubits=n_sys_qubits, Nf=n_electrons, right_to_left=False
+        n_qubits=n_sys_qubits, n_electrons=n_electrons, right_to_left=False
     )
     sys_mixed_state = np.ones(2**n_sys_qubits) / (2 ** (n_sys_qubits / 2))
     sys_slater_state = free_sys_eig_states[:, gs_index]
@@ -98,7 +99,7 @@ def __main__(args):
     sys_eig_energies, sys_eig_states = jw_eigenspectrum_at_particle_number(
         sparse_operator=get_sparse_operator(
             model.fock_hamiltonian,
-            n_qubits=len(model.flattened_qubits),
+            n_qubits=len(model.qubits),
         ),
         particle_number=n_electrons,
         expanded=True,
@@ -120,16 +121,16 @@ def __main__(args):
         )
     print(f"sum fids {sum(eig_fids)}")
     sys_initial_energy = expectation_wrapper(
-        model.hamiltonian, sys_initial_state, model.flattened_qubits
+        model.hamiltonian, sys_initial_state, model.qubits
     )
     sys_ground_energy_exp = expectation_wrapper(
-        model.hamiltonian, sys_ground_state, model.flattened_qubits
+        model.hamiltonian, sys_ground_state, model.qubits
     )
 
     fidelity = cirq.fidelity(
         sys_initial_state,
         sys_ground_state,
-        qid_shape=(2,) * (len(model.flattened_qubits)),
+        qid_shape=(2,) * (len(model.qubits)),
     )
     print("initial fidelity: {}".format(fidelity))
     print("ground energy from spectrum: {}".format(sys_ground_energy))
@@ -147,7 +148,7 @@ def __main__(args):
         n_env_qubits=n_env_qubits,
         sys_eig_energies=sys_eig_energies,
         env_eig_energies=env_eig_energies,
-        model=model.to_json_dict()["constructor_params"],
+        model=model.__to_json__()["constructor_params"],
     )
 
     max_k = 6
@@ -231,7 +232,7 @@ def __main__(args):
     cooler = Cooler(
         sys_hamiltonian=total_ham,
         n_electrons=n_electrons,
-        sys_qubits=model.flattened_qubits,
+        sys_qubits=model.qubits,
         sys_ground_state=sys_ground_state,
         sys_initial_state=sys_initial_state,
         env_hamiltonian=env_ham,

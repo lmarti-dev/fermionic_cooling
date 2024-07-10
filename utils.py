@@ -1,6 +1,5 @@
 import itertools
 import multiprocessing as mp
-import time
 from typing import Iterable, Iterator
 
 import cirq
@@ -26,8 +25,8 @@ from scipy.sparse import csc_matrix
 from scipy.sparse.linalg import eigsh, expm, expm_multiply
 
 
-from fauvqe.models.fermiHubbardModel import FermiHubbardModel
-from fauvqe.utilities import (
+from qutlet.models.fermi_hubbard_model import FermiHubbardModel
+from qutlet.utilities import (
     chained_matrix_multiplication,
     flatten,
     jw_eigenspectrum_at_particle_number,
@@ -44,20 +43,20 @@ from fauvqe.utilities import (
 
 
 def get_closest_noninteracting_degenerate_ground_state(
-    model: FermiHubbardModel, n_qubits: int, Nf: list
+    model: FermiHubbardModel, n_qubits: int, n_electrons: list
 ):
     sparse_fermion_operator = get_sparse_operator(
         model.fock_hamiltonian, n_qubits=n_qubits
     )
     ground_energy, ground_state = jw_get_true_ground_state_at_particle_number(
-        sparse_fermion_operator, Nf
+        sparse_fermion_operator, n_electrons
     )
     sparse_quadratic_fermion_operator = get_sparse_operator(
         model.non_interacting_model.fock_hamiltonian,
         n_qubits=n_qubits,
     )
     slater_eigenenergies, slater_eigenstates = jw_eigenspectrum_at_particle_number(
-        sparse_quadratic_fermion_operator, Nf, expanded=True
+        sparse_quadratic_fermion_operator, n_electrons, expanded=True
     )
 
     return get_closest_degenerate_ground_state(
@@ -144,7 +143,7 @@ def add_depol_noise(
 
     if is_noise_spin_conserving:
         rho_err = spin_dicke_mixed_state(
-            n_qubits=n_qubits, Nf=n_electrons, expanded=True
+            n_qubits=n_qubits, n_electrons=n_electrons, expanded=True
         )
     else:
         rho_err = np.eye(N=len(rho)) / len(rho)
@@ -546,10 +545,10 @@ def extrapolate_ground_state_non_interacting_fermi_hubbard(
     Returns:
         _type_: _description_
     """
-    coefficients = np.zeros((n_points, 2 ** len(model.flattened_qubits)))
+    coefficients = np.zeros((n_points, 2 ** len(model.qubits)))
     interval = np.linspace(1e-8, 1e-7, n_points)
     for ind, epsilon in enumerate(interval):
-        params = model.to_json_dict()["constructor_params"]
+        params = model.__to_json__()["constructor_params"]
         params["coulomb"] = epsilon
         model_eps = FermiHubbardModel(**params)
         _, ground_state = jw_get_true_ground_state_at_particle_number(
@@ -575,7 +574,7 @@ def get_slater_spectrum(model: FermiHubbardModel, n_electrons: list):
 
 
 def get_onsite_spectrum(model: FermiHubbardModel, n_electrons: list):
-    params = model.to_json_dict()
+    params = model.__to_json__()
     params["constructor_params"]["tunneling"] = 0
     onsite_model = FermiHubbardModel(**params["constructor_params"])
     slater_energies, slater_eigenstates = jw_eigenspectrum_at_particle_number(
@@ -588,7 +587,7 @@ def get_onsite_spectrum(model: FermiHubbardModel, n_electrons: list):
 
 def get_dicke_state(n_qubits, n_electrons):
     dicke_state = spin_dicke_state(
-        n_qubits=n_qubits, Nf=n_electrons, right_to_left=False
+        n_qubits=n_qubits, n_electrons=n_electrons, right_to_left=False
     )
     return dicke_state
 
@@ -599,7 +598,7 @@ def get_closest_slater(model: FermiHubbardModel, n_electrons: list):
         slater_state,
         max_ind,
     ) = get_closest_noninteracting_degenerate_ground_state(
-        model=model, n_qubits=len(model.flattened_qubits), Nf=n_electrons
+        model=model, n_qubits=len(model.qubits), n_electrons=n_electrons
     )
     return slater_energy, slater_state, max_ind
 
@@ -613,7 +612,7 @@ def get_hartree_fock(n_qubits: int, n_electrons: list):
 
 
 def get_close_ground_state(model: FermiHubbardModel, n_electrons: list, coulomb: float):
-    params = model.to_json_dict()["constructor_params"]
+    params = model.__to_json__()["constructor_params"]
     params["coulomb"] = coulomb
     close_model = FermiHubbardModel(**params)
     (

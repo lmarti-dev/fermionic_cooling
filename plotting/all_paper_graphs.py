@@ -3,26 +3,18 @@ import json
 import os
 
 import matplotlib.pyplot as plt
-from coolerClass import Cooler
+from cooler_class import Cooler
 from json_extender import ExtendedJSONDecoder
 from openfermion import get_sparse_operator
 
 from data_manager import ExperimentDataManager
 from fauplotstyle.styler import use_style
-from fauvqe.models import FermiHubbardModel
-from fauvqe.utilities import jw_eigenspectrum_at_particle_number
+from qutlet.models import FermiHubbardModel
+from qutlet.utilities import jw_eigenspectrum_at_particle_number
 from fermionic_cooling.plotting.plot_comparison_adiabatic_preprocessing import (
     plot_comparison_fast_sweep,
 )
-from fermionic_cooling.plotting.plot_each_coupler import plot_each_coupler_perf
 from fermionic_cooling.plotting.plot_fastsweep_m_fid import plot_fast_sweep_vs_m
-from fermionic_cooling.plotting.plot_thermal_state_decomposition import (
-    plot_amplitudes_vs_beta,
-)
-from fermionic_cooling.plotting.plot_thermalizing_vs_beta_init import (
-    afternoon_plot,
-    plot_single,
-)
 import numpy as np
 
 
@@ -36,7 +28,11 @@ def show_if_dry(dry_run: bool):
 
 def get_spectrum(x, y, tunneling, coulomb, n_electrons):
     model = FermiHubbardModel(
-        x_dimension=x, y_dimension=y, tunneling=tunneling, coulomb=coulomb
+        x_dimension=x,
+        y_dimension=y,
+        n_electrons=n_electrons,
+        tunneling=tunneling,
+        coulomb=coulomb,
     )
     eig_energies, _ = jw_eigenspectrum_at_particle_number(
         sparse_operator=get_sparse_operator(model.fock_hamiltonian),

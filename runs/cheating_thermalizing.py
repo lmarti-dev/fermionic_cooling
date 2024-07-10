@@ -1,26 +1,21 @@
-import sys
 from itertools import combinations
 
 import matplotlib.pyplot as plt
 import numpy as np
 from building_blocks import (
     get_cheat_coupler_list,
-    get_cheat_sweep,
-    get_cheat_thermalizers,
-    get_matrix_coupler,
     get_Z_env,
 )
-from openfermion import get_sparse_operator, jw_hartree_fock_state
+from openfermion import get_sparse_operator
 from thermalizer import Thermalizer
 
 from data_manager import ExperimentDataManager
 from fauplotstyle.styler import use_style
-from fauvqe.models.fermiHubbardModel import FermiHubbardModel
-from fauvqe.utilities import jw_eigenspectrum_at_particle_number, qmap, spin_dicke_state
+from qutlet.models.fermi_hubbard_model import FermiHubbardModel
+from qutlet.utilities import jw_eigenspectrum_at_particle_number
 from fermionic_cooling.utils import (
     dense_restricted_ham,
     get_min_gap,
-    ketbra,
     state_fidelity_to_eigenstates,
     thermal_density_matrix,
     thermal_density_matrix_at_particle_number,
@@ -128,9 +123,11 @@ def main_run(edm: ExperimentDataManager, initial_beta, target_beta, **kwargs):
     gs_index = 2
     model_name = "fh_coulomb"
     if "fh_" in model_name:
-        model = FermiHubbardModel(x_dimension=2, y_dimension=2, tunneling=1, coulomb=2)
-        n_qubits = len(model.flattened_qubits)
         n_electrons = [2, 2]
+        model = FermiHubbardModel(
+            lattice_dimensions=(2, 2), n_electrons=n_electrons, tunneling=1, coulomb=2
+        )
+        n_qubits = len(model.qubits)
         if "coulomb" in model_name:
             start_fock_hamiltonian = model.coulomb_model.fock_hamiltonian
             couplers_fock_hamiltonian = model.non_interacting_model.fock_hamiltonian
@@ -139,7 +136,7 @@ def main_run(edm: ExperimentDataManager, initial_beta, target_beta, **kwargs):
             couplers_fock_hamiltonian = start_fock_hamiltonian
     # define inverse temp
 
-    sys_qubits = model.flattened_qubits
+    sys_qubits = model.qubits
     n_sys_qubits = len(sys_qubits)
     n_env_qubits = 1
     n_total_qubits = n_sys_qubits + n_env_qubits
@@ -151,7 +148,7 @@ def main_run(edm: ExperimentDataManager, initial_beta, target_beta, **kwargs):
     sys_eig_energies, sys_eig_states = jw_eigenspectrum_at_particle_number(
         sparse_operator=get_sparse_operator(
             model.fock_hamiltonian,
-            n_qubits=len(model.flattened_qubits),
+            n_qubits=len(model.qubits),
         ),
         particle_number=n_electrons,
         expanded=False,
@@ -165,7 +162,7 @@ def main_run(edm: ExperimentDataManager, initial_beta, target_beta, **kwargs):
         jw_eigenspectrum_at_particle_number(
             sparse_operator=get_sparse_operator(
                 couplers_fock_hamiltonian,
-                n_qubits=len(model.flattened_qubits),
+                n_qubits=len(model.qubits),
             ),
             particle_number=n_electrons,
             expanded=False,
@@ -174,7 +171,7 @@ def main_run(edm: ExperimentDataManager, initial_beta, target_beta, **kwargs):
     start_sys_eig_energies, start_sys_eig_states = jw_eigenspectrum_at_particle_number(
         sparse_operator=get_sparse_operator(
             start_fock_hamiltonian,
-            n_qubits=len(model.flattened_qubits),
+            n_qubits=len(model.qubits),
         ),
         particle_number=n_electrons,
         expanded=False,
@@ -184,7 +181,7 @@ def main_run(edm: ExperimentDataManager, initial_beta, target_beta, **kwargs):
     min_gap = get_min_gap(sys_eig_energies, threshold=1e-8)
     # ketbra(sys_slater_state)
     spin_dicke_initial_state = spin_dicke_mixed_state(
-        n_qubits=n_sys_qubits, Nf=n_electrons
+        n_qubits=n_sys_qubits, n_electrons=n_electrons
     )
 
     use_fast_sweep = True
@@ -253,7 +250,7 @@ def main_run(edm: ExperimentDataManager, initial_beta, target_beta, **kwargs):
         jw_eigenspectrum_at_particle_number(
             sparse_operator=get_sparse_operator(
                 couplers_fock_hamiltonian,
-                n_qubits=len(model.flattened_qubits),
+                n_qubits=len(model.qubits),
             ),
             particle_number=n_electrons,
             expanded=False,
@@ -325,7 +322,7 @@ def main_run(edm: ExperimentDataManager, initial_beta, target_beta, **kwargs):
         thermal_sys_density=thermal_sys_density,
         sys_hamiltonian=sys_ham_matrix,
         n_electrons=n_electrons,
-        sys_qubits=model.flattened_qubits,
+        sys_qubits=model.qubits,
         sys_ground_state=sys_ground_state,
         sys_initial_state=sys_initial_state,
         env_hamiltonian=env_ham,
@@ -345,7 +342,7 @@ def main_run(edm: ExperimentDataManager, initial_beta, target_beta, **kwargs):
         n_env_qubits=n_env_qubits,
         sys_eigenspectrum=sys_eig_energies,
         env_eigenergies=env_eig_energies,
-        model=model.to_json_dict()["constructor_params"],
+        model=model.__to_json__()["constructor_params"],
         use_fast_sweep=use_fast_sweep,
         depol_noise=depol_noise,
         is_noise_spin_conserving=is_noise_spin_conserving,

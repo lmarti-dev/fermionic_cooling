@@ -1,33 +1,23 @@
 import sys
 
 # tsk tsk
-sys.path.append("/home/Refik/Data/My_files/Dropbox/PhD/repos/fauvqe/")
+sys.path.append("/home/Refik/Data/My_files/Dropbox/PhD/repos/qutlet/")
 
 
-import cirq
 import numpy as np
-from coolerClass import Cooler, get_total_spectra_at_given_omega
 from building_blocks import (
     get_moving_fsim_coupler_list,
-    get_moving_paulipauli_coupler_list,
     get_moving_ZY_coupler_list,
-    get_moving_ZYZY_coupler_list,
     get_Z_env,
-    get_ZY_coupler,
 )
 from utils import (
-    expectation_wrapper,
-    print_coupler_fidelity_to_ground_state_projectors,
     coupler_fidelity_to_ground_state_projectors,
 )
-from openfermion import get_sparse_operator, jw_hartree_fock_state
+from openfermion import get_sparse_operator
 
-from fauvqe.models.fermiHubbardModel import FermiHubbardModel
-from fauvqe.utilities import (
-    is_subspace_gs_global,
+from qutlet.models.fermi_hubbard_model import FermiHubbardModel
+from qutlet.utilities import (
     jw_eigenspectrum_at_particle_number,
-    spin_dicke_mixed_state,
-    spin_dicke_state,
 )
 
 import matplotlib.pyplot as plt
@@ -43,15 +33,18 @@ def process_pauli_sum_str(psum_str: str):
 
 
 if __name__ == "__main__":
-    model = FermiHubbardModel(x_dimension=2, y_dimension=2, tunneling=1, coulomb=2)
     n_electrons = [2, 1]
-    sys_qubits = model.flattened_qubits
+    model = FermiHubbardModel(
+        lattice_dimensions=(2, 2), n_electrons=n_electrons, tunneling=1, coulomb=2
+    )
+
+    sys_qubits = model.qubits
     n_sys_qubits = len(sys_qubits)
 
     sys_eigenspectrum, sys_eig_states = jw_eigenspectrum_at_particle_number(
         sparse_operator=get_sparse_operator(
             model.fock_hamiltonian,
-            n_qubits=len(model.flattened_qubits),
+            n_qubits=len(model.qubits),
         ),
         particle_number=n_electrons,
         expanded=True,

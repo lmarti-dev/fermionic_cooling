@@ -1,5 +1,5 @@
-from fauvqe.models import FermiHubbardModel
-from fauvqe.utilities import (
+from qutlet.models import FermiHubbardModel
+from qutlet.utilities import (
     jw_eigenspectrum_at_particle_number,
     jw_spin_correct_indices,
 )
@@ -50,9 +50,11 @@ def vanilla_expec(rho, observable, qubits):
 
 if __name__ == "__main__":
 
-    model = FermiHubbardModel(x_dimension=2, y_dimension=2, tunneling=1, coulomb=2)
     n_electrons = [2, 2]
-    n_sys_qubits = len(model.flattened_qubits)
+    model = FermiHubbardModel(
+        lattice_dimensions=(2, 2), n_electrons=n_electrons, tunneling=1, coulomb=2
+    )
+    n_sys_qubits = len(model.qubits)
     sys_eig_energies, sys_eig_states = jw_eigenspectrum_at_particle_number(
         sparse_operator=get_sparse_operator(model.fock_hamiltonian),
         particle_number=n_electrons,
@@ -69,7 +71,7 @@ if __name__ == "__main__":
 
     print(
         "vanilla energy:",
-        vanilla_expec(expanded_rho, model.hamiltonian, model.flattened_qubits),
+        vanilla_expec(expanded_rho, model.hamiltonian, model.qubits),
     )
     print(
         "subspace energy:",
