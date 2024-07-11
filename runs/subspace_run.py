@@ -32,9 +32,9 @@ def __main__(edm: ExperimentDataManager):
     model_name = "cooked/water_singlet_6e_10q"
     # model_name = "fh_slater"
     if "fh_" in model_name:
-        n_electrons = [2, 2]
+        n_electrons = [3, 3]
         model = FermiHubbardModel(
-            lattice_dimensions=(2, 2), n_electrons=n_electrons, tunneling=1, coulomb=6
+            lattice_dimensions=(3, 2), n_electrons=n_electrons, tunneling=1, coulomb=6
         )
         n_qubits = len(model.qubits)
         if "coulomb" in model_name:
