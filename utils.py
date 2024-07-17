@@ -67,15 +67,33 @@ def get_closest_noninteracting_degenerate_ground_state(
     )
 
 
+def get_closest_state(
+    ref_state: np.ndarray, comp_states: np.ndarray, subspace_simulation: bool = False
+):
+    fidelities = []
+    for ind in range(comp_states.shape[1]):
+        fidelities.append(
+            fidelity_wrapper(
+                comp_states[:, ind],
+                ref_state,
+                qid_shape=(2,) * int(np.log2(len(ref_state))),
+                subspace_simulation=subspace_simulation,
+            )
+        )
+    max_ind = np.argmax(fidelities)
+    print(f"degenerate fidelities: {fidelities}, max: {max_ind}")
+    return comp_states[:, max_ind], int(max_ind)
+
+
 def get_closest_degenerate_ground_state(
     ref_state: np.ndarray,
     comp_energies: np.ndarray,
     comp_states: np.ndarray,
     subspace_simulation: bool = False,
 ):
-    ix = np.argsort(comp_energies)
-    comp_states = comp_states[:, ix]
-    comp_energies = comp_energies[ix]
+    idx = np.argsort(comp_energies)
+    comp_states = comp_states[:, idx]
+    comp_energies = comp_energies[idx]
     comp_ground_energy = comp_energies[0]
     degeneracy = sum(
         (np.isclose(comp_ground_energy, eigenenergy) for eigenenergy in comp_energies)

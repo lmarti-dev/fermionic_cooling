@@ -17,11 +17,11 @@ from fauplotstyle.styler import use_style
 from fermionic_cooling.adiabatic_sweep import run_sweep
 from fermionic_cooling.utils import (
     dense_restricted_ham,
-    get_closest_degenerate_ground_state,
     get_min_gap,
     ketbra,
     print_state_fidelity_to_eigenstates,
     subspace_energy_expectation,
+    get_closest_state,
 )
 from qutlet.models.fermi_hubbard_model import FermiHubbardModel
 from qutlet.utilities import jw_eigenspectrum_at_particle_number, fidelity
@@ -30,11 +30,11 @@ from qutlet.utilities import jw_eigenspectrum_at_particle_number, fidelity
 def __main__(edm: ExperimentDataManager):
 
     model_name = "cooked/water_singlet_6e_10q"
-    # model_name = "fh_slater"
+    model_name = "fh_slater"
     if "fh_" in model_name:
-        n_electrons = [3, 3]
+        n_electrons = [2, 2]
         model = FermiHubbardModel(
-            lattice_dimensions=(3, 2), n_electrons=n_electrons, tunneling=1, coulomb=6
+            lattice_dimensions=(2, 2), n_electrons=n_electrons, tunneling=1, coulomb=6
         )
         n_qubits = len(model.qubits)
         if "coulomb" in model_name:
@@ -85,9 +85,12 @@ def __main__(edm: ExperimentDataManager):
         particle_number=n_electrons,
         expanded=False,
     )
-    _, _, start_gs_index = get_closest_degenerate_ground_state(
-        ref_state=sys_eig_states[:, 0],
-        comp_energies=start_sys_eig_energies,
+
+    sys_ground_state = sys_eig_states[:, np.argmin(sys_eig_energies)]
+    sys_ground_energy = np.min(sys_eig_energies)
+
+    _, start_gs_index = get_closest_state(
+        ref_state=sys_ground_state,
         comp_states=start_sys_eig_states,
         subspace_simulation=True,
     )
@@ -95,9 +98,6 @@ def __main__(edm: ExperimentDataManager):
 
     # initial state setting
     sys_initial_state = ketbra(start_sys_eig_states[:, start_gs_index])
-
-    sys_ground_state = sys_eig_states[:, np.argmin(sys_eig_energies)]
-    sys_ground_energy = np.min(sys_eig_energies)
 
     print("BEFORE SWEEP")
     print_state_fidelity_to_eigenstates(
@@ -141,7 +141,7 @@ def __main__(edm: ExperimentDataManager):
         model_name=model_name,
     )
 
-    max_k = 10
+    max_k = 14
 
     couplers = get_cheat_coupler_list(
         sys_eig_states=couplers_sys_eig_states,
@@ -237,7 +237,7 @@ def __main__(edm: ExperimentDataManager):
     print(f"coupler dim: {cooler.sys_env_coupler_data_dims}")
 
     ansatz_options = {"beta": 1, "mu": 30, "c": 40}
-    weaken_coupling = 50
+    weaken_coupling = 60
 
     start_omega = spectrum_width / 5
     stop_omega = 0.8
@@ -309,9 +309,9 @@ def __main__(edm: ExperimentDataManager):
 
 if __name__ == "__main__":
     # whether we want to skip all saving data
-    dry_run = True
+    dry_run = False
     edm = ExperimentDataManager(
-        experiment_name="bigbrain_subspace_multi_ancillas",
+        experiment_name="bigbrain_subspace_water_stuff",
         project="fermionic cooling",
         dry_run=dry_run,
     )
