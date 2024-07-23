@@ -169,7 +169,7 @@ def __main__():
         ax2.legend(lines + lines2, labels + labels2)
 
         edm.var_dump(model_name=model_name, n_qubits=n_qubits, n_electrons=n_electrons)
-        edm.save_figure(fig=fig, fig_shape="double-wide")
+        edm.save_figure(fig=fig, fig_shape="double-size")
         # plt.show()
 
 

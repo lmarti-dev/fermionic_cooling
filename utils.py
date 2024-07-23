@@ -72,14 +72,16 @@ def get_closest_state(
 ):
     fidelities = []
     for ind in range(comp_states.shape[1]):
-        fidelities.append(
-            fidelity_wrapper(
-                comp_states[:, ind],
-                ref_state,
-                qid_shape=(2,) * int(np.log2(len(ref_state))),
-                subspace_simulation=subspace_simulation,
-            )
+        fid = fidelity_wrapper(
+            comp_states[:, ind],
+            ref_state,
+            qid_shape=(2,) * int(np.log2(len(ref_state))),
+            subspace_simulation=subspace_simulation,
         )
+        if fid > 0.5:
+            # if one state has more than .5 fid with ref, then it's necessarily the closest
+            return comp_states[:, ind], int(ind)
+        fidelities.append(fid)
     max_ind = np.argmax(fidelities)
     print(f"degenerate fidelities: {fidelities}, max: {max_ind}")
     return comp_states[:, max_ind], int(max_ind)
@@ -421,7 +423,7 @@ def print_state_fidelity_to_eigenstates(
         eigenstates=eigenstates,
         expanded=expanded,
     )
-    print("Initial populations")
+    print("Populations")
     for ind, (fid, eigenenergy) in enumerate(zip(eig_fids, eigenenergies)):
         if not np.isclose(fid, 0):
             print(
