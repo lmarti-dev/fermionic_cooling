@@ -29,6 +29,7 @@ from scipy.sparse.linalg import eigsh, expm, expm_multiply
 from qutlet.models.fermi_hubbard_model import FermiHubbardModel
 from qutlet.utilities import (
     chained_matrix_multiplication,
+    jw_spin_correct_indices,
     flatten,
     jw_eigenspectrum_at_particle_number,
     jw_get_true_ground_state_at_particle_number,
@@ -36,6 +37,8 @@ from qutlet.utilities import (
     spin_dicke_state,
     jw_spin_restrict_operator,
     spin_dicke_mixed_state,
+    to_bitstring,
+    from_bitstring,
 )
 
 # this file contains general utils for the cooling.
@@ -694,3 +697,30 @@ def subspace_energy_expectation(
             @ np.diag(sys_eig_energies)
         )
     )
+
+
+def get_subspace_indices_with_env_qubits(
+    n_electrons: list, n_sys_qubits: int, n_env_qubits: int
+):
+    indices = jw_spin_correct_indices(
+        n_electrons=n_electrons, n_qubits=n_sys_qubits, right_to_left=True
+    )
+    out_indices = []
+    env_offsets = []
+    for env_ind in range(2**n_env_qubits):
+        env_bitstring = to_bitstring(
+            ind=env_ind, n_qubits=n_env_qubits, right_to_left=True
+        )
+        env_bitstring = env_bitstring + "0" * n_sys_qubits
+        env_offset = from_bitstring(
+            b=env_bitstring,
+            n_qubits=n_sys_qubits + n_env_qubits,
+            right_to_left=False,
+        )
+        env_offsets.append(env_offset)
+
+    for sys_ind in indices:
+        for env_offset in env_offsets:
+            out_ind = sys_ind + env_offset
+            out_indices.append(out_ind)
+    return out_indices

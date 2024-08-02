@@ -215,6 +215,21 @@ def get_YY_coupler(sys_qubits: list[cirq.Qid], env_qubits: list[cirq.Qid]):
     )
 
 
+def get_XXYY_coupler(sys_qubits: list[cirq.Qid], env_qubits: list[cirq.Qid]):
+    n_sys_qubits = len(sys_qubits)
+    n_env_qubits = len(env_qubits)
+    return sum(
+        [
+            0.5
+            * (
+                cirq.X(sys_qubits[k]) * cirq.X(env_qubits[k % n_env_qubits])
+                + cirq.Y(sys_qubits[k]) * cirq.Y(env_qubits[k % n_env_qubits])
+            )
+            for k in range(n_sys_qubits)
+        ]
+    )
+
+
 def get_ZY_coupler(sys_qubits: list[cirq.Qid], env_qubits: list[cirq.Qid]):
     n_sys_qubits = len(sys_qubits)
     n_env_qubits = len(env_qubits)

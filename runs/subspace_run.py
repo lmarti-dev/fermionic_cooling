@@ -2,11 +2,6 @@ from itertools import combinations
 
 import matplotlib.pyplot as plt
 import numpy as np
-from building_blocks import (
-    get_cheat_coupler_list,
-    get_Z_env,
-)
-from cooler_class import Cooler
 from openfermion import (
     get_sparse_operator,
 )
@@ -15,16 +10,22 @@ from chemical_models.specific_model import SpecificModel
 from data_manager import ExperimentDataManager
 from fauplotstyle.styler import use_style
 from fermionic_cooling.adiabatic_sweep import run_sweep
+from fermionic_cooling.building_blocks import (
+    get_cheat_coupler_list,
+    get_Z_env,
+    get_XXYY_coupler,
+)
+from fermionic_cooling.cooler_class import Cooler
 from fermionic_cooling.utils import (
     dense_restricted_ham,
+    get_closest_state,
     get_min_gap,
     ketbra,
     print_state_fidelity_to_eigenstates,
     subspace_energy_expectation,
-    get_closest_state,
 )
 from qutlet.models.fermi_hubbard_model import FermiHubbardModel
-from qutlet.utilities import jw_eigenspectrum_at_particle_number, fidelity
+from qutlet.utilities import fidelity, jw_eigenspectrum_at_particle_number
 
 
 def __main__(edm: ExperimentDataManager):

@@ -29,10 +29,7 @@ from scipy.sparse import csc_matrix
 from itertools import combinations
 
 from qutlet.models import FermionicModel
-from qutlet.utilities import (
-    flatten,
-    ket_in_subspace,
-)
+from qutlet.utilities import flatten, ket_in_subspace, subspace_size
 from fermionic_cooling.utils import (
     NO_CUPY,
     add_depol_noise,
@@ -40,6 +37,7 @@ from fermionic_cooling.utils import (
     expectation_wrapper,
     fidelity_wrapper,
     get_list_depth,
+    get_subspace_indices_with_env_qubits,
     is_density_matrix,
     ketbra,
     subspace_energy_expectation,
@@ -89,10 +87,7 @@ class Cooler:
             )
             time_evolve_method = "expm"
             n_sys_qubits = len(self.sys_qubits)
-            self.sys_subspace_size = len(
-                list(combinations(range(n_sys_qubits // 2), n_electrons[0]))
-            ) * len(list(combinations(range(n_sys_qubits // 2), n_electrons[1])))
-
+            self.sys_subspace_size = subspace_size(n_sys_qubits, n_electrons)
         self.env_hamiltonian = env_hamiltonian
         self.env_qubits = env_qubits
         self.env_ground_state = env_ground_state
@@ -127,13 +122,18 @@ class Cooler:
     def msg_out(self):
         print("\x1B[#B" * (2 + len(self.msg.keys())))
 
-    def to_matrix_if_pauli(self, obj, which: str):
+    def to_correct_matrix(self, obj: Union[np.ndarray, cirq.PauliSumLike], which: str):
         if isinstance(obj, (cirq.PauliSum, cirq.PauliString)):
             if not self.subspace_simulation:
                 return obj.matrix(qubits=self.total_qubits)
             else:
                 if which == "env":
                     mat = obj.matrix(qubits=self.env_qubits)
+                elif which == "couplers":
+                    idx = get_subspace_indices_with_env_qubits(
+                        self.n_electrons, len(self.sys_qubits), len(self.env_qubits)
+                    )
+                    mat = obj.matrix(qubits=self.total_qubits)[np.ix_(idx, idx)]
                 else:
                     raise ValueError(
                         "sys_hamiltonian need to be in matrix form for subspace simulation"
@@ -159,10 +159,6 @@ class Cooler:
             return mat
 
     def cooling_hamiltonian(self, env_coupling: float, alpha: float):
-        if isinstance(self.sys_env_coupler, (cirq.PauliSum, cirq.PauliString)):
-            coupler = self.sys_env_coupler.matrix(qubits=self.total_qubits)
-        else:
-            coupler = self.sys_env_coupler
 
         env_hamiltonian = self.env_hamiltonian
         if self.ancilla_split_spectrum:
@@ -176,9 +172,10 @@ class Cooler:
                 ]
             )
         return (
-            self.to_matrix_if_pauli(self.sys_hamiltonian, which="sys")
-            + env_coupling * self.to_matrix_if_pauli(env_hamiltonian, which="env")
-            + float(alpha) * self.to_matrix_if_pauli(coupler, which="couplers")
+            self.to_correct_matrix(self.sys_hamiltonian, which="sys")
+            + env_coupling * self.to_correct_matrix(env_hamiltonian, which="env")
+            + float(alpha)
+            * self.to_correct_matrix(self.sys_env_coupler, which="couplers")
         )
 
     @property
