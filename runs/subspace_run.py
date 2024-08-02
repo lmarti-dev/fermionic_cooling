@@ -30,12 +30,12 @@ from qutlet.utilities import fidelity, jw_eigenspectrum_at_particle_number
 
 def __main__(edm: ExperimentDataManager):
 
-    model_name = "cooked/water_singlet_6e_10q"
+    model_name = "cooked/Fe3_NTA_doublet_3e_8q"
     model_name = "fh_slater"
     if "fh_" in model_name:
-        n_electrons = [2, 2]
+        n_electrons = [3, 2]
         model = FermiHubbardModel(
-            lattice_dimensions=(2, 2), n_electrons=n_electrons, tunneling=1, coulomb=6
+            lattice_dimensions=(3, 2), n_electrons=n_electrons, tunneling=1, coulomb=6
         )
         n_qubits = len(model.qubits)
         if "coulomb" in model_name:
@@ -142,7 +142,7 @@ def __main__(edm: ExperimentDataManager):
         model_name=model_name,
     )
 
-    max_k = 14
+    max_k = None
 
     couplers = get_cheat_coupler_list(
         sys_eig_states=couplers_sys_eig_states,
@@ -165,7 +165,7 @@ def __main__(edm: ExperimentDataManager):
     # evolution_time = 1e-3
 
     # call cool
-    use_fast_sweep = True
+    use_fast_sweep = False
     depol_noise = None
     is_noise_spin_conserving = False
     ancilla_split_spectrum = False
@@ -178,7 +178,7 @@ def __main__(edm: ExperimentDataManager):
             start_fock_hamiltonian, n_electrons, n_sys_qubits
         )
         ham_stop = sys_ham_matrix
-        n_steps = 10
+        n_steps = 30
         total_sweep_time = (
             sweep_time_mult
             * spectrum_width
@@ -207,16 +207,15 @@ def __main__(edm: ExperimentDataManager):
             subspace_simulation=True,
         )
         sys_initial_state = final_state
+        print("AFTER SWEEP")
+        print_state_fidelity_to_eigenstates(
+            state=sys_initial_state,
+            eigenenergies=sys_eig_energies,
+            eigenstates=sys_eig_states,
+            expanded=False,
+        )
     else:
         total_sweep_time = 0
-
-    print("AFTER SWEEP")
-    print_state_fidelity_to_eigenstates(
-        state=sys_initial_state,
-        eigenenergies=sys_eig_energies,
-        eigenstates=sys_eig_states,
-        expanded=False,
-    )
 
     cooler = Cooler(
         sys_hamiltonian=sys_ham_matrix,
@@ -238,10 +237,10 @@ def __main__(edm: ExperimentDataManager):
     print(f"coupler dim: {cooler.sys_env_coupler_data_dims}")
 
     ansatz_options = {"beta": 1, "mu": 30, "c": 40}
-    weaken_coupling = 60
+    weaken_coupling = 0.1
 
-    start_omega = spectrum_width / 5
-    stop_omega = 0.8
+    start_omega = 23
+    stop_omega = 22
 
     method = "bigbrain"
 
@@ -255,6 +254,7 @@ def __main__(edm: ExperimentDataManager):
         start_gs_index=start_gs_index,
         coupler_gs_index=coupler_gs_index,
         spectrum_width=spectrum_width,
+        min_gap=min_gap,
         start_omega=start_omega,
         stop_omega=stop_omega,
         ancilla_split_spectrum=ancilla_split_spectrum,
@@ -310,7 +310,7 @@ def __main__(edm: ExperimentDataManager):
 
 if __name__ == "__main__":
     # whether we want to skip all saving data
-    dry_run = False
+    dry_run = True
     edm = ExperimentDataManager(
         experiment_name="bigbrain_subspace_water_stuff",
         project="fermionic cooling",
