@@ -21,14 +21,12 @@ from openfermion import (
     jw_hartree_fock_state,
     normal_ordered,
 )
-from scipy.linalg import sqrtm
 from scipy.sparse import csc_matrix
 from scipy.sparse.linalg import eigsh, expm, expm_multiply
 
 
 from qutlet.models.fermi_hubbard_model import FermiHubbardModel
 from qutlet.utilities import (
-    chained_matrix_multiplication,
     jw_spin_correct_indices,
     flatten,
     jw_eigenspectrum_at_particle_number,
