@@ -134,7 +134,7 @@ def __main__(args):
         n_env_qubits=n_env_qubits,
         sys_eigenspectrum=sys_eig_energies,
         env_eigenergies=env_eig_energies,
-        model=model.__to_json__()["constructor_params"],
+        model=model.__to_json__,
     )
     couplers = get_cheat_couplers(
         sys_eig_states=free_sys_eig_states,

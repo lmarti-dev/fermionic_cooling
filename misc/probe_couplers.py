@@ -39,7 +39,7 @@ def __main__():
                 tunneling=t,
                 coulomb=1,
             )
-            edm.var_dump(model=model.__to_json__()["constructor_params"])
+            edm.var_dump(model=model.__to_json__)
             n_qubits = len(model.qubits)
             coulomb_fock_hamiltonian = model.coulomb_model.fock_hamiltonian
             slater_fock_hamiltonian = model.non_interacting_model.fock_hamiltonian

@@ -64,7 +64,7 @@ gs_index = 0
 
 edm.var_dump(
     n_electrons=n_electrons,
-    model=model.__to_json__()["constructor_params"],
+    model=model.__to_json__,
     coupler_index=coupler_index,
     n_sys_qubits=n_sys_qubits,
     n_env_qubits=n_env_qubits,

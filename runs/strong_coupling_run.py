@@ -149,7 +149,7 @@ def __main__(edm: ExperimentDataManager):
         n_env_qubits=n_env_qubits,
         sys_eig_energies=sys_eig_energies,
         env_eig_energies=env_eig_energies,
-        model=model.__to_json__()["constructor_params"],
+        model=model.__to_json__,
         model_name=model_name,
     )
 

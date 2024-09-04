@@ -13,7 +13,7 @@ from fermionic_cooling.adiabatic_sweep import run_sweep
 from fermionic_cooling.building_blocks import (
     get_cheat_couplers,
     get_Z_env,
-    get_XXYY_couplers,
+    get_XsXbYsYb_couplers,
 )
 from fermionic_cooling.cooler_class import Cooler
 from fermionic_cooling.utils import (
@@ -24,7 +24,7 @@ from fermionic_cooling.utils import (
     print_state_fidelity_to_eigenstates,
     subspace_energy_expectation,
 )
-from qutlet.models.fermi_hubbard_model import FermiHubbardModel
+from qutlet.models import FermiHubbardModel, RandomFermionicModel
 from qutlet.utilities import (
     fidelity,
     jw_eigenspectrum_at_particle_number,
@@ -35,7 +35,7 @@ from qutlet.utilities import (
 def __main__(edm: ExperimentDataManager):
 
     # model_name = "cooked/Cyclobutene_singlet_6e_12q"
-    model_name = "fh_slater"
+    model_name = "random"
     subspace_simulation = True
     if "fh_" in model_name:
         n_electrons = [2, 2]
@@ -52,20 +52,29 @@ def __main__(edm: ExperimentDataManager):
         elif "slater" in model_name:
             start_fock_hamiltonian = model.non_interacting_model.fock_hamiltonian
             couplers_fock_hamiltonian = start_fock_hamiltonian
-    else:
+    elif "cooked" in model_name:
         spm = SpecificModel(model_name=model_name)
         model = spm.current_model
         n_qubits = len(model.qubits)
         n_electrons = spm.n_electrons
         start_fock_hamiltonian = spm.current_model.quadratic_terms
         couplers_fock_hamiltonian = start_fock_hamiltonian
+    elif "random" in model_name:
+        n_qubits = 8
+        model = RandomFermionicModel(
+            n_qubits=n_qubits, neighbour_order=n_qubits, n_electrons="hf"
+        )
+        start_fock_hamiltonian = model.quadratic_terms
+        couplers_fock_hamiltonian = start_fock_hamiltonian
+
+    n_electrons = model.n_electrons
 
     start_sys_eig_energies, start_sys_eig_states = jw_eigenspectrum_at_particle_number(
         sparse_operator=get_sparse_operator(
             start_fock_hamiltonian,
             n_qubits=len(model.qubits),
         ),
-        particle_number=n_electrons,
+        particle_number=model.n_electrons,
         expanded=not subspace_simulation,
     )
     couplers_sys_eig_energies, couplers_sys_eig_states = (
@@ -74,7 +83,7 @@ def __main__(edm: ExperimentDataManager):
                 couplers_fock_hamiltonian,
                 n_qubits=len(model.qubits),
             ),
-            particle_number=n_electrons,
+            particle_number=model.n_electrons,
             expanded=not subspace_simulation,
         )
     )
@@ -82,7 +91,7 @@ def __main__(edm: ExperimentDataManager):
     sys_qubits = model.qubits
     n_sys_qubits = len(sys_qubits)
     subspace_dim = len(
-        list(combinations(range(n_sys_qubits // 2), n_electrons[0]))
+        list(combinations(range(n_sys_qubits // 2), model.n_electrons[0]))
     ) * len(list(combinations(range(n_sys_qubits // 2), n_electrons[1])))
     print(f"SUBSPACE: {subspace_dim} matrices will be {subspace_dim**2}")
 
@@ -142,13 +151,13 @@ def __main__(edm: ExperimentDataManager):
         n_env_qubits=n_env_qubits,
         sys_eig_energies=sys_eig_energies,
         env_eig_energies=env_eig_energies,
-        model=model.__to_json__()["constructor_params"],
+        model=model.__to_json__,
         model_name=model_name,
     )
 
     max_k = None
 
-    couplers = get_XXYY_couplers(sys_qubits=sys_qubits, env_qubits=env_qubits)
+    couplers = get_XsXbYsYb_couplers(sys_qubits=sys_qubits, env_qubits=env_qubits)
 
     _, coupler_gs_index = get_closest_state(
         ref_state=sys_ground_state,

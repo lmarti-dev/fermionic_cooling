@@ -125,7 +125,7 @@ def run_comp(edm, model_name):
         total_time=total_time,
         n_steps=n_steps,
         min_gap=min_gap,
-        model=model.__to_json__()["constructor_params"],
+        model=model.__to_json__,
     )
     instantaneous_ground_states = get_instantaneous_ground_states(
         ham_start=ham_start, ham_stop=ham_stop, n_steps=n_steps, n_electrons=n_electrons

@@ -36,7 +36,7 @@ def get_couplers_for_sweep(
     omegas = np.zeros((n_steps,))
     couplers = []
 
-    params = model.__to_json__()["constructor_params"]
+    params = model.__to_json__
     tunneling = params["tunneling"]
     coulomb = params["coulomb"]
 

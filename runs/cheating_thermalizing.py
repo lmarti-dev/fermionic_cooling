@@ -342,7 +342,7 @@ def main_run(edm: ExperimentDataManager, initial_beta, target_beta, **kwargs):
         n_env_qubits=n_env_qubits,
         sys_eigenspectrum=sys_eig_energies,
         env_eigenergies=env_eig_energies,
-        model=model.__to_json__()["constructor_params"],
+        model=model.__to_json__,
         use_fast_sweep=use_fast_sweep,
         depol_noise=depol_noise,
         is_noise_spin_conserving=is_noise_spin_conserving,

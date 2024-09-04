@@ -101,9 +101,7 @@ def plot_mms_fidelity_vs_beta(edm):
 
         n_steps = 200
 
-        edm.var_dump(
-            model=model.__to_json__()["constructor_params"], n_electrons=n_electrons
-        )
+        edm.var_dump(model=model.__to_json__, n_electrons=n_electrons)
 
         mms_fids = np.zeros((n_steps,))
         for ind, beta_power in enumerate(np.linspace(-2, 2, n_steps)):

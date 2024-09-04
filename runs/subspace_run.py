@@ -13,7 +13,7 @@ from fermionic_cooling.adiabatic_sweep import run_sweep
 from fermionic_cooling.building_blocks import (
     get_cheat_couplers,
     get_Z_env,
-    get_XXYY_coupler,
+    get_GivensX_coupler,
 )
 from fermionic_cooling.cooler_class import Cooler
 from fermionic_cooling.utils import (
@@ -138,7 +138,7 @@ def __main__(edm: ExperimentDataManager):
         n_env_qubits=n_env_qubits,
         sys_eig_energies=sys_eig_energies,
         env_eig_energies=env_eig_energies,
-        model=model.__to_json__()["constructor_params"],
+        model=model.__to_json__,
         model_name=model_name,
     )
 

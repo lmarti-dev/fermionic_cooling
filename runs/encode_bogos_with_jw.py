@@ -158,7 +158,7 @@ if __name__ == "__main__":
     edm.var_dump(
         n_electrons=n_electrons,
         matrix=matrix,
-        model=model.__to_json__()["constructor_params"],
+        model=model.__to_json__,
     )
 
     print("### getting bogos")

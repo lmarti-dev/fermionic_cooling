@@ -533,7 +533,7 @@ def extrapolate_ground_state_non_interacting_fermi_hubbard(
     coefficients = np.zeros((n_points, 2 ** len(model.qubits)))
     interval = np.linspace(1e-8, 1e-7, n_points)
     for ind, epsilon in enumerate(interval):
-        params = model.__to_json__()["constructor_params"]
+        params = model.__to_json__
         params["coulomb"] = epsilon
         model_eps = FermiHubbardModel(**params)
         _, ground_state = jw_get_true_ground_state_at_particle_number(
@@ -559,7 +559,7 @@ def get_slater_spectrum(model: FermiHubbardModel, n_electrons: list):
 
 
 def get_onsite_spectrum(model: FermiHubbardModel, n_electrons: list):
-    params = model.__to_json__()
+    params = model.__to_json__
     params["constructor_params"]["tunneling"] = 0
     onsite_model = FermiHubbardModel(**params["constructor_params"])
     slater_energies, slater_eigenstates = jw_eigenspectrum_at_particle_number(
@@ -597,7 +597,7 @@ def get_hartree_fock(n_qubits: int, n_electrons: list):
 
 
 def get_close_ground_state(model: FermiHubbardModel, n_electrons: list, coulomb: float):
-    params = model.__to_json__()["constructor_params"]
+    params = model.__to_json__
     params["coulomb"] = coulomb
     close_model = FermiHubbardModel(**params)
     (
