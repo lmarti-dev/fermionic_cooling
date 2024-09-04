@@ -3,7 +3,7 @@ from itertools import combinations
 
 import numpy as np
 from building_blocks import (
-    get_cheat_coupler_list,
+    get_cheat_couplers,
     get_Z_env,
 )
 from cooler_class import Cooler
@@ -136,7 +136,7 @@ def __main__(args):
     max_k = None
 
     coupler_gs_index = 2
-    couplers = get_cheat_coupler_list(
+    couplers = get_cheat_couplers(
         sys_eig_states=couplers_sys_eig_states,
         env_eig_states=env_eig_states,
         qubits=sys_qubits + env_qubits,

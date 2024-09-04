@@ -2,7 +2,7 @@ import cirq
 import numpy as np
 from adiabatic_sweep import fermion_to_dense, run_sweep
 from building_blocks import (
-    get_cheat_coupler_list,
+    get_cheat_couplers,
     get_Z_env,
 )
 from cooler_class import Cooler
@@ -132,7 +132,7 @@ def comparison_ngaps(edm, n_gaps):
         model=model.__to_json__()["constructor_params"],
     )
     max_k = n_gaps + 1
-    couplers = get_cheat_coupler_list(
+    couplers = get_cheat_couplers(
         sys_eig_states=couplers_sys_eig_states,
         env_eig_states=env_eig_states,
         qubits=sys_qubits + env_qubits,

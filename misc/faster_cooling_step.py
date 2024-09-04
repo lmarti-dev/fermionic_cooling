@@ -1,5 +1,5 @@
 from utils import time_evolve_density_matrix, spin_dicke_state, ketbra
-from building_blocks import get_Z_env, get_cheat_coupler_list
+from building_blocks import get_Z_env, get_cheat_couplers
 import time
 import numpy as np
 from qutlet.models.fermi_hubbard_model import FermiHubbardModel
@@ -38,7 +38,7 @@ def setup_cooler(x, y, n_env_qubits, method):
     sys_initial_state = ketbra(
         jw_hartree_fock_state(n_orbitals=n_sys_qubits, n_electrons=sum(n_electrons))
     )
-    couplers = get_cheat_coupler_list(
+    couplers = get_cheat_couplers(
         sys_eig_states=free_sys_eig_states,
         env_eig_states=env_eig_states,
         qubits=sys_qubits + env_qubits,

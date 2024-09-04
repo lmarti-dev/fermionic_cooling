@@ -2,7 +2,7 @@ from qutlet.models.fermi_hubbard_model import FermiHubbardModel
 
 from building_blocks import (
     get_Z_env,
-    get_cheat_coupler_list,
+    get_cheat_couplers,
 )
 
 from utils import ketbra
@@ -49,7 +49,7 @@ if __name__ == "__main__":
         n_qubits=n_env_qubits
     )
 
-    couplers = get_cheat_coupler_list(
+    couplers = get_cheat_couplers(
         sys_eig_states=sys_eig_states,
         env_eig_states=env_eig_states,
         qubits=sys_qubits + env_qubits,

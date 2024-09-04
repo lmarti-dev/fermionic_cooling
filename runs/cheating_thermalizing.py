@@ -3,7 +3,7 @@ from itertools import combinations
 import matplotlib.pyplot as plt
 import numpy as np
 from building_blocks import (
-    get_cheat_coupler_list,
+    get_cheat_couplers,
     get_Z_env,
 )
 from openfermion import get_sparse_operator
@@ -294,7 +294,7 @@ def main_run(edm: ExperimentDataManager, initial_beta, target_beta, **kwargs):
     # sys_initial_state = thermal_sys_initial_density
     max_k = list(range(1, 25))
     # max_k = 16
-    couplers = get_cheat_coupler_list(
+    couplers = get_cheat_couplers(
         sys_eig_states=couplers_sys_eig_states,
         env_eig_states=env_eig_states,
         max_k=max_k,

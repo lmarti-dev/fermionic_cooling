@@ -10,7 +10,7 @@ from cooler_class import Cooler
 from building_blocks import (
     get_cheat_sweep,
     get_Z_env,
-    get_cheat_coupler_list,
+    get_cheat_couplers,
 )
 
 from utils import (
@@ -48,7 +48,7 @@ def probe_reps_with_noise(
         actual_rep = 4 * (n_rep + 1)
         for noise_ind, noise in enumerate(noise_range):
             print(f"noise: {noise}\n\n")
-            couplers = get_cheat_coupler_list(
+            couplers = get_cheat_couplers(
                 sys_eig_states=sys_eig_states,
                 env_eig_states=env_eig_states,
                 qubits=sys_qubits + env_qubits,
@@ -149,7 +149,7 @@ def probe_alpha_with_noise(
     for wc_ind, weaken_coupling in enumerate(weaken_couplings):
         for noise_ind, noise in enumerate(noise_range):
             print(f"noise: {noise}\n\n")
-            couplers = get_cheat_coupler_list(
+            couplers = get_cheat_couplers(
                 sys_eig_states=sys_eig_states,
                 env_eig_states=env_eig_states,
                 qubits=sys_qubits + env_qubits,
@@ -250,7 +250,7 @@ def probe_noise(
     weaken_coupling = 100
     for noise_ind, noise in enumerate(noise_range):
         print(f"noise: {noise}\n\n")
-        couplers = get_cheat_coupler_list(
+        couplers = get_cheat_couplers(
             sys_eig_states=sys_eig_states,
             env_eig_states=env_eig_states,
             qubits=sys_qubits + env_qubits,

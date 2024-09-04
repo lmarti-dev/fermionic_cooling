@@ -1,6 +1,6 @@
 import itertools
 import multiprocessing as mp
-from typing import Iterable, Iterator
+from typing import Iterable, Iterator, Union
 
 import cirq
 import numpy as np
@@ -195,21 +195,34 @@ def is_density_matrix(state):
     return len(state.shape) == 2
 
 
-def expectation_wrapper(observable, state: np.ndarray, qubits: list[cirq.Qid]):
+def expectation_wrapper(
+    observable: Union[cirq.PauliSum, np.ndarray],
+    state: np.ndarray,
+    qubits: list[cirq.Qid],
+):
     if is_density_matrix(state):
-        return np.real(
-            observable.expectation_from_density_matrix(
-                state.astype("complex_"),
-                qubit_map={k: v for k, v in zip(qubits, range(len(qubits)))},
+        if isinstance(observable, cirq.PauliSum):
+            return np.real(
+                observable.expectation_from_density_matrix(
+                    state.astype("complex_"),
+                    qubit_map={k: v for k, v in zip(qubits, range(len(qubits)))},
+                )
             )
-        )
+        elif isinstance(observable, np.ndarray):
+            return np.real(np.trace(observable @ state))
     else:
-        return np.real(
-            observable.expectation_from_state_vector(
-                state.astype("complex_"),
-                qubit_map={k: v for k, v in zip(qubits, range(len(qubits)))},
+        if isinstance(observable, cirq.PauliSum):
+            return np.real(
+                observable.expectation_from_state_vector(
+                    state.astype("complex_"),
+                    qubit_map={k: v for k, v in zip(qubits, range(len(qubits)))},
+                )
             )
-        )
+        elif isinstance(observable, np.ndarray):
+            return np.real(np.vdot(state, observable @ state))
+    raise ValueError(
+        f"Got an incompatible observable and state: observable {type(observable)}, state: {type(state)}"
+    )
 
 
 def get_psum_qubits(psum: cirq.PauliSum) -> Iterable[cirq.Qid]:

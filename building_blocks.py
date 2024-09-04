@@ -55,7 +55,7 @@ def get_cheat_thermalizers(
         return couplers
 
 
-def get_cheat_coupler_list(
+def get_cheat_couplers(
     sys_eig_states,
     env_eig_states,
     qubits: list[cirq.Qid] = None,
@@ -216,18 +216,21 @@ def get_YY_coupler(sys_qubits: list[cirq.Qid], env_qubits: list[cirq.Qid]):
 
 
 def get_XXYY_coupler(sys_qubits: list[cirq.Qid], env_qubits: list[cirq.Qid]):
+    return sum(get_XXYY_couplers(sys_qubits=sys_qubits, env_qubits=env_qubits))
+
+
+def get_XXYY_couplers(sys_qubits: list[cirq.Qid], env_qubits: list[cirq.Qid]):
     n_sys_qubits = len(sys_qubits)
     n_env_qubits = len(env_qubits)
-    return sum(
-        [
-            0.5
-            * (
-                cirq.X(sys_qubits[k]) * cirq.X(env_qubits[k % n_env_qubits])
-                + cirq.Y(sys_qubits[k]) * cirq.Y(env_qubits[k % n_env_qubits])
-            )
-            for k in range(n_sys_qubits)
-        ]
-    )
+    return [
+        0.5
+        * (
+            cirq.X(sys_qubits[k]) * cirq.X(sys_qubits[(k + 2) % n_sys_qubits])
+            + cirq.Y(sys_qubits[k]) * cirq.Y(sys_qubits[(k + 2) % n_sys_qubits])
+        )
+        * cirq.X(env_qubits[k % n_env_qubits])
+        for k in range(n_sys_qubits)
+    ]
 
 
 def get_ZY_coupler(sys_qubits: list[cirq.Qid], env_qubits: list[cirq.Qid]):
@@ -301,6 +304,7 @@ def control_function(
     minus: float = 0,
     use_accelerate: bool = False,
     clamp: bool = True,
+    clamp_t_fridge: bool = True,
 ):
     """Creates an ansatz for the derivative of omega, the strength of the environment. This is all control theory stuff, and I'm too dumb to get it
 
@@ -321,6 +325,9 @@ def control_function(
     else:
         accelerate = 1
 
+    if clamp_t_fridge is True:
+        t_fridge = np.clip(t_fridge, 1e-10, 1)
+
     # disallow values which might be due to bugs
     ctrl = (
         abs(beta / (np.exp(mu / (1 - np.log10(np.abs(t_fridge - minus) / omega))) + c))
@@ -329,8 +336,6 @@ def control_function(
     if clamp is True:
         return np.clip(ctrl, 1e-4, 1)
     return ctrl
-
-    # return abs(beta * f(omega) * np.exp(-((t_fridge * c) ** mu)))
 
 
 def get_hamiltonian_coupler(hamiltonian: cirq.PauliSum, env_qubits):

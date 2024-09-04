@@ -3,7 +3,7 @@ from itertools import combinations
 import matplotlib.pyplot as plt
 import numpy as np
 from building_blocks import (
-    get_cheat_coupler_list,
+    get_cheat_couplers,
     get_Z_env,
 )
 from cooler_class import Cooler
@@ -155,7 +155,7 @@ def __main__(edm: ExperimentDataManager):
 
     max_k = None
 
-    couplers = get_cheat_coupler_list(
+    couplers = get_cheat_couplers(
         sys_eig_states=sys_eig_states,
         env_eig_states=env_eig_states,
         qubits=sys_qubits + env_qubits,

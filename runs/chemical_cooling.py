@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
-from building_blocks import get_cheat_coupler_list, get_cheat_sweep, get_Z_env
+from building_blocks import get_cheat_couplers, get_cheat_sweep, get_Z_env
 from cooler_class import Cooler
 from openfermion import (
     get_quadratic_hamiltonian,
@@ -52,7 +52,7 @@ n_env_qubits = 1
 env_qubits, env_ground_state, env_ham, env_eig_energies, env_eig_states = get_Z_env(
     n_qubits=n_env_qubits
 )
-couplers = get_cheat_coupler_list(
+couplers = get_cheat_couplers(
     sys_eig_states=sys_eig_states,
     env_eig_states=env_eig_states,
     qubits=sys_qubits + env_qubits,

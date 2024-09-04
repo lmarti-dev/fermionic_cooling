@@ -16,7 +16,7 @@
 # get max(eigenvalues)-min(eigenvalues)
 # logsweep is log spaced omega sampling
 
-from typing import Iterable, Union
+from typing import Iterable, Union, Callable
 
 import cirq
 import matplotlib.cm as cm
@@ -122,7 +122,7 @@ class Cooler:
     def msg_out(self):
         print("\x1B[#B" * (2 + len(self.msg.keys())))
 
-    def to_correct_matrix(self, obj: Union[np.ndarray, cirq.PauliSumLike], which: str):
+    def to_correct_matrix(self, obj: Union[np.ndarray, cirq.PauliSum], which: str):
         if isinstance(obj, (cirq.PauliSum, cirq.PauliString)):
             if not self.subspace_simulation:
                 return obj.matrix(qubits=self.total_qubits)
@@ -172,11 +172,17 @@ class Cooler:
                 ]
             )
         return (
-            self.to_correct_matrix(self.sys_hamiltonian, which="sys")
-            + env_coupling * self.to_correct_matrix(env_hamiltonian, which="env")
+            self.sys_density_matrix(self.sys_hamiltonian)
+            + env_coupling * self.env_density_matrix(env_hamiltonian)
             + float(alpha)
             * self.to_correct_matrix(self.sys_env_coupler, which="couplers")
         )
+
+    def sys_density_matrix(self, total_density_matrix: np.ndarray):
+        return self.to_correct_matrix(total_density_matrix, "sys")
+
+    def env_density_matrix(self, total_density_matrix: np.ndarray):
+        return self.to_correct_matrix(total_density_matrix, "env")
 
     @property
     def total_qubits(self):
@@ -464,6 +470,7 @@ class Cooler:
         is_noise_spin_conserving: bool = False,
         use_random_coupler: bool = False,
         fidelity_threshold: float = 1.0,
+        callback: Callable[["Cooler"], None] = None,
     ):
         initial_density_matrix = self.total_initial_state
         if not cirq.is_hermitian(initial_density_matrix):
@@ -544,7 +551,7 @@ class Cooler:
                     overall_steps += 1
                     self.update_message(
                         "cind",
-                        f"Eff. num. of coupler: {len(coupler_indices):.1f}, coupler {coupler_index:.1f}",
+                        f"Eff. num. of coupler: {len(coupler_indices)}, coupler {coupler_index}",
                     )
                     self.sys_env_coupler_easy_setter(
                         coupler_index=coupler_index, rep=rep
@@ -615,6 +622,13 @@ class Cooler:
             rho=total_density_matrix, which="sys"
         )
         self.msg_out()
+        if callback is not None:
+            callback(
+                sys_fidelity,
+                sys_energy,
+                env_energy,
+                total_density_matrix,
+            )
         return fidelities, sys_energies, omegas, env_energies, final_sys_density_matrix
 
     def partial_trace_wrapper(self, rho: np.ndarray, which: str):
@@ -702,41 +716,49 @@ class Cooler:
         return sys_fidelity, sys_energy, env_energy, total_density_matrix
 
     def electron_number_message(self, state: np.ndarray):
-        n_up_op, n_down_op, _ = FermionicModel.spin_and_number_operator(
-            n_qubits=len(self.sys_qubits)
-        )
 
-        n_up = np.real(
-            expectation(
-                get_sparse_operator(n_up_op, len(self.sys_qubits)),
-                csc_matrix(state),
+        if self.subspace_simulation:
+            self.update_message(
+                "nelecnoise",
+                f"Subspace simulation fixes n_elec to {self.n_electrons}",
+                message_level=5,
             )
-        )
-        n_down = np.real(
-            expectation(
-                get_sparse_operator(n_down_op, len(self.sys_qubits)),
-                csc_matrix(state),
+        else:
+            n_up_op, n_down_op, _ = FermionicModel.spin_and_number_operator(
+                n_qubits=len(self.sys_qubits)
             )
-        )
 
-        var_up = np.real(
-            variance(
-                get_sparse_operator(n_up_op, len(self.sys_qubits)),
-                csc_matrix(state),
+            n_up = np.real(
+                expectation(
+                    get_sparse_operator(n_up_op, len(self.sys_qubits)),
+                    csc_matrix(state),
+                )
             )
-        )
-        var_down = np.real(
-            variance(
-                get_sparse_operator(n_down_op, len(self.sys_qubits)),
-                csc_matrix(state),
+            n_down = np.real(
+                expectation(
+                    get_sparse_operator(n_down_op, len(self.sys_qubits)),
+                    csc_matrix(state),
+                )
             )
-        )
 
-        self.update_message(
-            "nelecnoise",
-            f"e up: {n_up:.2f} vup: {var_up:.4f} e down: {n_down:.2f} vdown: {var_down:.4f}",
-            message_level=5,
-        )
+            var_up = np.real(
+                variance(
+                    get_sparse_operator(n_up_op, len(self.sys_qubits)),
+                    csc_matrix(state),
+                )
+            )
+            var_down = np.real(
+                variance(
+                    get_sparse_operator(n_down_op, len(self.sys_qubits)),
+                    csc_matrix(state),
+                )
+            )
+
+            self.update_message(
+                "nelecnoise",
+                f"e up: {n_up:.2f} vup: {var_up:.4f} e down: {n_down:.2f} vdown: {var_down:.4f}",
+                message_level=5,
+            )
 
     def cooling_step(
         self,
@@ -781,7 +803,7 @@ class Cooler:
                 n_electrons=self.n_electrons,
                 is_noise_spin_conserving=is_noise_spin_conserving,
             )
-            self.electron_number_message(traced_density_matrix)
+        self.electron_number_message(traced_density_matrix)
 
         # renormalizing to avoid errors
         traced_density_matrix /= np.trace(traced_density_matrix)

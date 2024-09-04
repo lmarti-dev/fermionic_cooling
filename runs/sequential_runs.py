@@ -6,7 +6,7 @@ from adiabatic_sweep import (
 )
 from building_blocks import (
     control_function,
-    get_cheat_coupler_list,
+    get_cheat_couplers,
     get_cheat_sweep,
     get_Z_env,
 )
@@ -276,7 +276,7 @@ def sequential_run():
     env_qubits, env_ground_state, env_ham, env_eig_energies, env_eig_states = get_Z_env(
         n_qubits=n_env_qubits
     )
-    couplers = get_cheat_coupler_list(
+    couplers = get_cheat_couplers(
         sys_eig_states=slater_eig_states,
         env_eig_states=env_eig_states,
         qubits=sys_qubits + env_qubits,

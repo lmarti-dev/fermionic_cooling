@@ -5,7 +5,7 @@ from scipy.sparse import csc_matrix
 from data_manager import ExperimentDataManager
 from qutlet.models import FermiHubbardModel
 from qutlet.utilities import jw_eigenspectrum_at_particle_number
-from fermionic_cooling.building_blocks import get_cheat_coupler_list, get_Z_env
+from fermionic_cooling.building_blocks import get_cheat_couplers, get_Z_env
 
 import matplotlib.pyplot as plt
 from fauplotstyle.styler import use_style
@@ -72,7 +72,7 @@ edm.var_dump(
     gs_index=gs_index,
 )
 
-couplers = get_cheat_coupler_list(
+couplers = get_cheat_couplers(
     sys_eig_states=sys_eig_states,
     env_eig_states=env_eig_states,
     qubits=sys_qubits + env_qubits,

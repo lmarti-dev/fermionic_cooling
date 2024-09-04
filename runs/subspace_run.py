@@ -11,7 +11,7 @@ from data_manager import ExperimentDataManager
 from fauplotstyle.styler import use_style
 from fermionic_cooling.adiabatic_sweep import run_sweep
 from fermionic_cooling.building_blocks import (
-    get_cheat_coupler_list,
+    get_cheat_couplers,
     get_Z_env,
     get_XXYY_coupler,
 )
@@ -144,7 +144,7 @@ def __main__(edm: ExperimentDataManager):
 
     max_k = None
 
-    couplers = get_cheat_coupler_list(
+    couplers = get_cheat_couplers(
         sys_eig_states=couplers_sys_eig_states,
         env_eig_states=env_eig_states,
         qubits=sys_qubits + env_qubits,

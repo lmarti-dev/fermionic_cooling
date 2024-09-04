@@ -11,9 +11,9 @@ from data_manager import ExperimentDataManager
 from fauplotstyle.styler import use_style
 from fermionic_cooling.adiabatic_sweep import run_sweep
 from fermionic_cooling.building_blocks import (
-    get_cheat_coupler_list,
+    get_cheat_couplers,
     get_Z_env,
-    get_XXYY_coupler,
+    get_XXYY_couplers,
 )
 from fermionic_cooling.cooler_class import Cooler
 from fermionic_cooling.utils import (
@@ -34,12 +34,16 @@ from qutlet.utilities import (
 
 def __main__(edm: ExperimentDataManager):
 
-    model_name = "cooked/water_singlet_6e_10q"
+    # model_name = "cooked/Cyclobutene_singlet_6e_12q"
     model_name = "fh_slater"
+    subspace_simulation = True
     if "fh_" in model_name:
         n_electrons = [2, 2]
         model = FermiHubbardModel(
-            lattice_dimensions=(2, 2), n_electrons=n_electrons, tunneling=1, coulomb=6
+            lattice_dimensions=list(n_electrons),
+            n_electrons=n_electrons,
+            tunneling=1,
+            coulomb=6,
         )
         n_qubits = len(model.qubits)
         if "coulomb" in model_name:
@@ -62,7 +66,7 @@ def __main__(edm: ExperimentDataManager):
             n_qubits=len(model.qubits),
         ),
         particle_number=n_electrons,
-        expanded=False,
+        expanded=not subspace_simulation,
     )
     couplers_sys_eig_energies, couplers_sys_eig_states = (
         jw_eigenspectrum_at_particle_number(
@@ -71,7 +75,7 @@ def __main__(edm: ExperimentDataManager):
                 n_qubits=len(model.qubits),
             ),
             particle_number=n_electrons,
-            expanded=False,
+            expanded=not subspace_simulation,
         )
     )
 
@@ -82,38 +86,42 @@ def __main__(edm: ExperimentDataManager):
     ) * len(list(combinations(range(n_sys_qubits // 2), n_electrons[1])))
     print(f"SUBSPACE: {subspace_dim} matrices will be {subspace_dim**2}")
 
-    sys_eig_energies, sys_eig_states = jw_eigenspectrum_at_particle_number(
-        sparse_operator=get_sparse_operator(
-            model.fock_hamiltonian,
-            n_qubits=len(model.qubits),
-        ),
-        particle_number=n_electrons,
-        expanded=False,
-    )
+    if subspace_simulation:
+        sys_eig_energies, sys_eig_states = model.subspace_spectrum
+    else:
+        sys_eig_energies, sys_eig_states = model.spectrum
 
     sys_ground_state = sys_eig_states[:, np.argmin(sys_eig_energies)]
     sys_ground_energy = np.min(sys_eig_energies)
 
     # initial state setting
-    sys_initial_state = jw_hartree_fock_state(model=model, expanded=False)
+    sys_initial_state = jw_hartree_fock_state(
+        model=model, expanded=not subspace_simulation
+    )
     print("BEFORE SWEEP")
     print_state_fidelity_to_eigenstates(
         state=sys_initial_state,
         eigenenergies=sys_eig_energies,
         eigenstates=sys_eig_states,
-        expanded=False,
+        expanded=not subspace_simulation,
     )
-    sys_initial_energy = subspace_energy_expectation(
-        sys_initial_state, sys_eig_energies, sys_eig_states
-    )
-    sys_ground_energy_exp = subspace_energy_expectation(
-        sys_ground_state, sys_eig_energies, sys_eig_states
-    )
+    if subspace_simulation:
+        sys_initial_energy = subspace_energy_expectation(
+            sys_initial_state, sys_eig_energies, sys_eig_states
+        )
+        sys_ground_energy_exp = subspace_energy_expectation(
+            sys_ground_state, sys_eig_energies, sys_eig_states
+        )
+    else:
+        sys_initial_energy = model.statevector_expectation(sys_initial_state)
+        sys_ground_energy_exp = model.statevector_expectation(sys_ground_state)
 
-    sys_ham_matrix = dense_restricted_ham(
-        model.fock_hamiltonian, n_electrons, n_sys_qubits
-    )
-
+    if subspace_simulation:
+        sys_ham_matrix = dense_restricted_ham(
+            model.fock_hamiltonian, n_electrons, n_sys_qubits
+        )
+    else:
+        sys_ham_matrix = get_sparse_operator(model.fock_hamiltonian).toarray()
     initial_fid = fidelity(
         sys_initial_state,
         sys_ground_state,
@@ -140,22 +148,22 @@ def __main__(edm: ExperimentDataManager):
 
     max_k = None
 
-    couplers = get_XXYY_coupler(sys_qubits=sys_qubits, env_qubits=env_qubits)
+    couplers = get_XXYY_couplers(sys_qubits=sys_qubits, env_qubits=env_qubits)
 
     _, coupler_gs_index = get_closest_state(
         ref_state=sys_ground_state,
         comp_states=start_sys_eig_states,
-        subspace_simulation=True,
+        subspace_simulation=subspace_simulation,
     )
 
-    couplers = get_cheat_coupler_list(
-        sys_eig_states=couplers_sys_eig_states,
-        env_eig_states=env_eig_states,
-        qubits=sys_qubits + env_qubits,
-        gs_indices=(coupler_gs_index,),
-        noise=None,
-        max_k=max_k,
-    )  # Interaction only on Qubit 0?
+    # couplers = get_cheat_coupler_list(
+    #     sys_eig_states=couplers_sys_eig_states,
+    #     env_eig_states=env_eig_states,
+    #     qubits=sys_qubits + env_qubits,
+    #     gs_indices=(coupler_gs_index,),
+    #     noise=None,
+    #     max_k=max_k,
+    # )  # Interaction only on Qubit 0?
 
     print("coupler done")
 
@@ -179,9 +187,13 @@ def __main__(edm: ExperimentDataManager):
         sweep_time_mult = 1
         initial_ground_state = sys_initial_state
         final_ground_state = sys_eig_states[:, 0]
-        ham_start = dense_restricted_ham(
-            start_fock_hamiltonian, n_electrons, n_sys_qubits
-        )
+
+        if subspace_simulation:
+            ham_start = dense_restricted_ham(
+                start_fock_hamiltonian, n_electrons, n_sys_qubits
+            )
+        else:
+            ham_start = get_sparse_operator(start_fock_hamiltonian).toarray()
         ham_stop = sys_ham_matrix
         n_steps = 10
         total_sweep_time = (
@@ -209,7 +221,7 @@ def __main__(edm: ExperimentDataManager):
             n_qubits=n_sys_qubits,
             is_noise_spin_conserving=is_noise_spin_conserving,
             n_electrons=n_electrons,
-            subspace_simulation=True,
+            subspace_simulation=subspace_simulation,
         )
         sys_initial_state = final_state
     else:
@@ -220,7 +232,7 @@ def __main__(edm: ExperimentDataManager):
         state=sys_initial_state,
         eigenenergies=sys_eig_energies,
         eigenstates=sys_eig_states,
-        expanded=False,
+        expanded=not subspace_simulation,
     )
 
     cooler = Cooler(
@@ -234,7 +246,7 @@ def __main__(edm: ExperimentDataManager):
         env_ground_state=env_ground_state,
         sys_env_coupler_data=couplers,
         verbosity=5,
-        subspace_simulation=True,
+        subspace_simulation=subspace_simulation,
         time_evolve_method="expm",
         ancilla_split_spectrum=ancilla_split_spectrum,
     )
@@ -252,6 +264,7 @@ def __main__(edm: ExperimentDataManager):
 
     edm.var_dump(
         depol_noise=depol_noise,
+        subspace_simulation=subspace_simulation,
         use_fast_sweep=use_fast_sweep,
         is_noise_spin_conserving=is_noise_spin_conserving,
         max_k=max_k,
@@ -311,9 +324,9 @@ def __main__(edm: ExperimentDataManager):
 
 if __name__ == "__main__":
     # whether we want to skip all saving data
-    dry_run = False
+    dry_run = True
     edm = ExperimentDataManager(
-        experiment_name="bigbrain_free_couplers_subspace_cooling",
+        experiment_name="bigbrain_xxyy_couplers_subspace_cooling",
         project="fermionic cooling",
         dry_run=dry_run,
     )

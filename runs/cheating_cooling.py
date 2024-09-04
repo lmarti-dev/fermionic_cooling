@@ -10,7 +10,7 @@ from cooler_class import Cooler
 from building_blocks import (
     get_cheat_sweep,
     get_Z_env,
-    get_cheat_coupler_list,
+    get_cheat_couplers,
 )
 
 from utils import (
@@ -136,7 +136,7 @@ def __main__(args):
         env_eigenergies=env_eig_energies,
         model=model.__to_json__()["constructor_params"],
     )
-    couplers = get_cheat_coupler_list(
+    couplers = get_cheat_couplers(
         sys_eig_states=free_sys_eig_states,
         env_eig_states=env_eig_states,
         qubits=sys_qubits + env_qubits,

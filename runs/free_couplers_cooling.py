@@ -12,7 +12,7 @@ from building_blocks import (
     get_cheat_sweep,
     get_perturbed_sweep,
     get_Z_env,
-    get_cheat_coupler_list,
+    get_cheat_couplers,
 )
 
 from fermionic_cooling.utils import (
@@ -153,7 +153,7 @@ def __main__(args):
 
     max_k = 6
 
-    couplers = get_cheat_coupler_list(
+    couplers = get_cheat_couplers(
         sys_eig_states=free_sys_eig_states,
         env_eig_states=env_eig_states,
         qubits=sys_qubits + env_qubits,
