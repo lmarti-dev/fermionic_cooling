@@ -651,7 +651,10 @@ def get_extrapolated_superposition(
 
 def dense_restricted_ham(ham: FermionOperator, n_electrons: list, n_qubits: int):
     return jw_spin_restrict_operator(
-        get_sparse_operator(ham), particle_number=n_electrons, n_qubits=n_qubits
+        get_sparse_operator(ham),
+        particle_number=n_electrons,
+        n_qubits=n_qubits,
+        right_to_left=True,
     ).toarray()
 
 
@@ -697,17 +700,13 @@ def subspace_energy_expectation(
 ):
     # rho is N by N and projectors M by N by N
     if len(rho.shape) == 1:
-        state = np.outer(rho.conjugate(), rho)
+        rho_hat = sys_eig_states.T.conjugate() @ rho
+        state_hat = np.outer(rho_hat.T.conjugate(), rho_hat)
     else:
         state = rho
-    return np.real(
-        np.trace(
-            sys_eig_states.T.conjugate()
-            @ state
-            @ sys_eig_states
-            @ np.diag(sys_eig_energies)
-        )
-    )
+        state_hat = sys_eig_states.T.conjugate() @ state @ sys_eig_states
+
+    return np.real(np.diag(state_hat) @ sys_eig_energies)
 
 
 def get_subspace_indices_with_env_qubits(

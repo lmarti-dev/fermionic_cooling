@@ -13,7 +13,7 @@ from fermionic_cooling.adiabatic_sweep import run_sweep
 from fermionic_cooling.building_blocks import (
     get_cheat_couplers,
     get_Z_env,
-    get_XsXbYsYb_couplers,
+    get_XsXbYsYb_coupler,
 )
 from fermionic_cooling.cooler_class import Cooler
 from fermionic_cooling.utils import (
@@ -62,7 +62,10 @@ def __main__(edm: ExperimentDataManager):
     elif "random" in model_name:
         n_qubits = 8
         model = RandomFermionicModel(
-            n_qubits=n_qubits, neighbour_order=n_qubits, n_electrons="hf"
+            n_qubits=n_qubits,
+            neighbour_order=n_qubits,
+            n_electrons="hf",
+            init_coefficients=["r[-1,-.01]", "r[0.01,6]"],
         )
         start_fock_hamiltonian = model.quadratic_terms
         couplers_fock_hamiltonian = start_fock_hamiltonian
@@ -157,7 +160,7 @@ def __main__(edm: ExperimentDataManager):
 
     max_k = None
 
-    couplers = get_XsXbYsYb_couplers(sys_qubits=sys_qubits, env_qubits=env_qubits)
+    couplers = get_XsXbYsYb_coupler(sys_qubits=sys_qubits, env_qubits=env_qubits)
 
     _, coupler_gs_index = get_closest_state(
         ref_state=sys_ground_state,

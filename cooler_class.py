@@ -51,7 +51,7 @@ from fermionic_cooling.utils import (
 class Cooler:
     def __init__(
         self,
-        sys_hamiltonian: cirq.PauliSum,
+        sys_hamiltonian: Union[cirq.PauliSum, np.ndarray],
         n_electrons: list,
         sys_qubits: Iterable[cirq.Qid],
         sys_initial_state: np.ndarray,
@@ -85,6 +85,9 @@ class Cooler:
             self._sys_eig_energies, self._sys_eig_states = np.linalg.eigh(
                 sys_hamiltonian
             )
+            sorted_idx = np.argsort(self._sys_eig_energies)
+            self._sys_eig_energies = self._sys_eig_energies[sorted_idx]
+            self._sys_eig_states = self._sys_eig_states[:, sorted_idx]
             time_evolve_method = "expm"
             n_sys_qubits = len(self.sys_qubits)
             self.sys_subspace_size = subspace_size(n_sys_qubits, n_electrons)
