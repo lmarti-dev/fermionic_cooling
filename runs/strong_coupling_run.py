@@ -13,7 +13,7 @@ from openfermion import (
 
 from chemical_models.specific_model import SpecificModel
 from data_manager import ExperimentDataManager
-from fauplotstyle.styler import use_style
+from fauplotstyle.styler import style
 from qutlet.models.fermi_hubbard_model import FermiHubbardModel
 from qutlet.utilities import (
     flatten,
@@ -311,6 +311,6 @@ if __name__ == "__main__":
         project="fermionic cooling",
         dry_run=dry_run,
     )
-    use_style()
+    style()
     __main__(edm)
     # model stuff

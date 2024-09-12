@@ -8,7 +8,7 @@ from openfermion import (
 )
 from itertools import combinations
 import matplotlib.pyplot as plt
-from fauplotstyle.styler import use_style
+from fauplotstyle.styler import style
 
 from data_manager import ExperimentDataManager
 from cirq import LineQubit
@@ -197,7 +197,7 @@ if __name__ == "__main__":
 
     print("### plotting")
 
-    use_style()
+    style()
 
     fig = plot_bogo_jw_coefficients(total_coefficients, max_pauli_strs)
 

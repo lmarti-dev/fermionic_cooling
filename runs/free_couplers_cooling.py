@@ -39,7 +39,7 @@ import matplotlib.pyplot as plt
 from fermionic_cooling.adiabatic_sweep import fermion_to_dense, run_sweep
 
 from data_manager import ExperimentDataManager
-from fauplotstyle.styler import use_style
+from fauplotstyle.styler import style
 import numpy as np
 
 
@@ -51,7 +51,7 @@ def __main__(args):
         notes="cooling this home cooked chemical ham with free couplers",
         dry_run=dry_run,
     )
-    use_style()
+    style()
     # model stuff
 
     model_name = "cooked/SingletO2_6e_8q"

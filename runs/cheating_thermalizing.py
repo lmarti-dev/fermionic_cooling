@@ -10,7 +10,7 @@ from openfermion import get_sparse_operator
 from thermalizer import Thermalizer
 
 from data_manager import ExperimentDataManager
-from fauplotstyle.styler import use_style
+from fauplotstyle.styler import style
 from qutlet.models.fermi_hubbard_model import FermiHubbardModel
 from qutlet.utilities import jw_eigenspectrum_at_particle_number
 from fermionic_cooling.utils import (
@@ -503,5 +503,5 @@ def normal_run():
 
 
 if __name__ == "__main__":
-    use_style()
+    style()
     normal_run()

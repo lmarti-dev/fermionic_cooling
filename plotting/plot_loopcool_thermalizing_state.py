@@ -1,4 +1,4 @@
-from fauplotstyle.styler import use_style
+from fauplotstyle.styler import style
 import json
 import io
 from json_extender import ExtendedJSONDecoder
@@ -26,7 +26,7 @@ def plot_fid_progression(fids):
 
 
 if __name__ == "__main__":
-    use_style()
+    style()
 
     edm = ExperimentDataManager(experiment_name="single_thermalization_plot")
     fpath = r"c:\Users\Moi4\Desktop\current\FAU\phd\data\2024_03_21\fh22_0_target_beta_12h15\run_00000\data\thermalizin_free_fh_coulomb_2.json"

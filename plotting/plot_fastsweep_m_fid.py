@@ -3,7 +3,7 @@ from data_manager import ExperimentDataManager
 import json
 import os
 import matplotlib.pyplot as plt
-from fauplotstyle.styler import use_style
+from fauplotstyle.styler import style
 import numpy as np
 import io
 from matplotlib.ticker import MaxNLocator
@@ -77,7 +77,7 @@ def plot_fast_sweep_vs_m(dirname, max_sweep_fid=None):
 
 
 if __name__ == "__main__":
-    use_style()
+    style()
     edm = ExperimentDataManager(experiment_name="plot_fastsweep_vs_m", dry_run=True)
 
     graph_dir = (

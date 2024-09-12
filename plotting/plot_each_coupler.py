@@ -1,5 +1,5 @@
 import matplotlib.pyplot as plt
-from fauplotstyle.styler import use_style
+from fauplotstyle.styler import style
 from data_manager import ExperimentDataManager, ExtendedJSONDecoder
 import json
 import io
@@ -69,7 +69,7 @@ def plot_each_coupler_perf(dirname):
 
 
 def local_plot():
-    use_style()
+    style()
     dry_run = False
     edm = ExperimentDataManager(
         experiment_name="plot_couplers_oneatatime",

@@ -12,7 +12,7 @@ from openfermion import (
 )
 
 from data_manager import ExperimentDataManager
-from fauplotstyle.styler import use_style
+from fauplotstyle.styler import style
 from qutlet.models.fermi_hubbard_model import FermiHubbardModel
 from qutlet.utilities import (
     jw_eigenspectrum_at_particle_number,
@@ -36,7 +36,7 @@ def __main__(args):
         notes="fh cooling with subspace simulation, with coulomb",
         dry_run=dry_run,
     )
-    use_style()
+    style()
     # model stuff
 
     model_name = "fh_coulomb"

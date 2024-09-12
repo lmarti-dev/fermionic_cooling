@@ -9,7 +9,7 @@ from qutlet.models.fermi_hubbard_model import FermiHubbardModel
 from qutlet.utilities import jw_eigenspectrum_at_particle_number, spin_dicke_mixed_state
 import matplotlib.pyplot as plt
 from data_manager import ExperimentDataManager
-from fauplotstyle.styler import use_style
+from fauplotstyle.styler import style
 
 
 def plot_amplitudes_vs_beta(
@@ -132,7 +132,7 @@ def plot_mms_fidelity_vs_beta(edm):
 
 
 if __name__ == "__main__":
-    use_style()
+    style()
 
     dry_run = False
     edm = ExperimentDataManager(

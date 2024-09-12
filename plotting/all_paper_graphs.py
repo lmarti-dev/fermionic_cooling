@@ -8,7 +8,7 @@ from json_extender import ExtendedJSONDecoder
 from openfermion import get_sparse_operator
 
 from data_manager import ExperimentDataManager
-from fauplotstyle.styler import use_style
+from fauplotstyle.styler import style
 from qutlet.models import FermiHubbardModel
 from qutlet.utilities import jw_eigenspectrum_at_particle_number
 from fermionic_cooling.plotting.plot_comparison_adiabatic_preprocessing import (
@@ -73,7 +73,7 @@ def controlled_cooling_load_plot(
     edm.save_figure(fig, fig_filename, add_timestamp=False)
 
 
-use_style()
+style()
 dry_run = False
 edm = ExperimentDataManager(
     experiment_name="fermionic_cooling_paper_graphs", dry_run=dry_run

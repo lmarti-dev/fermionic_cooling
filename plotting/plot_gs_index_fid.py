@@ -8,7 +8,7 @@ from json_extender import ExtendedJSONDecoder
 from utils import get_most_recent_timestamped_files
 
 from data_manager import ExperimentDataManager
-from fauplotstyle.styler import use_style
+from fauplotstyle.styler import style
 import matplotlib.cm as cm
 import matplotlib.colors as colors
 
@@ -55,7 +55,7 @@ for run in [s for s in os.listdir(experiment_path) if not s.startswith("__")]:
 
     gs_ind_final_fids[sgs, cgs] = jobj["fidelities"][0][-1]
 
-use_style()
+style()
 cmap = plt.get_cmap("faucmap", 7)
 
 scalar_mappable = cm.ScalarMappable(cmap=cmap)

@@ -8,7 +8,7 @@ import numpy as np
 from openfermion import get_sparse_operator
 
 from data_manager import ExperimentDataManager, load_figure_data
-from fauplotstyle.styler import use_style
+from fauplotstyle.styler import style
 from qutlet.models.fermi_hubbard_model import FermiHubbardModel
 from qutlet.utilities import jw_eigenspectrum_at_particle_number
 
@@ -91,7 +91,7 @@ pickle_fpaths = [
     r"/home/eckstein/Desktop/projects/data/2024_02_20/fh22_60_target_beta_11h03/run_00000/figures/hazelnuts_data_2024_02_21_08_38_11.pickle"
 ]
 
-use_style()
+style()
 # restyle_fig(pickle_fpaths[0])
 for fpath in fpaths:
     restyle_fig(fpath, normalized=True)

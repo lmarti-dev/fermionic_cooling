@@ -8,10 +8,10 @@ from qutlet.utilities import jw_eigenspectrum_at_particle_number
 from fermionic_cooling.building_blocks import get_cheat_couplers, get_Z_env
 
 import matplotlib.pyplot as plt
-from fauplotstyle.styler import use_style
+from fauplotstyle.styler import style
 
 dry_run = True
-use_style()
+style()
 
 model_name = "fh_slater"
 edm = ExperimentDataManager(

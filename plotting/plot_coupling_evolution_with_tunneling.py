@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from data_manager import ExperimentDataManager
-from fauplotstyle.styler import use_style
+from fauplotstyle.styler import style
 
 
 def main():
@@ -71,5 +71,5 @@ def main():
 
 if __name__ == "__main__":
 
-    use_style()
+    style()
     main()

@@ -125,7 +125,7 @@ class Cooler:
     def msg_out(self):
         print("\x1B[#B" * (2 + len(self.msg.keys())))
 
-    def to_correct_matrix(self, obj: Union[np.ndarray, cirq.PauliSum], which: str):
+    def expand_matrix(self, obj: Union[np.ndarray, cirq.PauliSum], which: str):
         if isinstance(obj, (cirq.PauliSum, cirq.PauliString)):
             if not self.subspace_simulation:
                 return obj.matrix(qubits=self.total_qubits)
@@ -143,6 +143,7 @@ class Cooler:
                     )
         else:
             mat = obj
+
         if which == "sys":
             return np.kron(
                 mat,
@@ -161,7 +162,7 @@ class Cooler:
         else:
             return mat
 
-    def cooling_hamiltonian(self, env_coupling: float, alpha: float):
+    def cooling_hamiltonian(self, env_coupling: float, alpha: Union[float, complex]):
 
         env_hamiltonian = self.env_hamiltonian
         if self.ancilla_split_spectrum:
@@ -177,15 +178,14 @@ class Cooler:
         return (
             self.sys_density_matrix(self.sys_hamiltonian)
             + env_coupling * self.env_density_matrix(env_hamiltonian)
-            + float(alpha)
-            * self.to_correct_matrix(self.sys_env_coupler, which="couplers")
+            + alpha * self.expand_matrix(self.sys_env_coupler, which="couplers")
         )
 
     def sys_density_matrix(self, total_density_matrix: np.ndarray):
-        return self.to_correct_matrix(total_density_matrix, "sys")
+        return self.expand_matrix(total_density_matrix, "sys")
 
     def env_density_matrix(self, total_density_matrix: np.ndarray):
-        return self.to_correct_matrix(total_density_matrix, "env")
+        return self.expand_matrix(total_density_matrix, "env")
 
     @property
     def total_qubits(self):
@@ -311,7 +311,7 @@ class Cooler:
                     )
 
         final_sys_density_matrix = self.partial_trace_wrapper(
-            rho=total_density_matrix, which="sys"
+            rho=total_density_matrix, trace_out="env"
         )
 
         self.msg_out()
@@ -327,6 +327,23 @@ class Cooler:
         use_random_coupler: bool = False,
         weights: list = None,
     ):
+        """This loops every coupler on every energy gap
+
+        Args:
+            evolution_times (np.ndarray): the evolution times
+            alphas (np.ndarray): the couplings
+            sweep_values (Iterable[float]): the energy gaps
+            pooling_method (str, optional): which fidelity to keep after a loop. Defaults to "max".
+            use_trotter (bool, optional): whether to trotterize each cooling step. Defaults to False.
+            use_random_coupler (bool, optional): whether to use a random coupler from the coupler list. Defaults to False.
+            weights (list, optional): to weigh the random couplers. Defaults to None.
+
+        Raises:
+            ValueError: is the density matrix not hermitian
+
+        Returns:
+            tuple: tuple o' results
+        """
         initial_density_matrix = self.total_initial_state
         if not cirq.is_hermitian(initial_density_matrix):
             raise ValueError("initial density matrix is not hermitian")
@@ -419,7 +436,7 @@ class Cooler:
                 env_energies.append(pool_fn(temp_env_energies))
 
         final_sys_density_matrix = self.partial_trace_wrapper(
-            rho=total_density_matrix, which="env"
+            rho=total_density_matrix, trace_out="env"
         )
 
         self.msg_out()
@@ -622,7 +639,7 @@ class Cooler:
                 omega = omega - epsilon
 
         final_sys_density_matrix = self.partial_trace_wrapper(
-            rho=total_density_matrix, which="sys"
+            rho=total_density_matrix, trace_out="env"
         )
         self.msg_out()
         if callback is not None:
@@ -634,11 +651,11 @@ class Cooler:
             )
         return fidelities, sys_energies, omegas, env_energies, final_sys_density_matrix
 
-    def partial_trace_wrapper(self, rho: np.ndarray, which: str):
+    def partial_trace_wrapper(self, rho: np.ndarray, trace_out: str):
         if self.subspace_simulation:
-            if which == "env":
+            if trace_out == "env":
                 trace_out = "dim2"
-            elif which == "sys":
+            elif trace_out == "sys":
                 trace_out = "dim1"
             traced_rho = two_tensor_partial_trace(
                 rho=rho,
@@ -647,19 +664,90 @@ class Cooler:
                 trace_out=trace_out,
             )
         else:
-            if which == "sys":
+            if trace_out == "sys":
                 traced_rho = trace_out_sys(
                     rho=rho,
                     n_sys_qubits=len(self.sys_qubits),
                     n_env_qubits=len(self.env_qubits),
                 )
-            elif which == "env":
+            elif trace_out == "env":
                 traced_rho = trace_out_env(
                     rho=rho,
                     n_sys_qubits=len(self.sys_qubits),
                     n_env_qubits=len(self.env_qubits),
                 )
         return traced_rho
+
+    def time_cool(
+        self,
+        filter_function: Callable[[float], float],
+        alpha: float,
+        times: list[float],
+        env_coupling: float,
+    ):
+
+        total_density_matrix = self.total_initial_state
+        diff_times = np.diff(np.array([0, *times]))
+
+        sys_ev_energies = [
+            self.sys_energy(self.partial_trace_wrapper(total_density_matrix, "env"))
+        ]
+        env_ev_energies = [
+            self.env_energy(self.partial_trace_wrapper(total_density_matrix, "sys"))
+        ]
+        fidelities = [
+            self.sys_fidelity(self.partial_trace_wrapper(total_density_matrix, "env"))
+        ]
+
+        for time, diff_time in zip(times, diff_times):
+
+            cooling_hamiltonian = self.cooling_hamiltonian(
+                env_coupling, filter_function(time) * alpha
+            )
+            total_density_matrix = time_evolve_density_matrix(
+                ham=cooling_hamiltonian,  # .matrix(qubits=self.total_qubits),
+                rho=total_density_matrix,
+                t=diff_time,
+                method="expm",
+            )
+            traced_density_matrix = self.partial_trace_wrapper(
+                rho=total_density_matrix, trace_out="env"
+            )
+            traced_env = self.partial_trace_wrapper(
+                rho=total_density_matrix, trace_out="sys"
+            )
+
+            # renormalizing to avoid errors
+            traced_density_matrix /= np.trace(traced_density_matrix)
+            total_density_matrix /= np.trace(total_density_matrix)
+            traced_env /= np.trace(traced_env)
+
+            sys_ev_energies.append(self.sys_energy(traced_density_matrix))
+            env_ev_energies.append(self.env_energy(traced_env))
+            fidelities.append(self.sys_fidelity(traced_density_matrix))
+
+            self.update_message(
+                "trottime",
+                f"total evolved time: {time:.5f}",
+                message_level=5,
+            )
+            self.update_message(
+                "fidetc",
+                f"fid: {fidelities[-1]:.5f}, sys E: {sys_ev_energies[-1]:.3f}, env E: {env_ev_energies[-1]:.5f}",
+            )
+            self.print_msg()
+        # putting the env back in the ground state
+        total_density_matrix = np.kron(
+            traced_density_matrix, self.env_ground_density_matrix
+        )
+
+        return (
+            np.array([0, *times]),
+            fidelities,
+            sys_ev_energies,
+            env_ev_energies,
+            total_density_matrix,
+        )
 
     def trotter_cooling_step(
         self,
@@ -794,9 +882,11 @@ class Cooler:
 
         traced_density_matrix = self.partial_trace_wrapper(
             rho=total_density_matrix,
-            which="env",
+            trace_out="env",
         )
-        traced_env = self.partial_trace_wrapper(rho=total_density_matrix, which="sys")
+        traced_env = self.partial_trace_wrapper(
+            rho=total_density_matrix, trace_out="sys"
+        )
 
         if depol_noise is not None:
             traced_density_matrix = add_depol_noise(
@@ -951,6 +1041,16 @@ class Cooler:
                 )
             else:
                 ax_bottom.legend(bbox_to_anchor=(0.2, 2))
+        return fig
+
+    @classmethod
+    def plot_time_cooling(cls, times, fidelities, env_energies):
+        fig, axes = plt.subplots(nrows=2, sharex=True)
+        axes[0].plot(times, fidelities)
+        axes[1].plot(times, env_energies)
+        axes[0].set_ylabel("Fidelity")
+        axes[1].set_ylabel("$E_F$")
+        axes[1].set_xlabel("$Time$")
         return fig
 
     @classmethod

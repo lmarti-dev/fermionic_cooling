@@ -20,7 +20,7 @@ from fermionic_cooling.utils import (
 
 from chemical_models.specific_model import SpecificModel
 from data_manager import ExperimentDataManager
-from fauplotstyle.styler import use_style
+from fauplotstyle.styler import style
 from qutlet.models.fermi_hubbard_model import FermiHubbardModel
 from qutlet.utilities import jw_eigenspectrum_at_particle_number
 
@@ -266,7 +266,7 @@ def comparison_ngaps(edm, n_gaps):
 
 
 if __name__ == "__main__":
-    use_style()
+    style()
 
     dry_run = True
     edm = ExperimentDataManager(

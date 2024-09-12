@@ -8,7 +8,7 @@ import numpy as np
 from cirq import fidelity
 
 import matplotlib.pyplot as plt
-from fauplotstyle.styler import use_style
+from fauplotstyle.styler import style
 from data_manager import ExperimentDataManager
 
 
@@ -78,7 +78,7 @@ if __name__ == "__main__":
     edm = ExperimentDataManager(
         experiment_name="ideal_coupler_overlap", dry_run=dry_run
     )
-    use_style()
+    style()
     fig = plot_free_state_overlap()
     edm.save_figure(fig, fig_shape="page-wide")
 

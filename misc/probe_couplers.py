@@ -6,7 +6,7 @@ from chemical_models.specific_model import SpecificModel
 from data_manager import ExperimentDataManager
 from qutlet.models import FermiHubbardModel
 from qutlet.utilities import jw_eigenspectrum_at_particle_number
-from fauplotstyle.styler import use_style
+from fauplotstyle.styler import style
 
 
 def __main__():
@@ -174,5 +174,5 @@ def __main__():
 
 
 if __name__ == "__main__":
-    use_style()
+    style()
     __main__()

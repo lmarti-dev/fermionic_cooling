@@ -8,7 +8,7 @@ import numpy as np
 from qutlet.models.fermi_hubbard_model import FermiHubbardModel
 from openfermion import get_sparse_operator
 from qutlet.utilities import jw_get_true_ground_state_at_particle_number
-from fauplotstyle.styler import use_style
+from fauplotstyle.styler import style
 
 
 def get_var_dump(logging_dir: str):
@@ -195,7 +195,7 @@ def evening_plot():
 
 
 if __name__ == "__main__":
-    use_style()
+    style()
     dirnames = afternoon_plot()
 
     dry_run = False

@@ -8,7 +8,7 @@ from openfermion import (
 
 from chemical_models.specific_model import SpecificModel
 from data_manager import ExperimentDataManager
-from fauplotstyle.styler import use_style
+from fauplotstyle.styler import style
 from fermionic_cooling.adiabatic_sweep import run_sweep
 from fermionic_cooling.building_blocks import (
     get_cheat_couplers,
@@ -25,17 +25,27 @@ from fermionic_cooling.utils import (
     subspace_energy_expectation,
 )
 from qutlet.models.fermi_hubbard_model import FermiHubbardModel
-from qutlet.utilities import fidelity, jw_eigenspectrum_at_particle_number
+from qutlet.utilities import (
+    fidelity,
+    jw_eigenspectrum_at_particle_number,
+    jw_hartree_fock_state,
+)
+
+
+def gaussian_bell(mu: float, sigma: float, n_steps: int):
+    return np.exp(-((np.linspace(-1, 1, n_steps) - mu) ** 2) / (2 * sigma**2))
 
 
 def __main__(edm: ExperimentDataManager):
 
     model_name = "cooked/Fe3_NTA_doublet_3e_8q"
-    model_name = "fh_slater"
+    # model_name = "fh_slater"
     if "fh_" in model_name:
-        n_electrons = [3, 2]
         model = FermiHubbardModel(
-            lattice_dimensions=(3, 2), n_electrons=n_electrons, tunneling=1, coulomb=6
+            lattice_dimensions=(3, 2),
+            n_electrons="half-filling",
+            tunneling=1,
+            coulomb=6,
         )
         n_qubits = len(model.qubits)
         if "coulomb" in model_name:
@@ -52,6 +62,7 @@ def __main__(edm: ExperimentDataManager):
         start_fock_hamiltonian = spm.current_model.quadratic_terms
         couplers_fock_hamiltonian = start_fock_hamiltonian
 
+    n_electrons = model.n_electrons
     start_sys_eig_energies, start_sys_eig_states = jw_eigenspectrum_at_particle_number(
         sparse_operator=get_sparse_operator(
             start_fock_hamiltonian,
@@ -87,18 +98,23 @@ def __main__(edm: ExperimentDataManager):
         expanded=False,
     )
 
+    subspace_simulation = True
+
     sys_ground_state = sys_eig_states[:, np.argmin(sys_eig_energies)]
     sys_ground_energy = np.min(sys_eig_energies)
 
     _, start_gs_index = get_closest_state(
         ref_state=sys_ground_state,
         comp_states=start_sys_eig_states,
-        subspace_simulation=True,
+        subspace_simulation=subspace_simulation,
     )
     coupler_gs_index = start_gs_index
 
     # initial state setting
-    sys_initial_state = ketbra(start_sys_eig_states[:, start_gs_index])
+    # sys_initial_state = ketbra(start_sys_eig_states[:, start_gs_index])
+    sys_initial_state = jw_hartree_fock_state(
+        model=model, expanded=not subspace_simulation
+    )
 
     print("BEFORE SWEEP")
     print_state_fidelity_to_eigenstates(
@@ -140,6 +156,7 @@ def __main__(edm: ExperimentDataManager):
         env_eig_energies=env_eig_energies,
         model=model.__to_json__,
         model_name=model_name,
+        subspace_simulation=subspace_simulation,
     )
 
     max_k = None
@@ -151,7 +168,12 @@ def __main__(edm: ExperimentDataManager):
         gs_indices=(coupler_gs_index,),
         noise=None,
         max_k=max_k,
+        use_pauli_x=True,
     )  # Interaction only on Qubit 0?
+    weights = gaussian_bell(1 / 2, 1, len(couplers))
+    couplers = [sum([x * w for x, w in zip(couplers, weights)])]
+    # couplers = [couplers[16]]
+
     print("coupler done")
 
     print(f"number of couplers: {len(couplers)}")
@@ -204,7 +226,7 @@ def __main__(edm: ExperimentDataManager):
             n_qubits=n_sys_qubits,
             is_noise_spin_conserving=is_noise_spin_conserving,
             n_electrons=n_electrons,
-            subspace_simulation=True,
+            subspace_simulation=subspace_simulation,
         )
         sys_initial_state = final_state
         print("AFTER SWEEP")
@@ -228,7 +250,7 @@ def __main__(edm: ExperimentDataManager):
         env_ground_state=env_ground_state,
         sys_env_coupler_data=couplers,
         verbosity=5,
-        subspace_simulation=True,
+        subspace_simulation=subspace_simulation,
         time_evolve_method="expm",
         ancilla_split_spectrum=ancilla_split_spectrum,
     )
@@ -236,11 +258,11 @@ def __main__(edm: ExperimentDataManager):
 
     print(f"coupler dim: {cooler.sys_env_coupler_data_dims}")
 
-    ansatz_options = {"beta": 1, "mu": 30, "c": 40}
-    weaken_coupling = 0.1
+    ansatz_options = {"beta": 1, "mu": 20, "c": 20}
+    weaken_coupling = 60
 
-    start_omega = 23
-    stop_omega = 22
+    start_omega = spectrum_width * 1.1
+    stop_omega = min_gap * 0.5
 
     method = "bigbrain"
 
@@ -312,10 +334,10 @@ if __name__ == "__main__":
     # whether we want to skip all saving data
     dry_run = True
     edm = ExperimentDataManager(
-        experiment_name="bigbrain_subspace_water_stuff",
+        experiment_name="bigbrain_subspace_fh_x_gate",
         project="fermionic cooling",
         dry_run=dry_run,
     )
-    use_style()
+    style()
     __main__(edm)
     # model stuff
