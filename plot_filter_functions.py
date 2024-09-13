@@ -12,6 +12,7 @@ def evaluate_and_fft(model: callable, times: list):
     y[np.isnan(y)] = np.nanmax(y)
     y /= np.max(y)
     fy = np.abs(np.fft.fft(y))
+    fy /= np.max(fy)
     return y, fy
 
 
@@ -24,7 +25,7 @@ def main():
 
     lloyd = get_lloyd_filter_function(biga=1, beta=1e5, tau=time / 2)
     ding = get_ding_filter_function(
-        a=2.5 * spectrum_width, da=spectrum_width, b=min_gap, db=min_gap
+        a=2.5 * spectrum_width, da=0.5 * spectrum_width, b=min_gap, db=min_gap
     )
 
     fig, axes = plt.subplots(nrows=2)

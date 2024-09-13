@@ -269,13 +269,15 @@ def __main__(edm: ExperimentDataManager):
     )
 
     total_sim_time = 80
-    times = np.linspace(0.01, total_sim_time, 10)
+    times = np.linspace(0.01, total_sim_time, 20)
 
-    # filter_function = get_ding_filter_function(
-    #     a=spectrum_width, da=0.01 * spectrum_width, b=min_gap, db=0.1 * min_gap
+    filter_function = get_ding_filter_function(
+        a=2.5 * spectrum_width, da=0.5 * spectrum_width, b=min_gap, db=0.1 * min_gap
+    )
+
+    # filter_function = get_lloyd_filter_function(
+    #     biga=1, beta=total_sim_time / 3, tau=total_sim_time / 2
     # )
-
-    filter_function = get_lloyd_filter_function(biga=1, beta=100, tau=times[-1] / 2)
     total_plot_times = []
     total_fidelities = []
     total_sys_energies = []
