@@ -29,17 +29,14 @@ from qutlet.utilities import (
     fidelity,
     jw_eigenspectrum_at_particle_number,
     jw_hartree_fock_state,
+    gaussian_envelope,
 )
-
-
-def gaussian_bell(mu: float, sigma: float, n_steps: int):
-    return np.exp(-((np.linspace(-1, 1, n_steps) - mu) ** 2) / (2 * sigma**2))
 
 
 def __main__(edm: ExperimentDataManager):
 
-    model_name = "cooked/Fe3_NTA_doublet_3e_8q"
-    # model_name = "fh_slater"
+    # model_name = "cooked/sulfanium_triplet_6e_12q"
+    model_name = "fh_slater"
     if "fh_" in model_name:
         model = FermiHubbardModel(
             lattice_dimensions=(3, 2),
@@ -170,7 +167,7 @@ def __main__(edm: ExperimentDataManager):
         max_k=max_k,
         use_pauli_x=True,
     )  # Interaction only on Qubit 0?
-    weights = gaussian_bell(1 / 2, 1, len(couplers))
+    weights = gaussian_envelope(1 / 2, 1, len(couplers))
     couplers = [sum([x * w for x, w in zip(couplers, weights)])]
     # couplers = [couplers[16]]
 

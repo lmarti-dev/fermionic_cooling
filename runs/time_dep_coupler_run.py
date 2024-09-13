@@ -29,30 +29,14 @@ from qutlet.utilities import (
     fidelity,
     jw_eigenspectrum_at_particle_number,
     jw_hartree_fock_state,
+    gaussian_envelope,
 )
 
 
-def get_ding_filter_function(a: float, da: float, b: float, db: float):
-    # Single-ancilla ground state preparation via Lindbladians
-    # paper values
-    # a=2.5 * spectrum_width, da=0.5 * spectrum_width, b=min_gap (spectral gap), db=min_gap
-    def filter_function(time: float):
-        pa = np.exp((-(time**2) * (da**2) / 4)) * np.exp(1j * a * time)
-        pb = np.exp((-(time**2) * (db**2) / 4)) * np.exp(1j * b * time)
-        return (pa - pb) / (2 * np.pi * 1j * time)
-
-    return filter_function
-
-
-def get_lloyd_filter_function(biga: float, beta: float, tau: float):
-    # Quasiparticle cooling algorithms for quantum many-body state preparation
-    # arXiv:2404.12175v1 [quant-ph] 18 Apr 2024
-    def filter_function(time: float):
-        return np.sin((np.pi(time - tau) / 2)) / (
-            (beta) * (np.sinh(np.pi(time - tau) / beta))
-        )
-
-    return filter_function
+from fermionic_cooling.filter_functions import (
+    get_ding_filter_function,
+    get_lloyd_filter_function,
+)
 
 
 def __main__(edm: ExperimentDataManager):
@@ -180,9 +164,17 @@ def __main__(edm: ExperimentDataManager):
 
     max_k = None
 
-    couplers = get_XsXbYsYb_coupler(
-        sys_qubits=sys_qubits, env_qubits=env_qubits
+    couplers = get_cheat_couplers(
+        sys_eig_states=sys_eig_states,
+        env_eig_states=env_eig_states,
+        qubits=sys_qubits + env_qubits,
+        gs_indices=(0,),
+        noise=None,
+        max_k=max_k,
+        use_pauli_x=False,
     )  # Interaction only on Qubit 0?
+    weights = gaussian_envelope(mu=1 / 2, sigma=3, n_steps=len(couplers))
+    # couplers = [sum([x * w for x, w in zip(couplers, weights)])]
     print("coupler done")
 
     print(f"number of couplers: {len(couplers)}")
@@ -276,26 +268,68 @@ def __main__(edm: ExperimentDataManager):
         ancilla_split_spectrum=ancilla_split_spectrum,
     )
 
-    filter_function = get_ding_filter_function(
-        a=2.5 * spectrum_width, da=0.5 * spectrum_width, b=min_gap, db=min_gap
+    total_sim_time = 80
+    times = np.linspace(0.01, total_sim_time, 10)
+
+    # filter_function = get_ding_filter_function(
+    #     a=spectrum_width, da=0.01 * spectrum_width, b=min_gap, db=0.1 * min_gap
+    # )
+
+    filter_function = get_lloyd_filter_function(biga=1, beta=100, tau=times[-1] / 2)
+    total_plot_times = []
+    total_fidelities = []
+    total_sys_energies = []
+
+    total_env_energies = []
+    n_reps = 10
+    last_plot_times = 0
+
+    edm.var_dump(
+        filter_function=filter_function.__name__,
+        total_sim_time=total_sim_time,
+        n_reps=n_reps,
     )
-    times = np.linspace(0.01, 1, 100)
-    (plot_times, fidelities, sys_ev_energies, env_ev_energies, total_density_matrix) = (
-        cooler.time_cool(
-            filter_function=filter_function, times=times, env_coupling=1.2, alpha=1
+
+    for rep in range(n_reps):
+        (
+            plot_times,
+            fidelities,
+            sys_ev_energies,
+            env_ev_energies,
+            total_density_matrix,
+        ) = cooler.time_cool(
+            filter_function=filter_function,
+            times=times,
+            env_coupling=spectrum_width,
+            alpha=1,
         )
-    )
+
+        plot_times_repped = plot_times + last_plot_times
+
+        total_plot_times.extend(plot_times_repped)
+        total_fidelities.extend(fidelities)
+        total_env_energies.extend(env_ev_energies)
+        total_sys_energies.extend(sys_ev_energies)
+
+        last_plot_times = plot_times_repped[-1]
+
+        cooler.sys_initial_state = cooler.partial_trace_wrapper(
+            total_density_matrix, trace_out="env"
+        )
 
     jobj = {
-        "fidelities": fidelities,
-        "sys_energies": sys_ev_energies,
-        "env_energies": env_ev_energies,
+        "total_plot_times": total_plot_times,
+        "total_fidelities": total_fidelities,
+        "total_sys_energies": total_sys_energies,
+        "total_env_energies": total_env_energies,
     }
-    edm.save_dict(
-        filename=f"cooling_free_{start_gs_index}_{coupler_gs_index}", jobj=jobj
-    )
+    edm.save_dict(jobj=jobj)
 
-    fig = cooler.plot_time_cooling(plot_times, fidelities, env_ev_energies)
+    fig = cooler.plot_time_cooling(
+        np.linspace(0, n_reps * total_sim_time * len(couplers), len(total_fidelities)),
+        total_fidelities,
+        total_env_energies,
+    )
     edm.save_figure(
         fig,
     )
@@ -306,7 +340,7 @@ if __name__ == "__main__":
     # whether we want to skip all saving data
     dry_run = True
     edm = ExperimentDataManager(
-        experiment_name="bigbrain_subspace_fh_x_gate",
+        experiment_name="time_dependent_coupler_cooling",
         project="fermionic cooling",
         dry_run=dry_run,
     )

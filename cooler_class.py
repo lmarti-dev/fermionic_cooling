@@ -700,43 +700,45 @@ class Cooler:
         ]
 
         for time, diff_time in zip(times, diff_times):
+            n_couplers = self.get_coupler_number(rep=None)
+            for coupler_idx in range(n_couplers):
+                self.sys_env_coupler_easy_setter(coupler_index=coupler_idx, rep=None)
+                cooling_hamiltonian = self.cooling_hamiltonian(
+                    env_coupling, filter_function(time) * alpha
+                )
+                total_density_matrix = time_evolve_density_matrix(
+                    ham=cooling_hamiltonian,  # .matrix(qubits=self.total_qubits),
+                    rho=total_density_matrix,
+                    t=diff_time,
+                    method="expm",
+                )
+                traced_density_matrix = self.partial_trace_wrapper(
+                    rho=total_density_matrix, trace_out="env"
+                )
+                traced_env = self.partial_trace_wrapper(
+                    rho=total_density_matrix, trace_out="sys"
+                )
 
-            cooling_hamiltonian = self.cooling_hamiltonian(
-                env_coupling, filter_function(time) * alpha
-            )
-            total_density_matrix = time_evolve_density_matrix(
-                ham=cooling_hamiltonian,  # .matrix(qubits=self.total_qubits),
-                rho=total_density_matrix,
-                t=diff_time,
-                method="expm",
-            )
-            traced_density_matrix = self.partial_trace_wrapper(
-                rho=total_density_matrix, trace_out="env"
-            )
-            traced_env = self.partial_trace_wrapper(
-                rho=total_density_matrix, trace_out="sys"
-            )
+                # renormalizing to avoid errors
+                traced_density_matrix /= np.trace(traced_density_matrix)
+                total_density_matrix /= np.trace(total_density_matrix)
+                traced_env /= np.trace(traced_env)
 
-            # renormalizing to avoid errors
-            traced_density_matrix /= np.trace(traced_density_matrix)
-            total_density_matrix /= np.trace(total_density_matrix)
-            traced_env /= np.trace(traced_env)
+                sys_ev_energies.append(self.sys_energy(traced_density_matrix))
+                env_ev_energies.append(self.env_energy(traced_env))
+                fidelities.append(self.sys_fidelity(traced_density_matrix))
 
-            sys_ev_energies.append(self.sys_energy(traced_density_matrix))
-            env_ev_energies.append(self.env_energy(traced_env))
-            fidelities.append(self.sys_fidelity(traced_density_matrix))
-
-            self.update_message(
-                "trottime",
-                f"total evolved time: {time:.5f}",
-                message_level=5,
-            )
-            self.update_message(
-                "fidetc",
-                f"fid: {fidelities[-1]:.5f}, sys E: {sys_ev_energies[-1]:.3f}, env E: {env_ev_energies[-1]:.5f}",
-            )
-            self.print_msg()
-        # putting the env back in the ground state
+                self.update_message(
+                    "trottime",
+                    f"total evolved time: {time:.5f}",
+                    message_level=5,
+                )
+                self.update_message(
+                    "fidetc",
+                    f"fid: {fidelities[-1]:.5f}, sys E: {sys_ev_energies[-1]:.3f}, env E: {env_ev_energies[-1]:.5f}",
+                )
+                self.print_msg()
+            # putting the env back in the ground state
         total_density_matrix = np.kron(
             traced_density_matrix, self.env_ground_density_matrix
         )
