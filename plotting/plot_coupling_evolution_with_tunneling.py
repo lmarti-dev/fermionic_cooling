@@ -34,9 +34,7 @@ def main():
     for overlap_pool in ("mean", "max"):
         fig, ax = plt.subplots()
         for label, filename in zip(labels, filenames):
-            ledm = ExperimentDataManager.load_experiment_manager(
-                experiment_dirname=rf"{filename}"
-            )
+            ledm = ExperimentDataManager.load(experiment_dirname=rf"{filename}")
             all_overlaps = []
             ts = []
             for r in range(ledm.run_number + 1):

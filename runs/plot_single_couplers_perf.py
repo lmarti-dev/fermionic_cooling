@@ -28,7 +28,7 @@ labels = (
 
 for ind, experiment in enumerate(experiments):
 
-    edm = ExperimentDataManager.load_experiment_manager(experiment)
+    edm = ExperimentDataManager.load(experiment)
 
     fid_improvements = np.zeros((edm.run_number + 1,))
 

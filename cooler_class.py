@@ -738,7 +738,8 @@ class Cooler:
                     f"fid: {fidelities[-1]:.5f}, sys E: {sys_ev_energies[-1]:.3f}, env E: {env_ev_energies[-1]:.5f}",
                 )
                 self.print_msg()
-            # putting the env back in the ground state
+        # putting the env back in the ground state
+        # at the end of the simulation
         total_density_matrix = np.kron(
             traced_density_matrix, self.env_ground_density_matrix
         )
