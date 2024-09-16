@@ -113,11 +113,14 @@ def __main__(edm: ExperimentDataManager):
     )
     coupler_gs_index = start_gs_index
 
-    # initial state setting
-    # sys_initial_state = ketbra(start_sys_eig_states[:, start_gs_index])
-    sys_initial_state = jw_hartree_fock_state(
-        model=model, expanded=not subspace_simulation
-    )
+    initial_state_name = "hartreefock"
+
+    if initial_state_name == "slater":
+        sys_initial_state = ketbra(start_sys_eig_states[:, start_gs_index])
+    elif initial_state_name == "hartreefock":
+        sys_initial_state = jw_hartree_fock_state(
+            model=model, expanded=not subspace_simulation
+        )
 
     print("BEFORE SWEEP")
     print_state_fidelity_to_eigenstates(
@@ -160,6 +163,7 @@ def __main__(edm: ExperimentDataManager):
         model=model.__to_json__,
         model_name=model_name,
         subspace_simulation=subspace_simulation,
+        initial_state_name=initial_state_name,
     )
 
     max_k = None
@@ -173,8 +177,9 @@ def __main__(edm: ExperimentDataManager):
         max_k=max_k,
         use_pauli_x=False,
     )  # Interaction only on Qubit 0?
-    weights = gaussian_envelope(mu=1 / 2, sigma=3, n_steps=len(couplers))
+    # weights = gaussian_envelope(mu=1 / 2, sigma=3, n_steps=len(couplers))
     # couplers = [sum([x * w for x, w in zip(couplers, weights)])]
+    couplers = sum(couplers)
     print("coupler done")
 
     print(f"number of couplers: {len(couplers)}")
@@ -188,7 +193,7 @@ def __main__(edm: ExperimentDataManager):
     # evolution_time = 1e-3
 
     # call cool
-    use_fast_sweep = False
+    use_fast_sweep = True
     depol_noise = None
     is_noise_spin_conserving = False
     ancilla_split_spectrum = False
@@ -268,11 +273,11 @@ def __main__(edm: ExperimentDataManager):
         ancilla_split_spectrum=ancilla_split_spectrum,
     )
 
-    total_sim_time = 80
-    times = np.linspace(0.01, total_sim_time, 20)
+    total_sim_time = 6
+    times = np.linspace(0.01, total_sim_time, 21)
 
     filter_function = get_ding_filter_function(
-        a=2.5 * spectrum_width, da=0.5 * spectrum_width, b=min_gap, db=0.1 * min_gap
+        a=2.5 * spectrum_width, da=0.1 * spectrum_width, b=min_gap, db=min_gap
     )
 
     # filter_function = get_lloyd_filter_function(

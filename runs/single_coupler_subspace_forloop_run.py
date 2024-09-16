@@ -107,6 +107,7 @@ def __main__(edm: ExperimentDataManager):
     )
     coupler_gs_index = start_gs_index
 
+    # initial state setting
     initial_state_name = "slater"
 
     if initial_state_name == "slater":
@@ -157,7 +158,6 @@ def __main__(edm: ExperimentDataManager):
         model=model.__to_json__,
         model_name=model_name,
         subspace_simulation=subspace_simulation,
-        initial_state_name=initial_state_name,
     )
 
     max_k = None
@@ -169,30 +169,20 @@ def __main__(edm: ExperimentDataManager):
         gs_indices=(coupler_gs_index,),
         noise=None,
         max_k=max_k,
-        use_pauli_x=False,
+        use_pauli_x=True,
     )
-    weights = gaussian_envelope(0.2, 1, len(couplers))
-    couplers = [sum([x * w for x, w in zip(couplers, weights)])]
-    # couplers = sum(couplers)
-
     print("coupler done")
 
     print(f"number of couplers: {len(couplers)}")
-    # coupler = get_cheat_coupler(sys_eigenstates, env_eigenstates)
 
-    # get environment ham sweep values
     spectrum_width = max(sys_eig_energies) - min(sys_eig_energies)
 
     min_gap = get_min_gap(couplers_sys_eig_energies, threshold=1e-6)
-
-    # evolution_time = 1e-3
 
     # call cool
     use_fast_sweep = True
     depol_noise = None
     is_noise_spin_conserving = False
-    ancilla_split_spectrum = False
-
     if use_fast_sweep:
         sweep_time_mult = 1
         initial_ground_state = sys_initial_state
@@ -240,102 +230,106 @@ def __main__(edm: ExperimentDataManager):
     else:
         total_sweep_time = 0
 
-    cooler = Cooler(
-        sys_hamiltonian=sys_ham_matrix,
-        n_electrons=n_electrons,
-        sys_qubits=model.qubits,
-        sys_ground_state=sys_ground_state,
-        sys_initial_state=sys_initial_state,
-        env_hamiltonian=env_ham,
-        env_qubits=env_qubits,
-        env_ground_state=env_ground_state,
-        sys_env_coupler_data=couplers,
-        verbosity=5,
-        subspace_simulation=subspace_simulation,
-        time_evolve_method="expm",
-        ancilla_split_spectrum=ancilla_split_spectrum,
-    )
-    n_rep = 1
+    start_new_run = False
+    for coupler_index in range(len(couplers)):
+        if start_new_run:
+            edm.new_run(f"Coupler number {coupler_index}")
 
-    print(f"coupler dim: {cooler.sys_env_coupler_data_dims}")
+        weights = gaussian_envelope(
+            mu=coupler_index / len(couplers), sigma=3, n_steps=len(couplers)
+        )
+        coupler_data = [sum([x * w for x, w in zip(couplers, weights)])]
 
-    ansatz_options = {"beta": 1, "mu": 20, "c": 20}
-    weaken_coupling = 60
+        cooler = Cooler(
+            sys_hamiltonian=sys_ham_matrix,
+            n_electrons=n_electrons,
+            sys_qubits=model.qubits,
+            sys_ground_state=sys_ground_state,
+            sys_initial_state=sys_initial_state,
+            env_hamiltonian=env_ham,
+            env_qubits=env_qubits,
+            env_ground_state=env_ground_state,
+            sys_env_coupler_data=coupler_data,
+            verbosity=5,
+            subspace_simulation=subspace_simulation,
+            time_evolve_method="expm",
+            ancilla_split_spectrum=False,
+        )
+        n_rep = 1
 
-    start_omega = spectrum_width * 1.1
-    stop_omega = min_gap * 0.5
+        print(f"coupler dim: {cooler.sys_env_coupler_data_dims}")
 
-    method = "bigbrain"
+        ansatz_options = {"beta": 1, "mu": 20, "c": 20}
+        weaken_coupling = 60
 
-    edm.var_dump(
-        depol_noise=depol_noise,
-        use_fast_sweep=use_fast_sweep,
-        is_noise_spin_conserving=is_noise_spin_conserving,
-        max_k=max_k,
-        ansatz_options=ansatz_options,
-        method=method,
-        start_gs_index=start_gs_index,
-        coupler_gs_index=coupler_gs_index,
-        spectrum_width=spectrum_width,
-        min_gap=min_gap,
-        start_omega=start_omega,
-        stop_omega=stop_omega,
-        ancilla_split_spectrum=ancilla_split_spectrum,
-    )
+        start_omega = spectrum_width * 1.1
+        stop_omega = min_gap * 0.5
 
-    coupler_transitions = np.abs(
-        np.array(couplers_sys_eig_energies[1:]) - couplers_sys_eig_energies[0]
-    )
+        method = "bigbrain"
 
-    (
-        fidelities,
-        sys_ev_energies,
-        omegas,
-        env_ev_energies,
-        final_sys_density_matrix,
-    ) = cooler.big_brain_cool(
-        start_omega=start_omega,
-        stop_omega=stop_omega,
-        ansatz_options=ansatz_options,
-        n_rep=n_rep,
-        weaken_coupling=weaken_coupling,
-        coupler_transitions=None,
-        depol_noise=depol_noise,
-        is_noise_spin_conserving=is_noise_spin_conserving,
-        use_random_coupler=False,
-        fidelity_threshold=0.99,
-    )
+        edm.var_dump(
+            max_k=max_k,
+            ansatz_options=ansatz_options,
+            method=method,
+            start_gs_index=start_gs_index,
+            coupler_gs_index=coupler_gs_index,
+            spectrum_width=spectrum_width,
+            min_gap=min_gap,
+            start_omega=start_omega,
+            stop_omega=stop_omega,
+            coupler_index=coupler_index,
+        )
 
-    jobj = {
-        "omegas": omegas,
-        "fidelities": fidelities,
-        "sys_energies": sys_ev_energies,
-        "env_energies": env_ev_energies,
-        "ansatz_options": ansatz_options,
-    }
-    edm.save_dict(
-        filename=f"cooling_free_{start_gs_index}_{coupler_gs_index}", jobj=jobj
-    )
+        (
+            fidelities,
+            sys_ev_energies,
+            omegas,
+            env_ev_energies,
+            final_sys_density_matrix,
+        ) = cooler.big_brain_cool(
+            start_omega=start_omega,
+            stop_omega=stop_omega,
+            ansatz_options=ansatz_options,
+            n_rep=n_rep,
+            weaken_coupling=weaken_coupling,
+            coupler_transitions=None,
+            depol_noise=False,
+            is_noise_spin_conserving=False,
+            use_random_coupler=False,
+            fidelity_threshold=0.99,
+        )
 
-    fig = cooler.plot_controlled_cooling(
-        fidelities=fidelities,
-        env_energies=env_ev_energies,
-        omegas=omegas,
-        eigenspectrums=[
-            sys_eig_energies - sys_eig_energies[0],
-        ],
-    )
-    edm.save_figure(
-        fig,
-    )
-    plt.show()
+        jobj = {
+            "omegas": omegas,
+            "fidelities": fidelities,
+            "ansatz_options": ansatz_options,
+        }
+        edm.save_dict(
+            filename=f"cooling_free_{start_gs_index}_{coupler_gs_index}_{coupler_index}",
+            jobj=jobj,
+        )
+
+        fig = cooler.plot_controlled_cooling(
+            fidelities=fidelities,
+            env_energies=env_ev_energies,
+            omegas=omegas,
+            eigenspectrums=[
+                sys_eig_energies - sys_eig_energies[0],
+            ],
+        )
+        edm.save_figure(
+            fig,
+        )
+
+        start_new_run = True
 
 
 if __name__ == "__main__":
     # whether we want to skip all saving data
     dry_run = False
     edm = ExperimentDataManager(
-        experiment_name="bigbrain_subspace_sum_free_coupler_sweep",
+        experiment_name="single_coupler_improvement",
+        notes="running a forloop on each of the free couplers",
         project="fermionic cooling",
         dry_run=dry_run,
     )
