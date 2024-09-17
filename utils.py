@@ -70,7 +70,7 @@ def get_closest_noninteracting_degenerate_ground_state(
 
 def get_closest_state(
     ref_state: np.ndarray, comp_states: np.ndarray, subspace_simulation: bool = False
-):
+) -> tuple[np.ndarray, int]:
     fidelities = []
     for ind in range(comp_states.shape[1]):
         fid = fidelity_wrapper(

@@ -14,18 +14,14 @@ fig, ax = plt.subplots()
 
 
 experiments = (
-    r"c:\Users\Moi4\Desktop\current\FAU\phd\data\2024_09_16\time_dependent_coupler_cooling",
-    r"c:\Users\Moi4\Desktop\current\FAU\phd\data\2024_09_16\time_dependent_coupler_cooling_00001",
-    r"c:\Users\Moi4\Desktop\current\FAU\phd\data\2024_09_16\time_dependent_coupler_cooling_00002",
-    r"c:\Users\Moi4\Desktop\current\FAU\phd\data\2024_09_16\time_dependent_coupler_cooling_00003",
     r"c:\Users\Moi4\Desktop\current\FAU\phd\data\2024_09_16\time_dependent_coupler_cooling_00004",
+    r"c:\Users\Moi4\Desktop\current\FAU\phd\data\2024_09_17\time_dependent_coupler_cooling",
+    r"c:\Users\Moi4\Desktop\current\FAU\phd\data\2024_09_17\time_dependent_coupler_cooling_00001",
 )
 labels = (
-    "cheating couplers",
-    "free couplers",
-    "gaussian free couplers",
-    "cheating couplers zoom",
     "free couplers zoom",
+    "free couplers no filter",
+    "free couplers no filter zoom",
 )
 
 
