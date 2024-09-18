@@ -26,6 +26,8 @@ labels = (
     r"Slater + sweep + Gaussian",
 )
 
+mark = "xodvs+"
+
 for ind, experiment in enumerate(experiments):
 
     edm = ExperimentDataManager.load(experiment)
@@ -43,7 +45,12 @@ for ind, experiment in enumerate(experiments):
         )
         fid_improvements[run] = jobj["fidelities"][-1][-1] - jobj["fidelities"][-1][0]
 
-    ax.plot(range(len(fid_improvements)), fid_improvements, label=labels[ind])
+    ax.plot(
+        range(len(fid_improvements)),
+        fid_improvements,
+        f"{mark[ind]}--",
+        label=labels[ind],
+    )
 
 ax.set_xlabel("Coupler index")
 ax.set_ylabel("Fidelity improvement")

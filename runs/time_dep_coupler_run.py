@@ -98,6 +98,7 @@ def __main__(edm: ExperimentDataManager):
         list(combinations(range(n_sys_qubits // 2), n_electrons[0]))
     ) * len(list(combinations(range(n_sys_qubits // 2), n_electrons[1])))
     print(f"SUBSPACE: {subspace_dim} matrices will be {subspace_dim**2}")
+    subspace_simulation = True
 
     sys_eig_energies, sys_eig_states = jw_eigenspectrum_at_particle_number(
         sparse_operator=get_sparse_operator(
@@ -105,10 +106,8 @@ def __main__(edm: ExperimentDataManager):
             n_qubits=len(model.qubits),
         ),
         particle_number=n_electrons,
-        expanded=False,
+        expanded=not subspace_simulation,
     )
-
-    subspace_simulation = True
 
     sys_ground_state = sys_eig_states[:, np.argmin(sys_eig_energies)]
     sys_ground_energy = np.min(sys_eig_energies)
@@ -120,7 +119,7 @@ def __main__(edm: ExperimentDataManager):
     )
     coupler_gs_index = start_gs_index
 
-    initial_state_name = "slater"
+    initial_state_name = "hartreefock"
 
     if initial_state_name == "slater":
         sys_initial_state = ketbra(start_sys_eig_states[:, start_gs_index])
@@ -199,7 +198,7 @@ def __main__(edm: ExperimentDataManager):
     # evolution_time = 1e-3
 
     # call cool
-    use_fast_sweep = True
+    use_fast_sweep = False
     depol_noise = None
     is_noise_spin_conserving = False
     ancilla_split_spectrum = False
@@ -281,9 +280,6 @@ def __main__(edm: ExperimentDataManager):
 
     times = np.linspace(0.01, total_sim_time, 31)
 
-    filter_function = get_ding_filter_function(
-        a=2.5 * spectrum_width, da=0.5 * spectrum_width, b=min_gap, db=min_gap
-    )
     # filter_function = get_test_ff(a=0.1)
     # filter_function = get_lloyd_filter_function(
     #     biga=1, beta=total_sim_time / 3, tau=total_sim_time / 2
@@ -297,12 +293,18 @@ def __main__(edm: ExperimentDataManager):
     last_plot_times = 0
 
     edm.var_dump(
-        filter_function=filter_function.__name__,
         total_sim_time=total_sim_time,
         n_reps=n_reps,
     )
 
     for rep in range(n_reps):
+        fac = 1
+        filter_function = get_ding_filter_function(
+            a=2.5 * spectrum_width * fac,
+            da=0.5 * spectrum_width * fac,
+            b=min_gap,
+            db=min_gap,
+        )
         (
             plot_times,
             fidelities,
@@ -339,6 +341,8 @@ def __main__(edm: ExperimentDataManager):
         "alphas": [filter_function(t) for t in times],
     }
     edm.save_dict(jobj=jobj)
+
+    edm.var_dump(filter_function=filter_function.__name__)
 
     fig = cooler.plot_time_cooling(
         np.linspace(0, n_reps * total_sim_time * len(couplers), len(total_fidelities)),
