@@ -253,7 +253,6 @@ def __main__(edm: ExperimentDataManager):
             verbosity=5,
             subspace_simulation=subspace_simulation,
             time_evolve_method="expm",
-            ancilla_split_spectrum=False,
         )
         n_rep = 1
 

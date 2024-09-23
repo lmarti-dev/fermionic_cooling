@@ -191,7 +191,6 @@ def __main__(edm: ExperimentDataManager):
     use_fast_sweep = True
     depol_noise = None
     is_noise_spin_conserving = False
-    ancilla_split_spectrum = False
 
     if use_fast_sweep:
         sweep_time_mult = 1
@@ -253,7 +252,6 @@ def __main__(edm: ExperimentDataManager):
         verbosity=5,
         subspace_simulation=subspace_simulation,
         time_evolve_method="expm",
-        ancilla_split_spectrum=ancilla_split_spectrum,
     )
     n_rep = 1
 
@@ -280,7 +278,6 @@ def __main__(edm: ExperimentDataManager):
         min_gap=min_gap,
         start_omega=start_omega,
         stop_omega=stop_omega,
-        ancilla_split_spectrum=ancilla_split_spectrum,
     )
 
     coupler_transitions = np.abs(

@@ -201,7 +201,6 @@ def __main__(edm: ExperimentDataManager):
     use_fast_sweep = False
     depol_noise = None
     is_noise_spin_conserving = False
-    ancilla_split_spectrum = False
 
     if use_fast_sweep:
         sweep_time_mult = 1
@@ -247,7 +246,7 @@ def __main__(edm: ExperimentDataManager):
         )
     else:
         total_sweep_time = 0
-    total_sim_time = 2.58
+
     cooler = Cooler(
         sys_hamiltonian=sys_ham_matrix,
         n_electrons=n_electrons,
@@ -261,7 +260,6 @@ def __main__(edm: ExperimentDataManager):
         verbosity=5,
         subspace_simulation=subspace_simulation,
         time_evolve_method="expm",
-        ancilla_split_spectrum=ancilla_split_spectrum,
     )
     print(f"coupler dim: {cooler.sys_env_coupler_data_dims}")
 
@@ -275,9 +273,10 @@ def __main__(edm: ExperimentDataManager):
         coupler_gs_index=coupler_gs_index,
         spectrum_width=spectrum_width,
         min_gap=min_gap,
-        ancilla_split_spectrum=ancilla_split_spectrum,
     )
 
+    # TIMES
+    total_sim_time = 2.6
     times = np.linspace(0.01, total_sim_time, 31)
 
     # filter_function = get_test_ff(a=0.1)
@@ -287,6 +286,7 @@ def __main__(edm: ExperimentDataManager):
     total_plot_times = []
     total_fidelities = []
     total_sys_energies = []
+    eig_components = []
 
     total_env_energies = []
     n_reps = 100
@@ -298,12 +298,12 @@ def __main__(edm: ExperimentDataManager):
     )
 
     for rep in range(n_reps):
-        fac = 1
         filter_function = get_ding_filter_function(
-            a=2.5 * spectrum_width * fac,
-            da=0.5 * spectrum_width * fac,
+            a=2.5 * spectrum_width,
+            da=0.5 * spectrum_width,
             b=min_gap,
             db=min_gap,
+            take_abs=True,
         )
         (
             plot_times,
@@ -316,6 +316,20 @@ def __main__(edm: ExperimentDataManager):
             times=times,
             env_coupling=spectrum_width,
             alpha=1,
+        )
+
+        sys_density_matrix = cooler.partial_trace_wrapper(
+            rho=total_density_matrix, trace_out="env"
+        )
+
+        eig_components.append(
+            np.diag(sys_eig_states.T.conjugate() @ sys_density_matrix @ sys_eig_states)
+        )
+
+        edm.save_dict(
+            {
+                "rep": rep,
+            }
         )
 
         plot_times_repped = plot_times + last_plot_times
@@ -338,6 +352,7 @@ def __main__(edm: ExperimentDataManager):
         "total_fidelities": total_fidelities,
         "total_sys_energies": total_sys_energies,
         "total_env_energies": total_env_energies,
+        "eig_components": eig_components,
         "alphas": [filter_function(t) for t in times],
     }
     edm.save_dict(jobj=jobj)
@@ -357,9 +372,9 @@ def __main__(edm: ExperimentDataManager):
 
 if __name__ == "__main__":
     # whether we want to skip all saving data
-    dry_run = True
+    dry_run = False
     edm = ExperimentDataManager(
-        experiment_name="time_dependent_coupler_cooling",
+        experiment_name="time_dependent_coupler_cooling_save_comps",
         project="fermionic cooling",
         dry_run=dry_run,
     )

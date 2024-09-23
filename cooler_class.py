@@ -63,7 +63,6 @@ class Cooler:
         verbosity: int = 0,
         time_evolve_method: str = "diag",
         subspace_simulation: bool = False,
-        ancilla_split_spectrum: bool = False,
     ):
         if NO_CUPY:
             print("Cupy not installed, using CPU")
@@ -78,7 +77,6 @@ class Cooler:
         self.sys_ground_state = sys_ground_state
         self._sys_eig_energies = None
         self._sys_eig_states = None
-        self.ancilla_split_spectrum = ancilla_split_spectrum
 
         self.subspace_simulation = subspace_simulation
         if self.subspace_simulation:
@@ -165,16 +163,6 @@ class Cooler:
     def cooling_hamiltonian(self, env_coupling: float, alpha: Union[float, complex]):
 
         env_hamiltonian = self.env_hamiltonian
-        if self.ancilla_split_spectrum:
-            env_hamiltonian = sum(
-                [
-                    x * pstring
-                    for x, pstring in zip(
-                        [2.0**-pw for pw in range(len(self.env_hamiltonian))],
-                        self.env_hamiltonian,
-                    )
-                ]
-            )
         return (
             self.sys_density_matrix(self.sys_hamiltonian)
             + env_coupling * self.env_density_matrix(env_hamiltonian)
@@ -735,7 +723,7 @@ class Cooler:
                 )
                 self.update_message(
                     "fidetc",
-                    f"fid: {fidelities[-1]:.5f}, sys E: {sys_ev_energies[-1]:.3f}, env E: {env_ev_energies[-1]:.5f}",
+                    f"fid: {fidelities[-1]:.5f}, sys E: {sys_ev_energies[-1]:.3f}, env E: {env_ev_energies[-1]:.5f} alpha: {filter_function(time):.5f}",
                 )
                 self.print_msg()
         # putting the env back in the ground state
