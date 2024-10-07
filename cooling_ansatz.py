@@ -23,16 +23,21 @@ class CoolingAnsatz(Ansatz, Cooler):
         weaken_coupling: int = 60,
         verbosity: int = 5,
         time_evolve_method: str = "expm",
+        return_env_energies: bool = False,
     ) -> None:
         if subspace_simulation:
             sys_ground_energy, sys_ground_state = model.subspace_gs
         else:
             sys_ground_energy, sys_ground_state = model.gs
 
+        sys_eig_energies, _ = model.subspace_spectrum
+        self.spectrum_width = max(sys_eig_energies) - min(sys_eig_energies)
+
         self.weaken_coupling = weaken_coupling
         self.model = model
 
         self.picked_couplers = []
+        self.env_cooled_energies = []
 
         Cooler.__init__(
             self,
@@ -54,7 +59,7 @@ class CoolingAnsatz(Ansatz, Cooler):
         )
 
     def simulate(self, opt_params: list = None, initial_state: np.ndarray = None):
-
+        self.env_cooled_energies = []
         if opt_params is None:
             opt_params = self.params
         if initial_state is None:
@@ -65,7 +70,7 @@ class CoolingAnsatz(Ansatz, Cooler):
         total_density_matrix = np.kron(initial_state, ketbra(self.env_ground_state))
 
         for ind in range(len(self.picked_couplers)):
-            env_coupling = self.params[ind]
+            env_coupling = self.params[ind] * self.spectrum_width
             self.sys_env_coupler = self.picked_couplers[ind]
             alpha = env_coupling / (self.weaken_coupling * self.model.n_qubits)
             evolution_time = np.pi / alpha
@@ -81,13 +86,35 @@ class CoolingAnsatz(Ansatz, Cooler):
                 env_coupling=env_coupling,
                 evolution_time=evolution_time,
             )
-
+            self.env_cooled_energies.append(env_cooled_energy)
         return total_density_matrix
 
 
-def fridge_energy_objective(cooler: CoolingAnsatz):
-    def objective(state):
-        env_state = cooler.partial_trace_wrapper(state, trace_out="sys")
-        return -cooler.env_energy(env_state)
+def cooled_env_energies_objective(cooler: CoolingAnsatz):
+    def objective(env_cooled_energies: np.ndarray) -> float:
+        return -np.sum(cooler.env_cooled_energies)
+
+    return objective
+
+
+def cooling_energy_objective(cooler: CoolingAnsatz, which: str = "env") -> callable:
+    if which == "env":
+        trace_out = "sys"
+        fn = cooler.env_energy
+    elif which == "sys":
+        trace_out = "env"
+        fn = cooler.sys_energy
+
+    def objective(state: np.ndarray) -> float:
+        state = cooler.partial_trace_wrapper(state, trace_out=trace_out)
+        return -fn(state)
+
+    return objective
+
+
+def cooling_infidelity_objective(cooler: CoolingAnsatz) -> callable:
+    def objective(state: np.ndarray) -> float:
+        state = cooler.partial_trace_wrapper(state, trace_out="env")
+        return 1 - cooler.sys_fidelity(state)
 
     return objective

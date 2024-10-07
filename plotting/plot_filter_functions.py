@@ -1,10 +1,12 @@
 from fermionic_cooling.filter_functions import (
     get_ding_filter_function,
     get_lloyd_filter_function,
+    get_fourier_gaps_filter_function,
 )
 
 import matplotlib.pyplot as plt
 import numpy as np
+from qutlet.models import FermiHubbardModel
 
 
 def evaluate_and_fft(model: callable, times: np.ndarray):
@@ -14,6 +16,14 @@ def evaluate_and_fft(model: callable, times: np.ndarray):
     fy = np.abs(np.fft.fft(y))
     fy /= np.max(fy)
     return y, fy
+
+
+def get_fh_ff(freq_positivity):
+    model = FermiHubbardModel(
+        lattice_dimensions=(2, 2), tunneling=1, coulomb=6, n_electrons="hf"
+    )
+    energies, states = model.spectrum
+    return get_fourier_gaps_filter_function(energies, freq_positivity=freq_positivity)
 
 
 def main():
@@ -28,21 +38,30 @@ def main():
     ding = get_ding_filter_function(
         a=2.5 * spectrum_width, da=0.5 * spectrum_width, b=min_gap, db=min_gap
     )
+    gaps_pos = get_fh_ff("pos")
+    gaps_neg = get_fh_ff("neg")
+    gaps_both = get_fh_ff("both")
 
+    ffunctions = (
+        [lloyd, "lloyd"],
+        [ding, "ding"],
+        [gaps_pos, "g pos"],
+        [gaps_neg, "g neg"],
+        [gaps_both, "g both"],
+    )
     fig, axes = plt.subplots(nrows=2)
 
-    lloyd_y, lloyd_fy = evaluate_and_fft(lloyd, times)
-    ding_y, ding_fy = evaluate_and_fft(ding, times)
+    for ind, (ff, lab) in enumerate(ffunctions):
 
-    axes[0].plot(times, lloyd_y, label="lloyd")
-    axes[0].plot(times, ding_y, label="ding")
-    axes[0].legend()
-    axes[0].set_xlabel("t")
+        y, fy = evaluate_and_fft(ff, times)
 
-    axes[1].plot(freq, lloyd_fy, label="lloyd")
-    axes[1].plot(freq, ding_fy, label="ding")
-    axes[1].legend()
-    axes[1].set_xlabel("$\omega$")
+        axes[0].plot(times, y, label=lab)
+        axes[0].legend()
+        axes[0].set_xlabel("t")
+
+        axes[1].plot(freq, fy, label=lab)
+        axes[1].legend()
+        axes[1].set_xlabel("$\omega$")
 
     plt.show()
 

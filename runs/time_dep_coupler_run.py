@@ -30,20 +30,16 @@ from qutlet.utilities import (
     jw_eigenspectrum_at_particle_number,
     jw_hartree_fock_state,
     gaussian_envelope,
+    gaussian_weighted_sum,
 )
 
 
 from fermionic_cooling.filter_functions import (
     get_ding_filter_function,
     get_lloyd_filter_function,
+    get_exp_filter_function,
+    get_fourier_gaps_filter_function,
 )
-
-
-def get_test_ff(a):
-    def filter_function(t):
-        return np.exp(-t * a)
-
-    return filter_function
 
 
 def __main__(edm: ExperimentDataManager):
@@ -183,8 +179,7 @@ def __main__(edm: ExperimentDataManager):
         max_k=max_k,
         use_pauli_x=False,
     )
-    weights = gaussian_envelope(mu=0.0, sigma=0.5, n_steps=len(couplers))
-    couplers = [sum([x * w for x, w in zip(couplers, weights)])]
+    couplers = gaussian_weighted_sum(items=couplers, sigma=0.5, n_out=1, width=0)
     print("coupler done")
 
     print(f"number of couplers: {len(couplers)}")
@@ -279,10 +274,24 @@ def __main__(edm: ExperimentDataManager):
     total_sim_time = 2.6
     times = np.linspace(0.01, total_sim_time, 31)
 
-    # filter_function = get_test_ff(a=0.1)
-    # filter_function = get_lloyd_filter_function(
-    #     biga=1, beta=total_sim_time / 3, tau=total_sim_time / 2
-    # )
+    which_ff = "gaps"
+    if which_ff == "lloyd":
+        filter_function = get_lloyd_filter_function(
+            biga=1, beta=total_sim_time / 3, tau=total_sim_time / 2
+        )
+    elif which_ff == "ding":
+        filter_function = get_ding_filter_function(
+            a=2.5 * spectrum_width,
+            da=0.5 * spectrum_width,
+            b=min_gap,
+            db=min_gap,
+            take_abs=True,
+        )
+    elif which_ff == "exp":
+        filter_function = get_exp_filter_function(spectrum_width * 0.5)
+    elif which_ff == "gaps":
+        filter_function = get_fourier_gaps_filter_function(sys_eig_energies)
+
     total_plot_times = []
     total_fidelities = []
     total_sys_energies = []
@@ -298,13 +307,7 @@ def __main__(edm: ExperimentDataManager):
     )
 
     for rep in range(n_reps):
-        filter_function = get_ding_filter_function(
-            a=2.5 * spectrum_width,
-            da=0.5 * spectrum_width,
-            b=min_gap,
-            db=min_gap,
-            take_abs=True,
-        )
+
         (
             plot_times,
             fidelities,
@@ -326,12 +329,6 @@ def __main__(edm: ExperimentDataManager):
             np.diag(sys_eig_states.T.conjugate() @ sys_density_matrix @ sys_eig_states)
         )
 
-        edm.save_dict(
-            {
-                "rep": rep,
-            }
-        )
-
         plot_times_repped = plot_times + last_plot_times
 
         total_plot_times.extend(plot_times_repped)
@@ -348,12 +345,14 @@ def __main__(edm: ExperimentDataManager):
             break
 
     jobj = {
+        "rep": rep,
         "total_plot_times": total_plot_times,
         "total_fidelities": total_fidelities,
         "total_sys_energies": total_sys_energies,
         "total_env_energies": total_env_energies,
         "eig_components": eig_components,
         "alphas": [filter_function(t) for t in times],
+        "which_ff": which_ff,
     }
     edm.save_dict(jobj=jobj)
 
@@ -372,7 +371,7 @@ def __main__(edm: ExperimentDataManager):
 
 if __name__ == "__main__":
     # whether we want to skip all saving data
-    dry_run = False
+    dry_run = True
     edm = ExperimentDataManager(
         experiment_name="time_dependent_coupler_cooling_save_comps",
         project="fermionic cooling",

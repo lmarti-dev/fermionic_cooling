@@ -14,7 +14,12 @@ from fermionic_cooling.building_blocks import (
     get_Z_env,
 )
 
-from fermionic_cooling.cooling_ansatz import CoolingAnsatz, fridge_energy_objective
+from fermionic_cooling.cooling_ansatz import (
+    CoolingAnsatz,
+    cooling_energy_objective,
+    cooling_infidelity_objective,
+    cooled_env_energies_objective,
+)
 from fermionic_cooling.cooler_class import Cooler
 from fermionic_cooling.utils import (
     dense_restricted_ham,
@@ -34,224 +39,19 @@ from qutlet.utilities import (
 )
 
 from qutlet.optimisers import ScipyOptimisers
-from qutlet.objectives.statevector_objectives import energy_objective
 
 
-def __main__(edm: ExperimentDataManager):
-
-    # model_name = "cooked/sulfanium_triplet_6e_12q"
-    model_name = "fh_slater"
-    initial_state_name = "hartreefock"
-    subspace_simulation = True
-    model_name, model, start_fock_hamiltonian, couplers_fock_hamiltonian = pick_model(
-        model_name
-    )
-
-    n_electrons = model.n_electrons
-
-    couplers_sys_eig_energies, couplers_sys_eig_states = (
-        jw_eigenspectrum_at_particle_number(
-            sparse_operator=get_sparse_operator(
-                couplers_fock_hamiltonian,
-                n_qubits=len(model.qubits),
-            ),
-            particle_number=n_electrons,
-            expanded=False,
-        )
-    )
-
-    sys_qubits = model.qubits
-    n_sys_qubits = len(sys_qubits)
-    subspace_dim = subspace_size(n_sys_qubits, model.n_electrons)
-    print(f"SUBSPACE: {subspace_dim} matrices will be {subspace_dim**2}")
-
-    sys_eig_energies, sys_eig_states = model.subspace_spectrum
-
-    sys_ground_state = sys_eig_states[:, np.argmin(sys_eig_energies)]
-    sys_ground_energy = np.min(sys_eig_energies)
-
-    start_gs_index, sys_initial_state = get_initial_state(
-        initial_state_name,
-        subspace_simulation,
-        model,
-        start_fock_hamiltonian,
-        sys_ground_state,
-    )
-
-    coupler_gs_index = start_gs_index
-
-    print("BEFORE SWEEP")
-    print_state_fidelity_to_eigenstates(
-        state=sys_initial_state,
-        eigenenergies=sys_eig_energies,
-        eigenstates=sys_eig_states,
-        expanded=False,
-    )
-    sys_initial_energy = subspace_energy_expectation(
-        sys_initial_state, sys_eig_energies, sys_eig_states
-    )
-    sys_ground_energy_exp = subspace_energy_expectation(
-        sys_ground_state, sys_eig_energies, sys_eig_states
-    )
-
-    sys_ham_matrix = dense_restricted_ham(
-        model.fock_hamiltonian, n_electrons, n_sys_qubits
-    )
-
-    initial_fid = fidelity(
-        sys_initial_state,
-        sys_ground_state,
-    )
-    print("initial fidelity: {}".format(initial_fid))
-    print("ground energy from spectrum: {}".format(sys_ground_energy))
-    print("ground energy from model: {}".format(sys_ground_energy_exp))
-    print("initial energy from model: {}".format(sys_initial_energy))
-
-    n_env_qubits = 1
-    env_qubits, env_ground_state, env_ham, env_eig_energies, env_eig_states = get_Z_env(
-        n_qubits=n_env_qubits
-    )
-
-    edm.var_dump(
-        n_electrons=n_electrons,
-        n_sys_qubits=n_sys_qubits,
-        n_env_qubits=n_env_qubits,
-        sys_eig_energies=sys_eig_energies,
-        env_eig_energies=env_eig_energies,
-        model=model.__to_json__,
-        model_name=model_name,
-        subspace_simulation=subspace_simulation,
-        initial_state_name=initial_state_name,
-    )
-
-    max_k = None
-
-    couplers = get_GivensX_couplers(sys_qubits, env_qubits)
-    couplers = get_cheat_couplers(
-        sys_eig_states=sys_eig_states,
-        env_eig_states=env_eig_states,
-        qubits=sys_qubits + env_qubits,
-        gs_indices=(coupler_gs_index,),
-        noise=None,
-        max_k=max_k,
-        use_pauli_x=False,
-    )
-
+def weight_sum_couplers(couplers: list, sigma: float = 0.15) -> list:
     couplers = [
         sum(
-            [x * w for x, w in zip(couplers, gaussian_envelope(mu, 0.1, len(couplers)))]
+            [
+                x * w
+                for x, w in zip(couplers, gaussian_envelope(mu, 0.15, len(couplers)))
+            ]
         )
-        for mu in np.linspace(0.1, 0.9, 100)
+        for mu in np.linspace(0.1, 0.9, len(couplers))
     ]
-
-    print("coupler done")
-
-    print(f"number of couplers: {len(couplers)}")
-    # coupler = get_cheat_coupler(sys_eigenstates, env_eigenstates)
-
-    # get environment ham sweep values
-    spectrum_width = max(sys_eig_energies) - min(sys_eig_energies)
-
-    min_gap = get_min_gap(couplers_sys_eig_energies, threshold=1e-6)
-
-    # evolution_time = 1e-3
-
-    # call cool
-    use_fast_sweep = False
-    depol_noise = None
-    is_noise_spin_conserving = False
-
-    sys_initial_state = run_fast_sweep(
-        subspace_simulation,
-        start_fock_hamiltonian,
-        n_electrons,
-        n_sys_qubits,
-        sys_eig_energies,
-        sys_eig_states,
-        sys_initial_state,
-        sys_ham_matrix,
-        spectrum_width,
-        use_fast_sweep,
-        depol_noise,
-        is_noise_spin_conserving,
-    )
-
-    cooler = CoolingAnsatz(
-        model=model,
-        sys_hamiltonian=sys_ham_matrix,
-        sys_initial_state=sys_initial_state,
-        env_hamiltonian=env_ham,
-        env_qubits=env_qubits,
-        env_ground_state=env_ground_state,
-        sys_env_coupler_data=couplers,
-        verbosity=-1,
-        subspace_simulation=subspace_simulation,
-        time_evolve_method="expm",
-    )
-    print(f"coupler dim: {cooler.sys_env_coupler_data_dims}")
-
-    edm.var_dump(
-        depol_noise=depol_noise,
-        use_fast_sweep=use_fast_sweep,
-        is_noise_spin_conserving=is_noise_spin_conserving,
-        max_k=max_k,
-        start_gs_index=start_gs_index,
-        coupler_gs_index=coupler_gs_index,
-        spectrum_width=spectrum_width,
-        min_gap=min_gap,
-    )
-    adapt_steps = 10
-
-    objective = fridge_energy_objective(cooler=cooler)
-    objective = energy_objective(model=model)
-    optimiser = ScipyOptimisers(ansatz=cooler, objective=objective)
-
-    env_cooled_energies = np.zeros((adapt_steps, len(couplers)))
-    for step in range(adapt_steps):
-        for ind in range(len(couplers)):
-
-            env_coupling = spectrum_width / 2
-            alpha = env_coupling / (cooler.weaken_coupling * n_sys_qubits)
-            evolution_time = np.pi / alpha
-            cooler.sys_env_coupler_easy_setter(ind, None)
-            if len(cooler.picked_couplers):
-                total_density_matrix = cooler.simulate()
-            else:
-                total_density_matrix = cooler.total_initial_state
-            (
-                sys_cooled_fidelity,
-                sys_cooled_energy,
-                env_cooled_energy,
-                _,
-            ) = cooler.cooling_step(
-                total_density_matrix=total_density_matrix,
-                alpha=alpha,
-                env_coupling=env_coupling,
-                evolution_time=evolution_time,
-            )
-            print(
-                f"coupler {ind} fid: {sys_cooled_fidelity:.5f}, esys: {sys_cooled_energy:.5f}, eenv: {env_cooled_energy:.5f}",
-                end="\r",
-            )
-            env_cooled_energies[step, ind] = env_cooled_energy
-        max_ind = np.argmax(env_cooled_energies[step, :])
-        print(
-            f"coupler {ind} fid: {sys_cooled_fidelity:.5f}, esys: {sys_cooled_energy:.5f}, eenv: {env_cooled_energy:.5f}"
-        )
-        cooler.picked_couplers.append(couplers[max_ind])
-        cooler.params.append(env_coupling)
-        cooler.symbols.append(None)
-        result, sim_data = optimiser.optimise(
-            initial_params="random",
-            initial_state=cooler.sys_initial_state,
-            bounds=[(min_gap, spectrum_width) for _ in range(len(cooler.symbols))],
-        )
-        cooler.params = list(result["x"])
-        out_state = cooler.simulate()
-        final_fid = cooler.sys_fidelity(
-            cooler.partial_trace_wrapper(out_state, trace_out="env")
-        )
-        print(f"max coupler {ind} optimized fid {final_fid:.5f}")
+    return couplers
 
 
 def get_initial_state(
@@ -369,11 +169,237 @@ def pick_model(model_name):
     else:
         spm = SpecificModel(model_name=model_name)
         model = spm.current_model
-        n_qubits = len(model.qubits)
-        n_electrons = spm.n_electrons
         start_fock_hamiltonian = spm.current_model.quadratic_terms
         couplers_fock_hamiltonian = start_fock_hamiltonian
     return model_name, model, start_fock_hamiltonian, couplers_fock_hamiltonian
+
+
+def get_gradient(
+    cooler: CoolingAnsatz,
+    env_coupling: float,
+    ind: int,
+    epsilon: float = 1e-5,
+):
+    n_sys_qubits = cooler.model.n_qubits
+    alpha = env_coupling / (cooler.weaken_coupling * n_sys_qubits)
+    evolution_time = np.pi / alpha
+    cooler.sys_env_coupler = cooler.sys_env_coupler_data[ind]
+    if len(cooler.picked_couplers):
+        total_density_matrix = cooler.simulate()
+    else:
+        total_density_matrix = cooler.total_initial_state
+    (
+        sys_cooled_fidelity_min,
+        sys_cooled_energy_min,
+        env_cooled_energy_min,
+        _,
+    ) = cooler.cooling_step(
+        total_density_matrix=total_density_matrix,
+        alpha=alpha,
+        env_coupling=env_coupling - epsilon,
+        evolution_time=evolution_time,
+    )
+    (
+        sys_cooled_fidelity_plus,
+        sys_cooled_energy_plus,
+        env_cooled_energy_plus,
+        _,
+    ) = cooler.cooling_step(
+        total_density_matrix=total_density_matrix,
+        alpha=alpha,
+        env_coupling=env_coupling + epsilon,
+        evolution_time=evolution_time,
+    )
+
+    grad_env_cooled_energy = np.abs(env_cooled_energy_min - env_cooled_energy_plus) / (
+        2 * epsilon
+    )
+    grad_sys_cooled_energy = (sys_cooled_energy_min - sys_cooled_energy_plus) / (
+        2 * epsilon
+    )
+    grad_sys_cooled_fid = (sys_cooled_fidelity_min - sys_cooled_fidelity_plus) / (
+        2 * epsilon
+    )
+
+    print(
+        f"coupler {ind} Δfid: {grad_sys_cooled_fid:.5f}, ΔEsys: {grad_sys_cooled_energy:.5f}, ΔEenv: {grad_env_cooled_energy:.5f}",
+        end="\r",
+    )
+
+    return grad_sys_cooled_fid
+
+
+def __main__(edm: ExperimentDataManager):
+
+    # model_name = "cooked/sulfanium_triplet_6e_12q"
+    model_name = "fh_slater"
+    initial_state_name = "slater"
+    subspace_simulation = True
+    model_name, model, start_fock_hamiltonian, couplers_fock_hamiltonian = pick_model(
+        model_name
+    )
+
+    n_electrons = model.n_electrons
+
+    couplers_sys_eig_energies, couplers_sys_eig_states = (
+        jw_eigenspectrum_at_particle_number(
+            sparse_operator=get_sparse_operator(
+                couplers_fock_hamiltonian,
+                n_qubits=len(model.qubits),
+            ),
+            particle_number=n_electrons,
+            expanded=False,
+        )
+    )
+
+    sys_qubits = model.qubits
+    n_sys_qubits = len(sys_qubits)
+    subspace_dim = subspace_size(n_sys_qubits, model.n_electrons)
+    print(f"SUBSPACE: {subspace_dim} matrices will be {subspace_dim**2}")
+
+    sys_eig_energies, sys_eig_states = model.subspace_spectrum
+
+    sys_ground_state = sys_eig_states[:, np.argmin(sys_eig_energies)]
+    sys_ground_energy = np.min(sys_eig_energies)
+
+    start_gs_index, sys_initial_state = get_initial_state(
+        initial_state_name,
+        subspace_simulation,
+        model,
+        start_fock_hamiltonian,
+        sys_ground_state,
+    )
+
+    coupler_gs_index = start_gs_index
+
+    print("BEFORE SWEEP")
+    print_state_fidelity_to_eigenstates(
+        state=sys_initial_state,
+        eigenenergies=sys_eig_energies,
+        eigenstates=sys_eig_states,
+        expanded=False,
+    )
+    sys_initial_energy = subspace_energy_expectation(
+        sys_initial_state, sys_eig_energies, sys_eig_states
+    )
+    sys_ground_energy_exp = subspace_energy_expectation(
+        sys_ground_state, sys_eig_energies, sys_eig_states
+    )
+
+    sys_ham_matrix = dense_restricted_ham(
+        model.fock_hamiltonian, n_electrons, n_sys_qubits
+    )
+
+    initial_fid = fidelity(
+        sys_initial_state,
+        sys_ground_state,
+    )
+    print("initial fidelity: {}".format(initial_fid))
+    print("ground energy from spectrum: {}".format(sys_ground_energy))
+    print("ground energy from model: {}".format(sys_ground_energy_exp))
+    print("initial energy from model: {}".format(sys_initial_energy))
+
+    n_env_qubits = 1
+    env_qubits, env_ground_state, env_ham, env_eig_energies, env_eig_states = get_Z_env(
+        n_qubits=n_env_qubits
+    )
+
+    edm.var_dump(
+        n_electrons=n_electrons,
+        n_sys_qubits=n_sys_qubits,
+        n_env_qubits=n_env_qubits,
+        sys_eig_energies=sys_eig_energies,
+        env_eig_energies=env_eig_energies,
+        model=model.__to_json__,
+        model_name=model_name,
+        subspace_simulation=subspace_simulation,
+        initial_state_name=initial_state_name,
+    )
+
+    # couplers = get_GivensX_couplers(sys_qubits, env_qubits)
+    couplers = get_cheat_couplers(
+        sys_eig_states=sys_eig_states,
+        env_eig_states=env_eig_states,
+        qubits=sys_qubits + env_qubits,
+        gs_indices=(coupler_gs_index,),
+        noise=None,
+        max_k=None,
+        use_pauli_x=False,
+    )
+
+    couplers = weight_sum_couplers(couplers, sigma=0.1)
+
+    print("coupler done")
+
+    print(f"number of couplers: {len(couplers)}")
+    # coupler = get_cheat_coupler(sys_eigenstates, env_eigenstates)
+
+    # get environment ham sweep values
+    spectrum_width = max(sys_eig_energies) - min(sys_eig_energies)
+
+    min_gap = get_min_gap(couplers_sys_eig_energies, threshold=1e-6)
+
+    # evolution_time = 1e-3
+
+    weaken_coupling = 0.01
+
+    cooler = CoolingAnsatz(
+        model=model,
+        sys_hamiltonian=sys_ham_matrix,
+        sys_initial_state=sys_initial_state,
+        env_hamiltonian=env_ham,
+        env_qubits=env_qubits,
+        env_ground_state=env_ground_state,
+        sys_env_coupler_data=couplers,
+        verbosity=-1,
+        subspace_simulation=subspace_simulation,
+        time_evolve_method="expm",
+        weaken_coupling=weaken_coupling,
+        return_env_energies=True,
+    )
+    print(f"coupler dim: {cooler.sys_env_coupler_data_dims}")
+
+    edm.var_dump(
+        start_gs_index=start_gs_index,
+        coupler_gs_index=coupler_gs_index,
+        spectrum_width=spectrum_width,
+        min_gap=min_gap,
+        weaken_coupling=weaken_coupling,
+    )
+    adapt_steps = 10
+
+    # objective = cooling_energy_objective(cooler=cooler, which="env")
+    # objective = cooling_infidelity_objective(cooler=cooler)
+    objective = cooled_env_energies_objective(cooler=cooler)
+    optimiser = ScipyOptimisers(ansatz=cooler, objective=objective)
+
+    grad_env_cooled_energies = np.zeros((adapt_steps, len(couplers)))
+    for step in range(adapt_steps):
+        for ind in range(len(couplers)):
+            env_coupling = sys_eig_energies[ind + 1] - sys_eig_energies[0]
+            grad_env_cooled_energy = get_gradient(
+                cooler=cooler, env_coupling=env_coupling, ind=ind
+            )
+            grad_env_cooled_energies[step, ind] = np.abs(grad_env_cooled_energy)
+
+        print("\n")
+        max_ind = np.argmax(grad_env_cooled_energies[step, :])
+        cooler.picked_couplers.append(couplers[max_ind])
+        cooler.params.append(env_coupling)
+        cooler.symbols.append(None)
+        result, sim_data = optimiser.optimise(
+            initial_params="zeros",
+            initial_state=cooler.sys_initial_state,
+            bounds=[(0.01, 1) for _ in range(len(cooler.symbols))],
+        )
+        out_state = cooler.simulate()
+        final_fid = cooler.sys_fidelity(
+            cooler.partial_trace_wrapper(out_state, trace_out="env")
+        )
+        print(f"n. {step}: pick coup. {max_ind} opt. fid {final_fid:.5f}")
+
+    print("\n")
+    print(f"params: {cooler.params}")
 
 
 if __name__ == "__main__":
