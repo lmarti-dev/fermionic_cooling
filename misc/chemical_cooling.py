@@ -11,7 +11,7 @@ from utils import ketbra
 
 from data_manager import ExperimentDataManager, set_color_cycler
 from qutlet.utilities import jw_eigenspectrum_at_particle_number
-from qutlet_running_code.chemical_models.specific_model import SpecificModel
+from chemical_models.specific_model import SpecificModel
 
 dry_run = True
 edm = ExperimentDataManager("chemical_cooling", dry_run=dry_run)

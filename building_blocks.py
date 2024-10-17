@@ -13,6 +13,12 @@ from openfermion import get_sparse_operator
 # depending on the environment energy
 
 
+def get_half_couplers(model: FermiHubbardModel, ratio: 0.5):
+    _, free_eig_states = model.non_interacting_model.subspace_spectrum
+    _, coul_eig_states = model.coulomb_model.subspace_spectrum
+    return np.sqrt(ratio) * free_eig_states + np.sqrt(1 - ratio) * coul_eig_states
+
+
 def get_matrix_coupler(mat: np.ndarray, env_eig_states: np.ndarray) -> np.ndarray:
     env_up = np.outer(env_eig_states[:, 1], np.conjugate(env_eig_states[:, 0]))
     coupler = np.kron(

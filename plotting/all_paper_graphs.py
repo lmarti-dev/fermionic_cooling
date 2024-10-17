@@ -18,7 +18,7 @@ from fermionic_cooling.plotting.plot_fastsweep_m_fid import plot_fast_sweep_vs_m
 import numpy as np
 
 
-from fermionic_cooling.runs.encode_bogos_with_jw import plot_bogo_jw_coefficients
+from misc.encode_bogos_with_jw import plot_bogo_jw_coefficients
 
 
 def show_if_dry(dry_run: bool):
