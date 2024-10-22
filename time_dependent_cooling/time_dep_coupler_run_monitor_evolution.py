@@ -49,7 +49,7 @@ def __main__(edm: ExperimentDataManager):
     if "fh_" in model_name:
         model = FermiHubbardModel(
             lattice_dimensions=(3, 2),
-            n_electrons=[3, 2],
+            n_electrons="hf",
             tunneling=1,
             coulomb=6,
         )
@@ -277,7 +277,7 @@ def __main__(edm: ExperimentDataManager):
     total_sim_time = 20
     times = np.linspace(0.01, total_sim_time, 1000)
 
-    which_ff = "ding"
+    which_ff = "gaps"
     if which_ff == "lloyd":
         filter_function = get_lloyd_filter_function(
             biga=1, beta=total_sim_time / 3, tau=total_sim_time / 2
@@ -312,7 +312,7 @@ def __main__(edm: ExperimentDataManager):
     ) = cooler.time_cool(
         filter_function=filter_function,
         times=times,
-        env_coupling=spectrum_width,
+        env_coupling=1,
         alpha=1,
     )
 
@@ -356,7 +356,7 @@ if __name__ == "__main__":
     dry_run = False
     edm = ExperimentDataManager(
         experiment_name="time_dependent_coupler_cooling_evolution",
-        notes="using sum of free couplers",
+        notes="using simple sum of free couplers",
         project="fermionic cooling",
         dry_run=dry_run,
     )

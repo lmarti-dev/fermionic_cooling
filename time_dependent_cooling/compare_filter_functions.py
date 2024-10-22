@@ -48,8 +48,8 @@ def __main__(edm: ExperimentDataManager):
     model_name = "fh_slater"
     if "fh_" in model_name:
         model = FermiHubbardModel(
-            lattice_dimensions=(2, 2),
-            n_electrons="half-filling",
+            lattice_dimensions=(3, 2),
+            n_electrons="hf",
             tunneling=1,
             coulomb=6,
         )
@@ -171,15 +171,17 @@ def __main__(edm: ExperimentDataManager):
     max_k = None
 
     couplers = get_cheat_couplers(
-        sys_eig_states=sys_eig_states,
+        sys_eig_states=couplers_sys_eig_states,
         env_eig_states=env_eig_states,
         qubits=sys_qubits + env_qubits,
-        gs_indices=(0,),
+        gs_indices=(coupler_gs_index,),
         noise=None,
         max_k=max_k,
         use_pauli_x=False,
     )
-    # couplers = gaussian_weighted_sum(items=couplers, sigma=0.5, n_out=1, width=0)
+    couplers = gaussian_weighted_sum(items=couplers, sigma=1, n_out=1, width=0)
+    couplers = [sum(couplers)]
+
     print("coupler done")
 
     print(f"number of couplers: {len(couplers)}")
@@ -189,8 +191,6 @@ def __main__(edm: ExperimentDataManager):
     spectrum_width = max(sys_eig_energies) - min(sys_eig_energies)
 
     min_gap = get_min_gap(couplers_sys_eig_energies, threshold=1e-6)
-
-    # evolution_time = 1e-3
 
     # call cool
     use_fast_sweep = False
@@ -272,18 +272,17 @@ def __main__(edm: ExperimentDataManager):
 
     # TIMES
 
-    final_fids = []
-    total_times = np.linspace(1, 5, 30)
+    total_sim_time = 20
+    times = np.linspace(0.01, total_sim_time, 1000)
+
+    d = {k: [] for k in ("lloyd", "ding", "exp", "gaps", "one")}
     new_run = False
-    for total_sim_time in total_times:
+    for k in d.keys():
         cooler.sys_initial_state = sys_initial_state
         if new_run:
-            edm.new_run()
+            edm.new_run(f"filter function: {k}")
         new_run = True
-        # total_sim_time = 2.6
-        times = np.linspace(0.01, total_sim_time, 31)
-
-        which_ff = "one"
+        which_ff = k
         if which_ff == "lloyd":
             filter_function = get_lloyd_filter_function(
                 biga=1, beta=total_sim_time / 3, tau=total_sim_time / 2
@@ -300,98 +299,60 @@ def __main__(edm: ExperimentDataManager):
             filter_function = get_exp_filter_function(spectrum_width * 0.5)
         elif which_ff == "gaps":
             filter_function = get_fourier_gaps_filter_function(sys_eig_energies)
+
         elif which_ff == "one":
             filter_function = lambda x: 1
-
-        total_plot_times = []
-        total_fidelities = []
-        total_sys_energies = []
-        eig_components = []
-
-        total_env_energies = []
-        n_reps = 10
         last_plot_times = 0
 
         edm.var_dump(
             total_sim_time=total_sim_time,
-            n_reps=n_reps,
         )
 
-        for rep in range(n_reps):
+        (
+            plot_times,
+            fidelities,
+            sys_ev_energies,
+            env_ev_energies,
+            total_density_matrix,
+        ) = cooler.time_cool(
+            filter_function=filter_function,
+            times=times,
+            env_coupling=spectrum_width,
+            alpha=1,
+        )
 
-            (
-                plot_times,
-                fidelities,
-                sys_ev_energies,
-                env_ev_energies,
-                total_density_matrix,
-            ) = cooler.time_cool(
-                filter_function=filter_function,
-                times=times,
-                env_coupling=spectrum_width / 2,
-                alpha=1,
-            )
+        sys_density_matrix = cooler.partial_trace_wrapper(
+            rho=total_density_matrix, trace_out="env"
+        )
 
-            sys_density_matrix = cooler.partial_trace_wrapper(
-                rho=total_density_matrix, trace_out="env"
-            )
+        plot_times_repped = plot_times + last_plot_times
 
-            eig_components.append(
-                np.diag(
-                    sys_eig_states.T.conjugate() @ sys_density_matrix @ sys_eig_states
-                )
-            )
+        last_plot_times = plot_times_repped[-1]
 
-            plot_times_repped = plot_times + last_plot_times
-
-            total_plot_times.extend(plot_times_repped)
-            total_fidelities.extend(fidelities)
-            total_env_energies.extend(env_ev_energies)
-            total_sys_energies.extend(sys_ev_energies)
-
-            last_plot_times = plot_times_repped[-1]
-
-            cooler.sys_initial_state = cooler.partial_trace_wrapper(
-                total_density_matrix, trace_out="env"
-            )
-            if fidelities[-1] > 0.99:
-                break
+        cooler.sys_initial_state = cooler.partial_trace_wrapper(
+            total_density_matrix, trace_out="env"
+        )
 
         jobj = {
-            "rep": rep,
-            "total_plot_times": total_plot_times,
-            "total_fidelities": total_fidelities,
-            "total_sys_energies": total_sys_energies,
-            "total_env_energies": total_env_energies,
-            "eig_components": eig_components,
+            "plot_times": plot_times,
+            "fidelities": fidelities,
+            "sys_ev_energies": sys_ev_energies,
+            "env_ev_energies": env_ev_energies,
             "alphas": [filter_function(t) for t in times],
             "which_ff": which_ff,
         }
-
-        final_fids.append(total_fidelities[-1])
         edm.save_dict(jobj=jobj)
 
-        edm.var_dump(filter_function=filter_function.__name__)
+        edm.var_dump(which_ff=which_ff)
 
         fig = cooler.plot_time_cooling(
-            np.linspace(
-                0, n_reps * total_sim_time * len(couplers), len(total_fidelities)
-            ),
-            total_fidelities,
-            total_env_energies,
+            np.linspace(0, len(couplers) * total_sim_time, len(fidelities)),
+            fidelities,
+            env_ev_energies,
         )
         edm.save_figure(
             fig,
         )
-        plt.close()
-
-    fig, ax = plt.subplots()
-    ax.plot(total_times, final_fids)
-    ax.set_xlabel("Cooling step time")
-    ax.set_ylabel("Final fidelity")
-    edm.save_figure(
-        fig,
-    )
     plt.show()
 
 
@@ -399,7 +360,8 @@ if __name__ == "__main__":
     # whether we want to skip all saving data
     dry_run = False
     edm = ExperimentDataManager(
-        experiment_name="time_dependent_coupler_cooling_loop_times",
+        experiment_name="time_dependent_coupler_cooling_evolution",
+        notes="using simple sum of free couplers",
         project="fermionic cooling",
         dry_run=dry_run,
     )
