@@ -36,7 +36,7 @@ def plot_comparison_fast_sweep(
     for ind, jobj in enumerate((jobj_with, jobj_wout)):
         axes[0].plot(
             jobj["omegas"][0],
-            jobj["fidelities"][0],
+            1 - np.array(jobj["fidelities"][0]),
             color=colors[ind],
             label=labels[ind],
         )
@@ -74,7 +74,7 @@ def plot_comparison_fast_sweep(
     axes[1].set_yscale("log")
     axes[1].invert_xaxis()
 
-    axes[0].set_ylabel("Fidelity")
+    axes[0].set_ylabel("Infidelity")
     axes[1].set_xlabel("$\omega$")
     axes[0].legend()
 

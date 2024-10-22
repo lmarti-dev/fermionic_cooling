@@ -4,7 +4,7 @@ import os
 
 import matplotlib.pyplot as plt
 from cooler_class import Cooler
-from json_extender import ExtendedJSONDecoder
+from data_manager import ExtendedJSONDecoder
 from openfermion import get_sparse_operator
 
 from data_manager import ExperimentDataManager
@@ -28,8 +28,7 @@ def show_if_dry(dry_run: bool):
 
 def get_spectrum(x, y, tunneling, coulomb, n_electrons):
     model = FermiHubbardModel(
-        x_dimension=x,
-        y_dimension=y,
+        lattice_dimensions=(2, 2),
         n_electrons=n_electrons,
         tunneling=tunneling,
         coulomb=coulomb,

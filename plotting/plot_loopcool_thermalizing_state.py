@@ -1,7 +1,7 @@
 from fauplotstyle.styler import style
 import json
 import io
-from json_extender import ExtendedJSONDecoder
+from data_manager import ExtendedJSONDecoder
 import matplotlib.pyplot as plt
 from data_manager import ExperimentDataManager
 import numpy as np

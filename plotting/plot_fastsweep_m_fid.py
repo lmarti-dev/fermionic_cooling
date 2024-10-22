@@ -1,4 +1,4 @@
-from json_extender import ExtendedJSONDecoder
+from data_manager import ExtendedJSONDecoder
 from data_manager import ExperimentDataManager
 import json
 import os
@@ -47,32 +47,32 @@ def plot_fast_sweep_vs_m(dirname, max_sweep_fid=None):
     ms = np.arange(0, len(final_fids[:, 0]))
     ax.plot(
         ms,
-        final_fids[:, 0],
+        1 - final_fids[:, 0],
         marker="x",
         label="With fast sweep",
     )
     ax.plot(
         ms,
-        final_fids[:, 1],
+        1 - final_fids[:, 1],
         marker="d",
         label="Without fast sweep",
     )
 
     if max_sweep_fid is not None:
         ax.hlines(
-            max_sweep_fid,
+            1 - max_sweep_fid,
             ms[0],
             ms[-1],
             "r",
-            label="Adiabatic sweep",
+            label="Slow sweep",
             linestyles="dashed",
         )
 
-    ax.set_ylabel("Final fidelity")
+    ax.set_ylabel("Final infidelity")
     ax.set_xlabel(r"$d_c$")
     ax.xaxis.set_major_locator(MaxNLocator(integer=True))
 
-    ax.legend(loc="center right", bbox_to_anchor=(1, 0.3))
+    ax.legend()
     return fig
 
 

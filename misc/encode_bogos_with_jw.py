@@ -110,7 +110,7 @@ def plot_bogo_jw_coefficients(total_coefficients, max_pauli_strs):
 
     fig, ax = plt.subplots()
     markers = "xdos1^+"
-    cmap = plt.get_cmap("faucmap", len(total_coefficients))
+    cmap = plt.get_cmap("fau_cmap", len(total_coefficients))
     for ind, coeffs in enumerate(total_coefficients):
         ax.plot(
             list(range(1, len(coeffs) + 1)),

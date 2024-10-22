@@ -4,7 +4,7 @@ import os
 
 import matplotlib.pyplot as plt
 import numpy as np
-from json_extender import ExtendedJSONDecoder
+from data_manager import ExtendedJSONDecoder
 from utils import get_most_recent_timestamped_files
 
 from data_manager import ExperimentDataManager
