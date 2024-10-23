@@ -61,7 +61,7 @@ def get_cheat_thermalizers(
         return couplers
 
 
-def get_cheat_couplers(
+def get_proj_couplers(
     sys_eig_states,
     env_eig_states,
     qubits: list[cirq.Qid] = None,
