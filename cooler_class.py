@@ -886,6 +886,7 @@ class Cooler:
                 n_qubits=len(self.sys_qubits),
                 n_electrons=self.n_electrons,
                 is_noise_spin_conserving=is_noise_spin_conserving,
+                expanded=not self.subspace_simulation,
             )
         self.electron_number_message(traced_density_matrix)
 
@@ -1059,12 +1060,14 @@ class Cooler:
             slice_size = int(len(omegas) / n_rep)
             for rep in range(n_rep):
                 idx = slice(rep * slice_size, (rep + 1) * slice_size)
-                axes[0].plot(omegas[idx], fidelities[idx], color=cmap(rep))
+                axes[0].plot(
+                    omegas[idx], 1 - np.array(fidelities[idx]), color=cmap(rep)
+                )
                 axes[1].plot(omegas[idx], env_energies[idx], color=cmap(rep))
         else:
             axes[0].plot(omegas, fidelities)
             axes[1].plot(omegas, env_energies)
-        axes[0].set_ylabel("Fidelity")
+        axes[0].set_ylabel("Infidelity")
         axes[1].set_ylabel(r"$E_F$")
         axes[1].set_xlabel(r"$\omega$")
         axes[1].invert_xaxis()

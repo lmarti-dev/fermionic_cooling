@@ -44,6 +44,25 @@ from qutlet.utilities import (
 # Some of them are a bit less trivial
 
 
+
+def pauli_mask_to_pstr(pauli_mask: np.array, qubits):
+    d = {0: "I", 1: "X", 2: "Y", 3: "Z"}
+    qubits_ind = [q.x for q in qubits]
+    sorted_qubs = np.argsort(qubits_ind)
+
+    return "".join(f"{d[pauli_mask[ind]]}_{qubits_ind[ind]}" for ind in sorted_qubs)
+
+
+def get_thermal_weights(beta: float, sys_eig_energies: np.ndarray, max_k=None):
+    if max_k is None:
+        weights = [np.exp(-beta * x) for x in sys_eig_energies[1:]]
+    elif isinstance(max_k, list):
+        weights = [np.exp(-beta * x) for x in sys_eig_energies[max_k]]
+    elif isinstance(max_k, int):
+        weights = [np.exp(-beta * x) for x in sys_eig_energies[1 : max_k + 1]]
+    return np.array(weights) / np.sum(weights)
+
+
 def get_closest_noninteracting_degenerate_ground_state(
     model: FermiHubbardModel, n_qubits: int, n_electrons: list
 ):
@@ -158,6 +177,7 @@ def add_depol_noise(
     n_qubits: int,
     n_electrons: list,
     is_noise_spin_conserving: bool = False,
+    expanded: bool = True,
 ):
     if depol_noise is None:
         # return the matrix
@@ -165,7 +185,7 @@ def add_depol_noise(
 
     if is_noise_spin_conserving:
         rho_err = spin_dicke_mixed_state(
-            n_qubits=n_qubits, n_electrons=n_electrons, expanded=True
+            n_qubits=n_qubits, n_electrons=n_electrons, expanded=expanded
         )
     else:
         rho_err = np.eye(N=len(rho)) / len(rho)
@@ -649,7 +669,7 @@ def get_extrapolated_superposition(
     return eigenstates[:, indices] @ np.array(coefficients)
 
 
-def dense_restricted_ham(ham: FermionOperator, n_electrons: list, n_qubits: int):
+def dense_subspace_hamiltonian(ham: FermionOperator, n_electrons: list, n_qubits: int):
     return jw_spin_restrict_operator(
         get_sparse_operator(ham),
         particle_number=n_electrons,

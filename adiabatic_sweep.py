@@ -204,6 +204,7 @@ def run_sweep(
                 n_qubits=n_qubits,
                 n_electrons=n_electrons,
                 is_noise_spin_conserving=is_noise_spin_conserving,
+                expanded=not subspace_simulation,
             )
 
         if get_populations:
@@ -241,7 +242,8 @@ def run_sweep(
             instant_fidelities.append(instant_fid)
 
         print(
-            f"step {ind}: fid: {fid:.4f} init. inst. fid: {instant_fid:.4f}", end="\r"
+            f"step {ind}: fid: {fid:.4f} init. inst. fid: {instant_fid:.4f}",
+            end="\r",
         )
     if get_populations:
         return fidelities, instant_fidelities, final_ground_state, populations, state
