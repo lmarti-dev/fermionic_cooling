@@ -44,7 +44,6 @@ from qutlet.utilities import (
 # Some of them are a bit less trivial
 
 
-
 def pauli_mask_to_pstr(pauli_mask: np.array, qubits):
     d = {0: "I", 1: "X", 2: "Y", 3: "Z"}
     qubits_ind = [q.x for q in qubits]
@@ -103,7 +102,7 @@ def get_closest_state(
             return comp_states[:, ind], int(ind)
         fidelities.append(fid)
     max_ind = np.argmax(fidelities)
-    print(f"degenerate fidelities: {fidelities}, max: {max_ind}")
+    print(f"degenerate fidelities: {len(fidelities)}, max: {max_ind}")
     return comp_states[:, max_ind], int(max_ind)
 
 
