@@ -672,6 +672,7 @@ class Cooler:
         alpha: float,
         times: list[float],
         env_coupling: float,
+        fidelity_threshold: float = 1,
     ):
 
         total_density_matrix = self.total_initial_state
@@ -726,6 +727,20 @@ class Cooler:
                     f"fid: {fidelities[-1]:.5f}, sys E: {sys_ev_energies[-1]:.3f}, env E: {env_ev_energies[-1]:.5f} alpha: {filter_function(time):.5f}",
                 )
                 self.print_msg()
+
+                if fidelities[-1] > fidelity_threshold:
+                    total_density_matrix = np.kron(
+                        traced_density_matrix, self.env_ground_density_matrix
+                    )
+
+                    return (
+                        np.array([0, *times]),
+                        fidelities,
+                        sys_ev_energies,
+                        env_ev_energies,
+                        total_density_matrix,
+                    )
+
         # putting the env back in the ground state
         # at the end of the simulation
         total_density_matrix = np.kron(
